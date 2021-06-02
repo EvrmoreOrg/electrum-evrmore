@@ -18,7 +18,7 @@ cache:
 script:
     - tox
 after_success:
-    - if [ "$TRAVIS_BRANCH" = "master" ]; then pip install requests && contrib/push_locale; fi
+    - if [ "$TRAVIS_BRANCH" = "master" ]; then pip install requests; fi # && contrib/push_locale; fi
     - coveralls
 jobs:
   include:
@@ -70,7 +70,7 @@ jobs:
       services:
         - docker
       install:
-        - pip install requests && ./contrib/pull_locale
+        - pip install requests # && ./contrib/pull_locale
         - ./contrib/make_packages
         - sudo docker build --no-cache -t electrum-android-builder-img contrib/android
       script:

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from aiorpcx import TaskGroup
 
-from . import bitcoin
+from . import ravencoin
 from .constants import BIP39_WALLET_FORMATS
 from .bip32 import BIP32_PRIME, BIP32Node
 from .bip32 import convert_bip32_path_to_list_of_uint32 as bip32_str_to_ints
@@ -51,9 +51,9 @@ async def account_has_history(network: 'Network', account_node: BIP32Node, scrip
         for address_index in range(gap_limit):
             address_node = account_node.subkey_at_public_derivation("0/" + str(address_index))
             pubkey = address_node.eckey.get_public_key_hex()
-            address = bitcoin.pubkey_to_address(script_type, pubkey)
-            script = bitcoin.address_to_script(address)
-            scripthash = bitcoin.script_to_scripthash(script)
+            address = ravencoin.pubkey_to_address(script_type, pubkey)
+            script = ravencoin.address_to_script(address)
+            scripthash = ravencoin.script_to_scripthash(script)
             get_history = network.get_history_for_scripthash(scripthash)
             get_history_tasks.append(await group.spawn(get_history))
     for task in get_history_tasks:

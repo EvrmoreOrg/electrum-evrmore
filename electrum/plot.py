@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as md
 
 from .i18n import _
-from .bitcoin import COIN
+from .ravencoin import COIN
 
 
 class NothingToPlotException(Exception):

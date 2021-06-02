@@ -81,18 +81,18 @@ class Exception_Window(BaseCrashReporter, QWidget, MessageBoxMixin, Logger):
                                                         "The report will be visible on the public issue tracker."))
         main_box.addWidget(self.description_textfield)
 
-        main_box.addWidget(QLabel(BaseCrashReporter.ASK_CONFIRM_SEND))
+        # main_box.addWidget(QLabel(BaseCrashReporter.ASK_CONFIRM_SEND))
 
         buttons = QHBoxLayout()
 
-        report_button = QPushButton(_('Send Bug Report'))
-        report_button.clicked.connect(self.send_report)
-        report_button.setIcon(read_QIcon("tab_send.png"))
-        buttons.addWidget(report_button)
+        # report_button = QPushButton(_('Send Bug Report'))
+        # report_button.clicked.connect(self.send_report)
+        # report_button.setIcon(read_QIcon("tab_send.png"))
+        # buttons.addWidget(report_button)
 
-        never_button = QPushButton(_('Never'))
-        never_button.clicked.connect(self.show_never)
-        buttons.addWidget(never_button)
+        # never_button = QPushButton(_('Never'))
+        # never_button.clicked.connect(self.show_never)
+        # buttons.addWidget(never_button)
 
         close_button = QPushButton(_('Not Now'))
         close_button.clicked.connect(self.close)

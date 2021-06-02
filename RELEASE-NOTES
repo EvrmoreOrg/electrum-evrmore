@@ -1,3 +1,6 @@
+# Release Ravencoin 0.3.0 - (May 21, 2021)
+ * Conversion to Ravencoin
+
 # Release 4.1.2 - (April 8, 2021)
  * Qt GUI:
     - fix some crashes when exiting (#6889)

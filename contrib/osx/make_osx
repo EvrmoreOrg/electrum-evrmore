@@ -3,8 +3,8 @@
 # Parameterize
 PYTHON_VERSION=3.7.10
 BUILDDIR=/tmp/electrum-build
-PACKAGE=Electrum
-GIT_REPO=https://github.com/spesmilo/electrum
+PACKAGE=Electrum-Ravencoin
+GIT_REPO=https://github.com/Electrum-RVN-SIG/electrum-ravencoin/
 
 export GCC_STRIP_BINARIES="1"
 
@@ -149,6 +149,15 @@ info "Installing dependencies specific to binaries..."
 python3 -m pip install --no-dependencies --no-warn-script-location -Ir ./contrib/deterministic-build/requirements-binaries-mac.txt \
     || fail "Could not install dependencies specific to binaries"
 
+info "Installing dependencies specific to ravencoin..."
+python3 -m pip install --no-dependencies --no-warn-script-location -Ir ./contrib/deterministic-build/requirements-ravencoin.txt \
+    || fail "Could not install dependencies specific to ravencoin"
+
+info "Installing dependencies specific to ravencoin binaries..."
+# We don't want to ignore installed packages
+python3 -m pip install --no-warn-script-location -r ./contrib/deterministic-build/requirements-ravencoin-binaries.txt \
+    || fail "Could not install dependencies specific to ravencoin binaries"
+
 info "Building $PACKAGE..."
 python3 -m pip install --no-dependencies --no-warn-script-location . > /dev/null || fail "Could not build $PACKAGE"
 
@@ -182,9 +191,9 @@ if [ ! -z "$CODESIGN_CERT" ]; then
 fi
 
 info "Creating .DMG"
-hdiutil create -fs HFS+ -volname $PACKAGE -srcfolder dist/$PACKAGE.app dist/electrum-$VERSION.dmg || fail "Could not create .DMG"
+hdiutil create -fs HFS+ -volname $PACKAGE -srcfolder dist/$PACKAGE.app dist/electrum-ravencoin-$VERSION.dmg || fail "Could not create .DMG"
 
-DoCodeSignMaybe ".DMG" "dist/electrum-${VERSION}.dmg"
+DoCodeSignMaybe ".DMG" "dist/electrum-ravencoin-${VERSION}.dmg"
 
 if [ -z "$CODESIGN_CERT" ]; then
     warn "App was built successfully but was not code signed. Users may get security warnings from macOS."

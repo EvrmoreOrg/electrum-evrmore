@@ -140,6 +140,7 @@ class RequestList(MyTreeView):
         status_item.setText(status_str)
         status_item.setIcon(read_QIcon(pr_icons.get(status)))
 
+    # TODO: Implement for assets
     def update(self):
         # not calling maybe_defer_update() as it interferes with conditional-visibility
         self.parent.update_receive_address_styling()
@@ -152,7 +153,7 @@ class RequestList(MyTreeView):
             status_str = req.get_status_str(status)
             request_type = req.type
             timestamp = req.time
-            amount = req.get_amount_sat()
+            amount = req.get_amount_sat().rvn_value
             message = req.message
             date = format_time(timestamp)
             amount_str = self.parent.format_amount(amount) if amount else ""
@@ -161,7 +162,7 @@ class RequestList(MyTreeView):
                 icon = read_QIcon("lightning.png")
                 tooltip = 'lightning request'
             else:
-                icon = read_QIcon("bitcoin.png")
+                icon = read_QIcon("ravencoin.png")
                 tooltip = 'onchain request'
             items = [QStandardItem(e) for e in labels]
             self.set_editability(items)
@@ -209,8 +210,8 @@ class RequestList(MyTreeView):
             menu.addAction(_("Copy Request"), lambda: self.parent.do_copy(req.invoice, title='Lightning Request'))
         else:
             URI = self.wallet.get_request_URI(req)
-            menu.addAction(_("Copy Request"), lambda: self.parent.do_copy(URI, title='Bitcoin URI'))
-            menu.addAction(_("Copy Address"), lambda: self.parent.do_copy(req.get_address(), title='Bitcoin Address'))
+            menu.addAction(_("Copy Request"), lambda: self.parent.do_copy(URI, title='ravencoin URI'))
+            menu.addAction(_("Copy Address"), lambda: self.parent.do_copy(req.get_address(), title='ravencoin Address'))
         #if 'view_url' in req:
         #    menu.addAction(_("View in web browser"), lambda: webopen(req['view_url']))
         menu.addAction(_("Delete"), lambda: self.parent.delete_requests([key]))

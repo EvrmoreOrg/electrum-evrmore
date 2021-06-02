@@ -9,13 +9,13 @@ import attr
 
 from .crypto import sha256, hash_160
 from .ecc import ECPrivkey
-from .bitcoin import (script_to_p2wsh, opcodes, p2wsh_nested_script, push_script,
-                      is_segwit_address, construct_witness)
+from .ravencoin import (script_to_p2wsh, opcodes, p2wsh_nested_script, push_script,
+                        is_segwit_address, construct_witness)
 from .transaction import PartialTxInput, PartialTxOutput, PartialTransaction
 from .transaction import script_GetOp, match_script_against_template, OPPushDataGeneric, OPPushDataPubkey
 from .util import log_exceptions
 from .lnutil import REDEEM_AFTER_DOUBLE_SPENT_DELAY, ln_dummy_address, LN_MAX_HTLC_VALUE_MSAT
-from .bitcoin import dust_threshold
+from .ravencoin import dust_threshold
 from .logging import Logger
 from .lnutil import hex_to_bytes
 from .json_db import StoredObject

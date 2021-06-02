@@ -20,12 +20,11 @@ from electrum.network import Network
 
 
 class UpdateCheck(QDialog, Logger):
-    url = "https://electrum.org/version"
-    download_url = "https://electrum.org/#download"
+    url = "https://raw.githubusercontent.com/Electrum-RVN-SIG/electrum-ravencoin/master/check-version.json"
+    download_url = "https://github.com/Electrum-RVN-SIG/electrum-ravencoin/releases"
 
     VERSION_ANNOUNCEMENT_SIGNING_KEYS = (
-        "13xjmVAB1EATPP8RshTE8S8sNwwSUM9p1P",  # ThomasV (since 3.3.4)
-        "1Nxgk6NTooV4qZsX5fdqQwrLjYcsQZAfTg",  # ghost43 (since 4.1.2)
+        "RPuQNvDVBC5Q4fXKyfYLjrunbyqiEYckP5",  # kralverde since ravencoin fork
     )
 
     def __init__(self, *, latest_version=None):
@@ -124,7 +123,7 @@ class UpdateCheckThread(QThread, Logger):
                     sig = base64.b64decode(sig)
                     msg = version_num.encode('utf-8')
                     if ecc.verify_message_with_address(address=address, sig65=sig, message=msg,
-                                                       net=constants.BitcoinMainnet):
+                                                       net=constants.RavencoinMainnet):
                         self.logger.info(f"valid sig for version announcement '{version_num}' from address '{address}'")
                         break
                 else:

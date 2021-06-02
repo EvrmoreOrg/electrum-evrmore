@@ -53,12 +53,12 @@ from . import x509
 from . import pem
 from . import version
 from . import blockchain
-from .blockchain import Blockchain, HEADER_SIZE
-from . import bitcoin
+from .blockchain import Blockchain, PRE_KAWPOW_HEADER_SIZE, POST_KAWPOW_HEADER_SIZE
+from . import ravencoin
 from . import constants
 from .i18n import _
 from .logging import Logger
-from .transaction import Transaction
+from .transaction import Transaction, AssetMeta
 
 if TYPE_CHECKING:
     from .network import Network
@@ -358,7 +358,7 @@ class Interface(Logger):
         assert network.config.path
         self.cert_path = _get_cert_path_for_host(config=network.config, host=self.host)
         self.blockchain = None  # type: Optional[Blockchain]
-        self._requested_chunks = set()  # type: Set[int]
+        self._requested_chunks = set()  # type: Set[Tuple[int, int]]
         self.network = network
         self.proxy = MySocksProxy.from_proxy_dict(proxy)
         self.session = None  # type: Optional[NotificationSession]
@@ -593,33 +593,40 @@ class Interface(Logger):
     async def request_chunk(self, height: int, tip=None, *, can_return_early=False):
         if not is_non_negative_integer(height):
             raise Exception(f"{repr(height)} is not a block height")
-        index = height // 2016
-        if can_return_early and index in self._requested_chunks:
+
+        ret = False
+        for mi, ma in self._requested_chunks:
+            if mi <= height < ma:
+                ret = True
+                break
+
+        if can_return_early and ret:
             return
         self.logger.info(f"requesting chunk from height {height}")
         size = 2016
         if tip is not None:
-            size = min(size, tip - index * 2016 + 1)
+            size = min(size, tip - height + 1)
             size = max(size, 0)
         try:
-            self._requested_chunks.add(index)
-            res = await self.session.send_request('blockchain.block.headers', [index * 2016, size])
+            self._requested_chunks.add((height, height + size))
+            res = await self.session.send_request('blockchain.block.headers', [height, size])
         finally:
-            self._requested_chunks.discard(index)
+            self._requested_chunks.discard((height, height + size))
         assert_dict_contains_field(res, field_name='count')
         assert_dict_contains_field(res, field_name='hex')
         assert_dict_contains_field(res, field_name='max')
         assert_non_negative_integer(res['count'])
         assert_non_negative_integer(res['max'])
         assert_hex_str(res['hex'])
-        if len(res['hex']) != HEADER_SIZE * 2 * res['count']:
+        if POST_KAWPOW_HEADER_SIZE * 2 * res['count'] < len(res['hex']) \
+                or len(res['hex']) < PRE_KAWPOW_HEADER_SIZE * 2 * res['count']:
             raise RequestCorrupted('inconsistent chunk hex and count')
         # we never request more than 2016 headers, but we enforce those fit in a single response
         if res['max'] < 2016:
             raise RequestCorrupted(f"server uses too low 'max' count for block.headers: {res['max']} < 2016")
         if res['count'] != size:
             raise RequestCorrupted(f"expected {size} headers but only got {res['count']}")
-        conn = self.blockchain.connect_chunk(index, res['hex'])
+        conn = self.blockchain.connect_chunk(height, res['hex'])
         if not conn:
             return conn, 0
         return conn, res['count']
@@ -747,7 +754,7 @@ class Interface(Logger):
                     last, height = await self.step(height)
                     continue
                 util.trigger_callback('network_updated')
-                height = (height // 2016 * 2016) + num_headers
+                height = height + num_headers
                 assert height <= next_height+1, (height, self.tip)
                 last = 'catchup'
             else:
@@ -844,8 +851,8 @@ class Interface(Logger):
         async def iterate():
             nonlocal height, header
             checkp = False
-            if height <= constants.net.max_checkpoint():
-                height = constants.net.max_checkpoint()
+            if height <= 0:
+                height = 0
                 checkp = True
             header = await self.get_block_header(height, 'backward')
             chain = blockchain.check_header(header) if 'mock' not in header else header['mock']['check'](header)
@@ -853,7 +860,7 @@ class Interface(Logger):
             if chain or can_connect:
                 return False
             if checkp:
-                raise GracefulDisconnect("server chain conflicts with checkpoints")
+                raise GracefulDisconnect("server chain is invalid")
             return True
 
         bad, bad_header = height, header
@@ -1053,9 +1060,9 @@ class Interface(Logger):
         # check response
         if not res:  # ignore empty string
             return ''
-        if not bitcoin.is_address(res):
+        if not ravencoin.is_address(res):
             # note: do not hard-fail -- allow server to use future-type
-            #       bitcoin address we do not recognize
+            #       ravencoin address we do not recognize
             self.logger.info(f"invalid donation address from server: {repr(res)}")
             res = ''
         return res
@@ -1066,7 +1073,7 @@ class Interface(Logger):
         res = await self.session.send_request('blockchain.relayfee')
         # check response
         assert_non_negative_int_or_float(res)
-        relayfee = int(res * bitcoin.COIN)
+        relayfee = int(res * ravencoin.COIN)
         relayfee = max(0, relayfee)
         return relayfee
 
@@ -1081,7 +1088,7 @@ class Interface(Logger):
         # check response
         if res != -1:
             assert_non_negative_int_or_float(res)
-            res = int(res * bitcoin.COIN)
+            res = int(res * ravencoin.COIN)
         return res
 
 

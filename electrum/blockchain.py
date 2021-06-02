@@ -20,67 +20,164 @@
 # ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+import sys
 import os
 import threading
 import time
+import struct
 from typing import Optional, Dict, Mapping, Sequence
 
 from . import util
-from .bitcoin import hash_encode, int_to_hex, rev_hex
+from .ravencoin import hash_encode, int_to_hex, rev_hex
 from .crypto import sha256d
 from . import constants
 from .util import bfh, bh2u, with_lock
 from .simple_config import SimpleConfig
 from .logging import get_logger, Logger
 
+try:
+    import x16r_hash
+    import x16rv2_hash
+    import kawpow
+except ImportError as e:
+    sys.exit("x16r, x16rv2 and kawpow modules are required")
 
 _logger = get_logger(__name__)
 
-HEADER_SIZE = 80  # bytes
-MAX_TARGET = 0x00000000FFFF0000000000000000000000000000000000000000000000000000
+MAX_TARGET = 0x00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+KAWPOW_LIMIT = 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+POST_KAWPOW_HEADER_SIZE = 120  # bytes
+PRE_KAWPOW_HEADER_SIZE = 80
+
+DGW_PASTBLOCKS = 180
+
+if constants.net.TESTNET:
+    X16Rv2ActivationTS = 1567533600
+    KawpowActivationTS = 1585159200
+    KawpowActivationHeight = 231544
+    nDGWActivationBlock = 1
+else:
+    X16Rv2ActivationTS = 1569945600
+    KawpowActivationTS = 1588788000
+    KawpowActivationHeight = 1219736
+    nDGWActivationBlock = 338778
+
+
+def set_constants():
+    global X16Rv2ActivationTS, KawpowActivationTS, KawpowActivationHeight, nDGWActivationBlock
+    if constants.net.TESTNET:
+        X16Rv2ActivationTS = 1567533600
+        KawpowActivationTS = 1585159200
+        KawpowActivationHeight = 231544
+        nDGWActivationBlock = 1
+    else:
+        X16Rv2ActivationTS = 1569945600
+        KawpowActivationTS = 1588788000
+        KawpowActivationHeight = 1219736
+        nDGWActivationBlock = 338778
 
 
 class MissingHeader(Exception):
     pass
 
+
 class InvalidHeader(Exception):
     pass
 
+
 def serialize_header(header_dict: dict) -> str:
-    s = int_to_hex(header_dict['version'], 4) \
-        + rev_hex(header_dict['prev_block_hash']) \
-        + rev_hex(header_dict['merkle_root']) \
-        + int_to_hex(int(header_dict['timestamp']), 4) \
-        + int_to_hex(int(header_dict['bits']), 4) \
-        + int_to_hex(int(header_dict['nonce']), 4)
+    ts = header_dict['timestamp']
+    if ts >= KawpowActivationTS:
+        s = int_to_hex(header_dict['version'], 4) \
+            + rev_hex(header_dict['prev_block_hash']) \
+            + rev_hex(header_dict['merkle_root']) \
+            + int_to_hex(int(header_dict['timestamp']), 4) \
+            + int_to_hex(int(header_dict['bits']), 4) \
+            + int_to_hex(int(header_dict['nheight']), 4) \
+            + int_to_hex(int(header_dict['nonce']), 8) \
+            + rev_hex(header_dict['mix_hash'])
+    else:
+        s = int_to_hex(header_dict['version'], 4) \
+            + rev_hex(header_dict['prev_block_hash']) \
+            + rev_hex(header_dict['merkle_root']) \
+            + int_to_hex(int(header_dict['timestamp']), 4) \
+            + int_to_hex(int(header_dict['bits']), 4) \
+            + int_to_hex(int(header_dict['nonce']), 4)
+        s = s.ljust(POST_KAWPOW_HEADER_SIZE * 2, '0')  # pad with zeros to post kawpow header size
     return s
+
 
 def deserialize_header(s: bytes, height: int) -> dict:
     if not s:
         raise InvalidHeader('Invalid header: {}'.format(s))
-    if len(s) != HEADER_SIZE:
+    if len(s) not in (POST_KAWPOW_HEADER_SIZE, PRE_KAWPOW_HEADER_SIZE):
         raise InvalidHeader('Invalid header length: {}'.format(len(s)))
-    hex_to_int = lambda s: int.from_bytes(s, byteorder='little')
-    h = {}
-    h['version'] = hex_to_int(s[0:4])
-    h['prev_block_hash'] = hash_encode(s[4:36])
-    h['merkle_root'] = hash_encode(s[36:68])
-    h['timestamp'] = hex_to_int(s[68:72])
-    h['bits'] = hex_to_int(s[72:76])
-    h['nonce'] = hex_to_int(s[76:80])
+
+    def hex_to_int(hex):
+        return int.from_bytes(hex, byteorder='little')
+
+    h = {'version': hex_to_int(s[0:4]),
+         'prev_block_hash': hash_encode(s[4:36]),
+         'merkle_root': hash_encode(s[36:68]),
+         'timestamp': int(hash_encode(s[68:72]), 16),
+         'bits': int(hash_encode(s[72:76]), 16)}
+    if h['timestamp'] >= KawpowActivationTS:
+        h['nheight'] = int(hash_encode(s[76:80]), 16)
+        h['nonce'] = int(hash_encode(s[80:88]), 16)
+        h['mix_hash'] = hash_encode(s[88:120])
+    else:
+        h['nonce'] = int(hash_encode(s[76:80]), 16)
     h['block_height'] = height
     return h
+
 
 def hash_header(header: dict) -> str:
     if header is None:
         return '0' * 64
     if header.get('prev_block_hash') is None:
-        header['prev_block_hash'] = '00'*32
-    return hash_raw_header(serialize_header(header))
+        header['prev_block_hash'] = '00' * 32
+    if header['timestamp'] >= KawpowActivationTS:
+        return hash_raw_header_kawpow(serialize_header(header))
+    elif header['timestamp'] >= X16Rv2ActivationTS:
+        hdr = serialize_header(header)[:80 * 2]
+        h = hash_raw_header_v2(hdr)
+        return h
+    else:
+        hdr = serialize_header(header)[:80 * 2]
+        h = hash_raw_header(hdr)
+        return h
 
 
 def hash_raw_header(header: str) -> str:
-    return hash_encode(sha256d(bfh(header)))
+    raw_hash = x16r_hash.getPoWHash(bfh(header)[:80])
+    hash_result = hash_encode(raw_hash)
+    return hash_result
+
+
+def hash_raw_header_v2(header: str) -> str:
+    raw_hash = x16rv2_hash.getPoWHash(bfh(header)[:80])
+    hash_result = hash_encode(raw_hash)
+    return hash_result
+
+
+def revb(data):
+    b = bytearray(data)
+    b.reverse()
+    return bytes(b)
+
+
+def kawpow_hash(hdr_bin):
+    header_hash = revb(sha256d(hdr_bin[:80]))
+    mix_hash = revb(hdr_bin[88:120])
+    nNonce64 = struct.unpack("< Q", hdr_bin[80:88])[0]
+    final_hash = revb(kawpow.light_verify(header_hash, mix_hash, nNonce64))
+    return final_hash
+
+
+def hash_raw_header_kawpow(header: str) -> str:
+    final_hash = hash_encode(kawpow_hash(bfh(header)))
+    return final_hash
 
 
 # key: blockhash hex at forkpoint
@@ -98,7 +195,7 @@ def read_blockchains(config: 'SimpleConfig'):
     blockchains[constants.net.GENESIS] = best_chain
     # consistency checks
     if best_chain.height() > constants.net.max_checkpoint():
-        header_after_cp = best_chain.read_header(constants.net.max_checkpoint()+1)
+        header_after_cp = best_chain.read_header(constants.net.max_checkpoint() + 1)
         if not header_after_cp or not best_chain.can_connect(header_after_cp, check_height=False):
             _logger.info("[blockchain] deleting best chain. cannot connect header after last cp to last cp.")
             os.unlink(best_chain.path())
@@ -117,8 +214,8 @@ def read_blockchains(config: 'SimpleConfig'):
     def instantiate_chain(filename):
         __, forkpoint, prev_hash, first_hash = filename.split('_')
         forkpoint = int(forkpoint)
-        prev_hash = (64-len(prev_hash)) * "0" + prev_hash  # left-pad with zeroes
-        first_hash = (64-len(first_hash)) * "0" + first_hash
+        prev_hash = (64 - len(prev_hash)) * "0" + prev_hash  # left-pad with zeroes
+        first_hash = (64 - len(first_hash)) * "0" + first_hash
         # forks below the max checkpoint are not allowed
         if forkpoint <= constants.net.max_checkpoint():
             delete_chain(filename, "deleting fork below max checkpoint")
@@ -154,6 +251,7 @@ def read_blockchains(config: 'SimpleConfig'):
 def get_best_chain() -> 'Blockchain':
     return blockchains[constants.net.GENESIS]
 
+
 # block hash -> chain work; up to and including that block
 _CHAINWORK_CACHE = {
     "0000000000000000000000000000000000000000000000000000000000000000": 0,  # virtual block at height -1
@@ -163,12 +261,9 @@ _CHAINWORK_CACHE = {
 def init_headers_file_for_best_chain():
     b = get_best_chain()
     filename = b.path()
-    length = HEADER_SIZE * len(constants.net.CHECKPOINTS) * 2016
-    if not os.path.exists(filename) or os.path.getsize(filename) < length:
+    if not os.path.exists(filename):
         with open(filename, 'wb') as f:
-            if length > 0:
-                f.seek(length - 1)
-                f.write(b'\x00')
+            pass
         util.ensure_sparse_file(filename)
     with b.lock:
         b.update_size()
@@ -212,7 +307,7 @@ class Blockchain(Logger):
 
     def get_direct_children(self) -> Sequence['Blockchain']:
         with blockchains_lock:
-            return list(filter(lambda y: y.parent==self, blockchains.values()))
+            return list(filter(lambda y: y.parent == self, blockchains.values()))
 
     def get_parent_heights(self) -> Mapping['Blockchain', int]:
         """Returns map: (parent chain -> height of last common block)"""
@@ -266,7 +361,7 @@ class Blockchain(Logger):
                           forkpoint=forkpoint,
                           parent=parent,
                           forkpoint_hash=hash_header(header),
-                          prev_hash=parent.get_hash(forkpoint-1))
+                          prev_hash=parent.get_hash(forkpoint - 1))
         self.assert_headers_file_available(parent.path())
         open(self.path(), 'w+').close()
         self.save_header(header)
@@ -288,10 +383,10 @@ class Blockchain(Logger):
     @with_lock
     def update_size(self) -> None:
         p = self.path()
-        self._size = os.path.getsize(p)//HEADER_SIZE if os.path.exists(p) else 0
+        self._size = os.path.getsize(p) // POST_KAWPOW_HEADER_SIZE if os.path.exists(p) else 0
 
     @classmethod
-    def verify_header(cls, header: dict, prev_hash: str, target: int, expected_header_hash: str=None) -> None:
+    def verify_header(cls, header: dict, prev_hash: str, target: int, expected_header_hash: str = None) -> None:
         _hash = hash_header(header)
         if expected_header_hash and expected_header_hash != _hash:
             raise Exception("hash mismatches with expected: {} vs {}".format(expected_header_hash, _hash))
@@ -302,23 +397,46 @@ class Blockchain(Logger):
         bits = cls.target_to_bits(target)
         if bits != header.get('bits'):
             raise Exception("bits mismatch: %s vs %s" % (bits, header.get('bits')))
-        block_hash_as_num = int.from_bytes(bfh(_hash), byteorder='big')
-        if block_hash_as_num > target:
-            raise Exception(f"insufficient proof of work: {block_hash_as_num} vs target {target}")
+        if header['timestamp'] >= KawpowActivationTS:
+            hash_func = kawpow_hash
+        elif header['timestamp'] >= X16Rv2ActivationTS:
+            hash_func = x16rv2_hash.getPoWHash
+        else:
+            hash_func = x16r_hash.getPoWHash
+        _powhash = rev_hex(bh2u(hash_func(bfh(serialize_header(header)))))
+        if int('0x' + _powhash, 16) > target:
+            raise Exception("insufficient proof of work: %s vs target %s" % (int('0x' + _powhash, 16), target))
 
-    def verify_chunk(self, index: int, data: bytes) -> None:
-        num = len(data) // HEADER_SIZE
-        start_height = index * 2016
+    def verify_chunk(self, start_height: int, data: bytes) -> None:
+
+        def get_headers():
+            r = []
+            p = 0
+            s = start_height
+            while p < len(data):
+                if s < KawpowActivationHeight:
+                    r.append(data[p:p + PRE_KAWPOW_HEADER_SIZE])
+                    p += PRE_KAWPOW_HEADER_SIZE
+                else:
+                    r.append(data[p:p + POST_KAWPOW_HEADER_SIZE])
+                    p += POST_KAWPOW_HEADER_SIZE
+                s += 1
+            if len(r[-1]) not in (POST_KAWPOW_HEADER_SIZE, PRE_KAWPOW_HEADER_SIZE):
+                raise Exception('Invalid header length: {}'.format(len(r[-1])))
+            return r
+
         prev_hash = self.get_hash(start_height - 1)
-        target = self.get_target(index-1)
-        for i in range(num):
+        raw_headers = get_headers()
+        headers = {}
+        for i, raw_header in enumerate(raw_headers):
             height = start_height + i
             try:
                 expected_header_hash = self.get_hash(height)
             except MissingHeader:
                 expected_header_hash = None
-            raw_header = data[i*HEADER_SIZE : (i+1)*HEADER_SIZE]
-            header = deserialize_header(raw_header, index*2016 + i)
+            header = deserialize_header(raw_header, start_height + i)
+            headers[header.get('block_height')] = header
+            target = self.get_target(start_height + i, headers)
             self.verify_header(header, prev_hash, target, expected_header_hash)
             prev_hash = hash_header(header)
 
@@ -336,24 +454,43 @@ class Blockchain(Logger):
         return os.path.join(d, filename)
 
     @with_lock
-    def save_chunk(self, index: int, chunk: bytes):
-        assert index >= 0, index
-        chunk_within_checkpoint_region = index < len(self.checkpoints)
+    def save_chunk(self, start_height: int, chunk: bytes):
+        assert start_height >= 0, start_height
+        chunk_within_checkpoint_region = start_height < nDGWActivationBlock
         # chunks in checkpoint region are the responsibility of the 'main chain'
         if chunk_within_checkpoint_region and self.parent is not None:
             main_chain = get_best_chain()
-            main_chain.save_chunk(index, chunk)
+            main_chain.save_chunk(start_height, chunk)
             return
 
-        delta_height = (index * 2016 - self.forkpoint)
-        delta_bytes = delta_height * HEADER_SIZE
+        delta_height = (start_height - self.forkpoint)
+        delta_bytes = delta_height * POST_KAWPOW_HEADER_SIZE
         # if this chunk contains our forkpoint, only save the part after forkpoint
         # (the part before is the responsibility of the parent)
         if delta_bytes < 0:
             chunk = chunk[-delta_bytes:]
             delta_bytes = 0
         truncate = not chunk_within_checkpoint_region
+
+        def convert_to_kawpow_len():
+            r = b''
+            p = 0
+            s = start_height
+            while p < len(chunk):
+                if s < KawpowActivationHeight:
+                    r += chunk[p:p + PRE_KAWPOW_HEADER_SIZE] + bytes(40)
+                    p += PRE_KAWPOW_HEADER_SIZE
+                else:
+                    r += chunk[p:p + POST_KAWPOW_HEADER_SIZE]
+                    p += POST_KAWPOW_HEADER_SIZE
+                s += 1
+            if len(r) % POST_KAWPOW_HEADER_SIZE != 0:
+                raise Exception('Header extension error')
+            return r
+
+        chunk = convert_to_kawpow_len()
         self.write(chunk, delta_bytes, truncate)
+        assert self.read_header(start_height) == deserialize_header(chunk[:120], start_height)
         self.swap_with_parent()
 
     def swap_with_parent(self) -> None:
@@ -399,14 +536,15 @@ class Blockchain(Logger):
         assert forkpoint > parent.forkpoint, (f"forkpoint of parent chain ({parent.forkpoint}) "
                                               f"should be at lower height than children's ({forkpoint})")
         with open(parent.path(), 'rb') as f:
-            f.seek((forkpoint - parent.forkpoint)*HEADER_SIZE)
-            parent_data = f.read(parent_branch_size*HEADER_SIZE)
+            f.seek((forkpoint - parent.forkpoint) * POST_KAWPOW_HEADER_SIZE)
+            parent_data = f.read(parent_branch_size * POST_KAWPOW_HEADER_SIZE)
         self.write(parent_data, 0)
-        parent.write(my_data, (forkpoint - parent.forkpoint)*HEADER_SIZE)
+        parent.write(my_data, (forkpoint - parent.forkpoint) * POST_KAWPOW_HEADER_SIZE)
         # swap parameters
         self.parent, parent.parent = parent.parent, self  # type: Optional[Blockchain], Optional[Blockchain]
         self.forkpoint, parent.forkpoint = parent.forkpoint, self.forkpoint
-        self._forkpoint_hash, parent._forkpoint_hash = parent._forkpoint_hash, hash_raw_header(bh2u(parent_data[:HEADER_SIZE]))
+        self._forkpoint_hash, parent._forkpoint_hash = parent._forkpoint_hash, hash_raw_header(
+            bh2u(parent_data[:POST_KAWPOW_HEADER_SIZE]))
         self._prev_hash, parent._prev_hash = parent._prev_hash, self._prev_hash
         # parent's new name
         os.replace(child_old_name, parent.path())
@@ -431,11 +569,11 @@ class Blockchain(Logger):
             raise FileNotFoundError('Cannot find headers file but headers_dir is there. Should be at {}'.format(path))
 
     @with_lock
-    def write(self, data: bytes, offset: int, truncate: bool=True) -> None:
+    def write(self, data: bytes, offset: int, truncate: bool = True) -> None:
         filename = self.path()
         self.assert_headers_file_available(filename)
         with open(filename, 'rb+') as f:
-            if truncate and offset != self._size * HEADER_SIZE:
+            if truncate and offset != self._size * POST_KAWPOW_HEADER_SIZE:
                 f.seek(offset)
                 f.truncate()
             f.seek(offset)
@@ -450,8 +588,8 @@ class Blockchain(Logger):
         data = bfh(serialize_header(header))
         # headers are only _appended_ to the end:
         assert delta == self.size(), (delta, self.size())
-        assert len(data) == HEADER_SIZE
-        self.write(data, delta*HEADER_SIZE)
+        assert len(data) == POST_KAWPOW_HEADER_SIZE
+        self.write(data, delta * POST_KAWPOW_HEADER_SIZE)
         self.swap_with_parent()
 
     @with_lock
@@ -466,11 +604,11 @@ class Blockchain(Logger):
         name = self.path()
         self.assert_headers_file_available(name)
         with open(name, 'rb') as f:
-            f.seek(delta * HEADER_SIZE)
-            h = f.read(HEADER_SIZE)
-            if len(h) < HEADER_SIZE:
+            f.seek(delta * POST_KAWPOW_HEADER_SIZE)
+            h = f.read(POST_KAWPOW_HEADER_SIZE)
+            if len(h) < POST_KAWPOW_HEADER_SIZE:
                 raise Exception('Expected to read a full header. This was only {} bytes'.format(len(h)))
-        if h == bytes([0])*HEADER_SIZE:
+        if h == bytes([0]) * POST_KAWPOW_HEADER_SIZE:
             return None
         return deserialize_header(h, height)
 
@@ -495,8 +633,8 @@ class Blockchain(Logger):
 
     def get_hash(self, height: int) -> str:
         def is_height_checkpoint():
-            within_cp_range = height <= constants.net.max_checkpoint()
-            at_chunk_boundary = (height+1) % 2016 == 0
+            within_cp_range = height <= nDGWActivationBlock
+            at_chunk_boundary = (height + 1) % 2016 == 0
             return within_cp_range and at_chunk_boundary
 
         if height == -1:
@@ -513,40 +651,108 @@ class Blockchain(Logger):
                 raise MissingHeader(height)
             return hash_header(header)
 
-    def get_target(self, index: int) -> int:
-        # compute target from chunk x, used in chunk x+1
+    def get_target(self, height: int, chain=None) -> int:
         if constants.net.TESTNET:
             return 0
-        if index == -1:
-            return MAX_TARGET
-        if index < len(self.checkpoints):
-            h, t = self.checkpoints[index]
+        # Before we switched to Dark Wave Gravity Difficulty,
+        # We used bitcoin's method of calculating difficulty.
+        # The bits of each block (the difficulty) was the same for
+        # The entire 2016 block checkpoint. Note that the last block hash to target
+        # pairing in checkpoints.json
+        # "000000000000f0bf1b393ef1dbbf23421eba2ad09de6315dcfaabe106fcf9e7a",
+        # 2716428330192056873911465544471964056901126523302699863524769792
+        # is technically incorrect but necessary due to DGW activating
+        # in the middle of that chunk.
+        elif height < nDGWActivationBlock:
+            h, t = self.checkpoints[height // 2016]
             return t
-        # new target
-        first = self.read_header(index * 2016)
-        last = self.read_header(index * 2016 + 2015)
-        if not first or not last:
-            raise MissingHeader()
-        bits = last.get('bits')
-        target = self.bits_to_target(bits)
-        nActualTimespan = last.get('timestamp') - first.get('timestamp')
-        nTargetTimespan = 14 * 24 * 60 * 60
-        nActualTimespan = max(nActualTimespan, nTargetTimespan // 4)
-        nActualTimespan = min(nActualTimespan, nTargetTimespan * 4)
-        new_target = min(MAX_TARGET, (target * nActualTimespan) // nTargetTimespan)
-        # not any target can be represented in 32 bits:
-        new_target = self.bits_to_target(self.target_to_bits(new_target))
-        return new_target
+        # There was a difficulty reset for kawpow
+        elif not constants.net.TESTNET and height in range(1219736, 1219736 + 180):  # kawpow reset
+            return KAWPOW_LIMIT
+        # If we have a DWG header already saved to our header cache (i.e. for a reorg), get that
+        elif height <= self.height():
+            return self.bits_to_target(self.read_header(height)['bits'])
+        else:
+            # Now we no longer have cached checkpoints and need to compute our own DWG targets to verify
+            # a header
+            return self.get_target_dgwv3(height, chain)
+
+    def convbignum(self, bits):
+        MM = 256 * 256 * 256
+        a = bits % MM
+        if a < 0x8000:
+            a *= 256
+        target = a * pow(2, 8 * (bits // MM - 3))
+        return target
+
+    def get_target_dgwv3(self, height, chain=None) -> int:
+
+        def get_block_reading_from_height(height):
+            last = None
+            try:
+                last = chain.get(height)
+            except:
+                pass
+            if last is None:
+                last = self.read_header(height)
+                assert last is not None
+            return last
+
+        # params
+        BlockLastSolved = get_block_reading_from_height(height - 1)
+        BlockReading = get_block_reading_from_height(height - 1)
+        BlockCreating = height
+        nActualTimespan = 0
+        LastBlockTime = 0
+        PastBlocksMin = DGW_PASTBLOCKS
+        PastBlocksMax = DGW_PASTBLOCKS
+        CountBlocks = 0
+        PastDifficultyAverage = 0
+        PastDifficultyAveragePrev = 0
+        bnNum = 0
+
+        if BlockLastSolved is None:
+            return MAX_TARGET
+        for i in range(1, PastBlocksMax + 1):
+            CountBlocks += 1
+
+            if CountBlocks <= PastBlocksMin:
+                if CountBlocks == 1:
+                    PastDifficultyAverage = self.convbignum(BlockReading.get('bits'))
+                else:
+                    bnNum = self.convbignum(BlockReading.get('bits'))
+                    PastDifficultyAverage = ((PastDifficultyAveragePrev * CountBlocks) + (bnNum)) // (CountBlocks + 1)
+                PastDifficultyAveragePrev = PastDifficultyAverage
+
+            if LastBlockTime > 0:
+                Diff = (LastBlockTime - BlockReading.get('timestamp'))
+                nActualTimespan += Diff
+            LastBlockTime = BlockReading.get('timestamp')
+
+            BlockReading = get_block_reading_from_height((height - 1) - CountBlocks)
+
+        bnNew = PastDifficultyAverage
+        nTargetTimespan = CountBlocks * 60  # 1 min
+
+        nActualTimespan = max(nActualTimespan, nTargetTimespan // 3)
+        nActualTimespan = min(nActualTimespan, nTargetTimespan * 3)
+
+        # retarget
+        bnNew *= nActualTimespan
+        bnNew //= nTargetTimespan
+        bnNew = min(bnNew, MAX_TARGET)
+
+        return bnNew
 
     @classmethod
     def bits_to_target(cls, bits: int) -> int:
         bitsN = (bits >> 24) & 0xff
-        if not (0x03 <= bitsN <= 0x1d):
-            raise Exception("First part of bits should be in [0x03, 0x1d]")
+        if not (0x03 <= bitsN <= 0x1e):
+            raise Exception("First part of bits should be in [0x03, 0x1e]")
         bitsBase = bits & 0xffffff
         if not (0x8000 <= bitsBase <= 0x7fffff):
             raise Exception("Second part of bits should be in [0x8000, 0x7fffff]")
-        return bitsBase << (8 * (bitsN-3))
+        return bitsBase << (8 * (bitsN - 3))
 
     @classmethod
     def target_to_bits(cls, target: int) -> int:
@@ -561,11 +767,12 @@ class Blockchain(Logger):
 
     def chainwork_of_header_at_height(self, height: int) -> int:
         """work done by single header at given height"""
-        chunk_idx = height // 2016 - 1
-        target = self.get_target(chunk_idx)
+        target = self.get_target(height)
         work = ((2 ** 256 - target - 1) // (target + 1)) + 1
         return work
 
+    # This works theoretically
+    # TODO: Take a better look at this for DWG
     @with_lock
     def get_chainwork(self, height=None) -> int:
         if height is None:
@@ -574,26 +781,33 @@ class Blockchain(Logger):
             # On testnet/regtest, difficulty works somewhat different.
             # It's out of scope to properly implement that.
             return height
+        # We want to calculate chainwork from 0.
+        # Lets use bitcoin chunks for arbitrary checkpoints
         last_retarget = height // 2016 * 2016 - 1
         cached_height = last_retarget
+        # First get the last cached chainwork values we might have (0 if none)
         while _CHAINWORK_CACHE.get(self.get_hash(cached_height)) is None:
             if cached_height <= -1:
                 break
             cached_height -= 2016
         assert cached_height >= -1, cached_height
         running_total = _CHAINWORK_CACHE[self.get_hash(cached_height)]
+        # Calculate the chainwork in chunks if needed for caching
         while cached_height < last_retarget:
-            cached_height += 2016
-            work_in_single_header = self.chainwork_of_header_at_height(cached_height)
-            work_in_chunk = 2016 * work_in_single_header
+            work_in_chunk = 0
+            for i in range(2016):
+                cached_height += 1
+                work_in_chunk += self.chainwork_of_header_at_height(cached_height)
             running_total += work_in_chunk
             _CHAINWORK_CACHE[self.get_hash(cached_height)] = running_total
-        cached_height += 2016
-        work_in_single_header = self.chainwork_of_header_at_height(cached_height)
-        work_in_last_partial_chunk = (height % 2016 + 1) * work_in_single_header
+        # Calculate the remaining chainwork
+        work_in_last_partial_chunk = 0
+        while cached_height < height:
+            cached_height += 1
+            work_in_last_partial_chunk += self.chainwork_of_header_at_height(cached_height)
         return running_total + work_in_last_partial_chunk
 
-    def can_connect(self, header: dict, check_height: bool=True) -> bool:
+    def can_connect(self, header: dict, check_height: bool = True) -> bool:
         if header is None:
             return False
         height = header['block_height']
@@ -607,43 +821,36 @@ class Blockchain(Logger):
             return False
         if prev_hash != header.get('prev_block_hash'):
             return False
+        headers = {header.get('block_height'): header}
         try:
-            target = self.get_target(height // 2016 - 1)
+            target = self.get_target(height, headers)
         except MissingHeader:
             return False
         try:
             self.verify_header(header, prev_hash, target)
         except BaseException as e:
             return False
+
         return True
 
-    def connect_chunk(self, idx: int, hexdata: str) -> bool:
-        assert idx >= 0, idx
+    def connect_chunk(self, start_height: int, hexdata: str) -> bool:
+        assert start_height >= 0, start_height
         try:
             data = bfh(hexdata)
-            self.verify_chunk(idx, data)
-            self.save_chunk(idx, data)
+            self.verify_chunk(start_height, data)
+            self.save_chunk(start_height, data)
             return True
         except BaseException as e:
-            self.logger.info(f'verify_chunk idx {idx} failed: {repr(e)}')
+            self.logger.info(f'verify_chunk from height {start_height} failed: {repr(e)}')
             return False
-
-    def get_checkpoints(self):
-        # for each chunk, store the hash of the last block and the target after the chunk
-        cp = []
-        n = self.height() // 2016
-        for index in range(n):
-            h = self.get_hash((index+1) * 2016 -1)
-            target = self.get_target(index)
-            cp.append((h, target))
-        return cp
 
 
 def check_header(header: dict) -> Optional[Blockchain]:
     """Returns any Blockchain that contains header, or None."""
     if type(header) is not dict:
         return None
-    with blockchains_lock: chains = list(blockchains.values())
+    with blockchains_lock:
+        chains = list(blockchains.values())
     for b in chains:
         if b.check_header(header):
             return b
@@ -654,7 +861,8 @@ def can_connect(header: dict) -> Optional[Blockchain]:
     """Returns the Blockchain that has a tip that directly links up
     with header, or None.
     """
-    with blockchains_lock: chains = list(blockchains.values())
+    with blockchains_lock:
+        chains = list(blockchains.values())
     for b in chains:
         if b.can_connect(header):
             return b

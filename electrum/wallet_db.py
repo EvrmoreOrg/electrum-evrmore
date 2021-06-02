@@ -31,11 +31,11 @@ from collections import defaultdict
 from typing import Dict, Optional, List, Tuple, Set, Iterable, NamedTuple, Sequence, TYPE_CHECKING, Union
 import binascii
 
-from . import util, bitcoin
+from . import util, ravencoin
 from .util import profiler, WalletFileException, multisig_type, TxMinedInfo, bfh
 from .invoices import PR_TYPE_ONCHAIN, Invoice
 from .keystore import bip44_derivation
-from .transaction import Transaction, TxOutpoint, tx_from_any, PartialTransaction, PartialTxOutput
+from .transaction import Transaction, TxOutpoint, tx_from_any, PartialTransaction, PartialTxOutput, AssetMeta, RavenValue
 from .logging import Logger
 from .lnutil import LOCAL, REMOTE, FeeUpdate, UpdateAddHtlc, LocalConfig, RemoteConfig, Keypair, OnlyPubkeyKeypair, RevocationStore
 from .lnutil import ImportedChannelBackupStorage, OnchainChannelBackupStorage
@@ -53,8 +53,9 @@ if TYPE_CHECKING:
 
 OLD_SEED_VERSION = 4        # electrum versions < 2.0
 NEW_SEED_VERSION = 11       # electrum versions >= 2.0
-FINAL_SEED_VERSION = 40     # electrum >= 2.7 will set this to prevent
+# FINAL_SEED_VERSION = 40     # electrum >= 2.7 will set this to prevent
                             # old versions from overwriting new format
+RAVENCOIN_SEED_VERSION = 41  # Rewrites wallet to support assets
 
 
 class TxFeesValue(NamedTuple):
@@ -73,7 +74,7 @@ class WalletDB(JsonDB):
             self.load_data(raw)
             self.load_plugins()
         else:  # creating new db
-            self.put('seed_version', FINAL_SEED_VERSION)
+            self.put('seed_version', RAVENCOIN_SEED_VERSION)
             self._after_upgrade_tasks()
 
     def load_data(self, s):
@@ -150,7 +151,7 @@ class WalletDB(JsonDB):
         return result
 
     def requires_upgrade(self):
-        return self.get_seed_version() < FINAL_SEED_VERSION
+        return self.get_seed_version() < RAVENCOIN_SEED_VERSION
 
     @profiler
     def upgrade(self):
@@ -189,7 +190,8 @@ class WalletDB(JsonDB):
         self._convert_version_38()
         self._convert_version_39()
         self._convert_version_40()
-        self.put('seed_version', FINAL_SEED_VERSION)  # just to be sure
+        self._convert_version_41()
+        self.put('seed_version', RAVENCOIN_SEED_VERSION)  # just to be sure
 
         self._after_upgrade_tasks()
 
@@ -297,7 +299,7 @@ class WalletDB(JsonDB):
                 d = {'change': []}
                 receiving_addresses = []
                 for pubkey in pubkeys:
-                    addr = bitcoin.pubkey_to_address('p2pkh', pubkey)
+                    addr = ravencoin.pubkey_to_address('p2pkh', pubkey)
                     receiving_addresses.append(addr)
                 d['receiving'] = receiving_addresses
                 self.put('addresses', d)
@@ -322,7 +324,7 @@ class WalletDB(JsonDB):
                 assert len(addresses) == len(pubkeys)
                 d = {}
                 for pubkey in pubkeys:
-                    addr = bitcoin.pubkey_to_address('p2pkh', pubkey)
+                    addr = ravencoin.pubkey_to_address('p2pkh', pubkey)
                     assert addr in addresses
                     d[addr] = {
                         'pubkey': pubkey,
@@ -374,7 +376,7 @@ class WalletDB(JsonDB):
             assert isinstance(addresses, dict)
             addresses_new = dict()
             for address, details in addresses.items():
-                if not bitcoin.is_address(address):
+                if not ravencoin.is_address(address):
                     remove_address(address)
                     continue
                 if details is None:
@@ -475,14 +477,14 @@ class WalletDB(JsonDB):
         if not self._is_upgrade_method_needed(21, 21):
             return
 
-        from .bitcoin import script_to_scripthash
+        from .ravencoin import script_to_scripthash
         transactions = self.get('transactions', {})  # txid -> raw_tx
         prevouts_by_scripthash = defaultdict(list)
         for txid, raw_tx in transactions.items():
             tx = Transaction(raw_tx)
             for idx, txout in enumerate(tx.outputs()):
                 outpoint = f"{txid}:{idx}"
-                scripthash = script_to_scripthash(txout.scriptpubkey.hex())
+                scripthash = script_to_scripthash(txout.scriptpubkey)
                 prevouts_by_scripthash[scripthash].append((outpoint, txout.value))
         self.put('prevouts_by_scripthash', prevouts_by_scripthash)
 
@@ -761,7 +763,7 @@ class WalletDB(JsonDB):
             return
         PR_TYPE_ONCHAIN = 0
         PR_TYPE_LN = 2
-        from .bitcoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN
+        from .ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN
         max_sats = TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN
         requests = self.data.get('payment_requests', {})
         invoices = self.data.get('invoices', {})
@@ -810,6 +812,37 @@ class WalletDB(JsonDB):
             if seed_type is not None:
                 ks['seed_type'] = seed_type
         self.data['seed_version'] = 40
+
+    def _convert_version_41(self):
+        if not self._is_upgrade_method_needed(40, 40):
+            return
+        txi = self.data.get('txi', {})
+        txi = {txi_hash:
+                   {addr:
+                        {ser: RavenValue(v) for ser, v in d2.items()}
+                    for addr, d2 in d1.items()}
+               for txi_hash, d1 in txi.items()}
+        self.data['txi'] = txi
+
+        txo = self.data.get('txo', {})
+        txo = {tx_hash:
+                   {addr:
+                        {pos: (RavenValue(v), cb) for pos, (v, cb) in d2.items()}
+                    for addr, d2 in d1.items()}
+               for tx_hash, d1 in txo.items()}
+        self.data['txo'] = txo
+
+        # This seems to be updated to RavenValues in an earlier update
+        # prev = self.data.get('prevouts_by_scripthash', {})
+        # prev = {scripthash: [(out, RavenValue(v)) for (out, v) in lst] for scripthash, lst in prev.items()}
+        # self.data['prevouts_by_scripthash'] = prev
+
+        # Clear history to mark re-download for assets
+        self._load_transactions()
+        self.clear_history()
+        self.data['stored_height'] = 0
+        self.data['seed_version'] = 41
+
 
     def _convert_imported(self):
         if not self._is_upgrade_method_needed(0, 13):
@@ -862,10 +895,10 @@ class WalletDB(JsonDB):
         seed_version = self.get('seed_version')
         if not seed_version:
             seed_version = OLD_SEED_VERSION if len(self.get('master_public_key','')) == 128 else NEW_SEED_VERSION
-        if seed_version > FINAL_SEED_VERSION:
+        if seed_version > RAVENCOIN_SEED_VERSION:
             raise WalletFileException('This version of Electrum is too old to open this wallet.\n'
                                       '(highest supported storage version: {}, version of this file: {})'
-                                      .format(FINAL_SEED_VERSION, seed_version))
+                                      .format(RAVENCOIN_SEED_VERSION, seed_version))
         if seed_version==14 and self.get('seed_type') == 'segwit':
             self._raise_unsupported_version(seed_version)
         if seed_version >=12:
@@ -890,6 +923,21 @@ class WalletDB(JsonDB):
         raise WalletFileException(msg)
 
     @locked
+    def get_assets(self) -> Iterable[str]:
+        return list(sorted(self.asset.keys()))
+
+    @locked
+    def get_asset_meta(self, asset: str) -> AssetMeta:
+        assert isinstance(asset, str)
+        return self.asset.get(asset, None)
+
+    @modifier
+    def add_asset_meta(self, asset: str, meta: AssetMeta) -> None:
+        assert isinstance(asset, str)
+        assert isinstance(meta, AssetMeta)
+        self.asset[asset] = meta
+
+    @locked
     def get_txi_addresses(self, tx_hash: str) -> List[str]:
         """Returns list of is_mine addresses that appear as inputs in tx."""
         assert isinstance(tx_hash, str)
@@ -902,7 +950,7 @@ class WalletDB(JsonDB):
         return list(self.txo.get(tx_hash, {}).keys())
 
     @locked
-    def get_txi_addr(self, tx_hash: str, address: str) -> Iterable[Tuple[str, int]]:
+    def get_txi_addr(self, tx_hash: str, address: str) -> Iterable[Tuple[str, RavenValue]]:
         """Returns an iterable of (prev_outpoint, value)."""
         assert isinstance(tx_hash, str)
         assert isinstance(address, str)
@@ -910,7 +958,7 @@ class WalletDB(JsonDB):
         return list(d.items())
 
     @locked
-    def get_txo_addr(self, tx_hash: str, address: str) -> Dict[int, Tuple[int, bool]]:
+    def get_txo_addr(self, tx_hash: str, address: str) -> Dict[int, Tuple[RavenValue, bool]]:
         """Returns a dict: output_index -> (value, is_coinbase)."""
         assert isinstance(tx_hash, str)
         assert isinstance(address, str)
@@ -918,11 +966,11 @@ class WalletDB(JsonDB):
         return {int(n): (v, cb) for (n, (v, cb)) in d.items()}
 
     @modifier
-    def add_txi_addr(self, tx_hash: str, addr: str, ser: str, v: int) -> None:
+    def add_txi_addr(self, tx_hash: str, addr: str, ser: str, v: RavenValue) -> None:
         assert isinstance(tx_hash, str)
         assert isinstance(addr, str)
         assert isinstance(ser, str)
-        assert isinstance(v, int)
+        assert isinstance(v, RavenValue)
         if tx_hash not in self.txi:
             self.txi[tx_hash] = {}
         d = self.txi[tx_hash]
@@ -931,12 +979,12 @@ class WalletDB(JsonDB):
         d[addr][ser] = v
 
     @modifier
-    def add_txo_addr(self, tx_hash: str, addr: str, n: Union[int, str], v: int, is_coinbase: bool) -> None:
+    def add_txo_addr(self, tx_hash: str, addr: str, n: Union[int, str], v: RavenValue, is_coinbase: bool) -> None:
         n = str(n)
         assert isinstance(tx_hash, str)
         assert isinstance(addr, str)
         assert isinstance(n, str)
-        assert isinstance(v, int)
+        assert isinstance(v, RavenValue)
         assert isinstance(is_coinbase, bool)
         if tx_hash not in self.txo:
             self.txo[tx_hash] = {}
@@ -999,25 +1047,25 @@ class WalletDB(JsonDB):
         self.spent_outpoints[prevout_hash][prevout_n] = tx_hash
 
     @modifier
-    def add_prevout_by_scripthash(self, scripthash: str, *, prevout: TxOutpoint, value: int) -> None:
+    def add_prevout_by_scripthash(self, scripthash: str, *, prevout: TxOutpoint, value: RavenValue) -> None:
         assert isinstance(scripthash, str)
         assert isinstance(prevout, TxOutpoint)
-        assert isinstance(value, int)
+        assert isinstance(value, RavenValue)
         if scripthash not in self._prevouts_by_scripthash:
             self._prevouts_by_scripthash[scripthash] = set()
         self._prevouts_by_scripthash[scripthash].add((prevout.to_str(), value))
 
     @modifier
-    def remove_prevout_by_scripthash(self, scripthash: str, *, prevout: TxOutpoint, value: int) -> None:
+    def remove_prevout_by_scripthash(self, scripthash: str, *, prevout: TxOutpoint, value: RavenValue) -> None:
         assert isinstance(scripthash, str)
         assert isinstance(prevout, TxOutpoint)
-        assert isinstance(value, int)
+        assert isinstance(value, RavenValue)
         self._prevouts_by_scripthash[scripthash].discard((prevout.to_str(), value))
         if not self._prevouts_by_scripthash[scripthash]:
             self._prevouts_by_scripthash.pop(scripthash)
 
     @locked
-    def get_prevouts_by_scripthash(self, scripthash: str) -> Set[Tuple[TxOutpoint, int]]:
+    def get_prevouts_by_scripthash(self, scripthash: str) -> Set[Tuple[TxOutpoint, RavenValue]]:
         assert isinstance(scripthash, str)
         prevouts_and_values = self._prevouts_by_scripthash.get(scripthash, set())
         return {(TxOutpoint.from_str(prevout), value) for prevout, value in prevouts_and_values}
@@ -1257,17 +1305,15 @@ class WalletDB(JsonDB):
         self.data = StoredDict(self.data, self, [])
         # references in self.data
         # TODO make all these private
-        # txid -> address -> prev_outpoint -> value
-        self.txi = self.get_dict('txi')                          # type: Dict[str, Dict[str, Dict[str, int]]]
-        # txid -> address -> output_index -> (value, is_coinbase)
-        self.txo = self.get_dict('txo')                          # type: Dict[str, Dict[str, Dict[str, Tuple[int, bool]]]]
+        self.asset = self.get_dict('asset_meta')                 # type: Dict[str, AssetMeta]
+        self.txi = self.get_dict('txi')                          # type: Dict[str, Dict[str, Dict[str, RavenValue]]]
+        self.txo = self.get_dict('txo')                          # type: Dict[str, Dict[str, Dict[str, Tuple[RavenValue, bool]]]]
         self.transactions = self.get_dict('transactions')        # type: Dict[str, Transaction]
         self.spent_outpoints = self.get_dict('spent_outpoints')  # txid -> output_index -> next_txid
         self.history = self.get_dict('addr_history')             # address -> list of (txid, height)
         self.verified_tx = self.get_dict('verified_tx3')         # txid -> (height, timestamp, txpos, header_hash)
         self.tx_fees = self.get_dict('tx_fees')                  # type: Dict[str, TxFeesValue]
-        # scripthash -> set of (outpoint, value)
-        self._prevouts_by_scripthash = self.get_dict('prevouts_by_scripthash')  # type: Dict[str, Set[Tuple[str, int]]]
+        self._prevouts_by_scripthash = self.get_dict('prevouts_by_scripthash')  # type: Dict[str, Set[Tuple[str, RavenValue]]]
         # remove unreferenced tx
         for tx_hash in list(self.transactions.keys()):
             if not self.get_txi_addresses(tx_hash) and not self.get_txo_addresses(tx_hash):
@@ -1313,11 +1359,18 @@ class WalletDB(JsonDB):
         elif key == 'tx_fees':
             v = dict((k, TxFeesValue(*x)) for k, x in v.items())
         elif key == 'prevouts_by_scripthash':
-            v = dict((k, {(prevout, value) for (prevout, value) in x}) for k, x in v.items())
+            v = dict((k, {(prevout, value if isinstance(value, RavenValue) else RavenValue.from_json(value)) for (prevout, value) in x}) for k, x in v.items())
+        elif key == 'txo':
+            v = {txid: {addr: {pos: (v if isinstance(v, RavenValue) else RavenValue.from_json(v), cb) for pos, (v, cb) in d2.items()} for addr, d2 in d1.items()} for txid, d1 in v.items()}
+        elif key == 'txi':
+            v = {txid: {addr: {ser: v if isinstance(v, RavenValue) else RavenValue.from_json(v) for ser, v in d2.items()} for addr, d2 in d1.items()} for txid, d1 in v.items()}
         elif key == 'buckets':
             v = dict((k, ShachainElement(bfh(x[0]), int(x[1]))) for k, x in v.items())
         elif key == 'data_loss_protect_remote_pcp':
             v = dict((k, bfh(x)) for k, x in v.items())
+        elif key == 'asset_meta':
+            v = dict((k, AssetMeta(name, ownr, reis, div, ipfs, data))
+                     for k, (name, ownr, reis, div, ipfs, data) in v.items())
         return v
 
     def _convert_value(self, path, key, v):

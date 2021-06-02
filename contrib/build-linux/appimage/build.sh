@@ -7,7 +7,7 @@ CONTRIB="$PROJECT_ROOT/contrib"
 CONTRIB_APPIMAGE="$CONTRIB/build-linux/appimage"
 DISTDIR="$PROJECT_ROOT/dist"
 BUILDDIR="$CONTRIB_APPIMAGE/build/appimage"
-APPDIR="$BUILDDIR/electrum.AppDir"
+APPDIR="$BUILDDIR/electrum-ravencoin.AppDir"
 CACHEDIR="$CONTRIB_APPIMAGE/.cache/appimage"
 PIP_CACHE_DIR="$CACHEDIR/pip_cache"
 
@@ -22,7 +22,7 @@ SQUASHFSKIT_COMMIT="ae0d656efa2d0df2fcac795b6823b44462f19386"
 
 
 VERSION=`git describe --tags --dirty --always`
-APPIMAGE="$DISTDIR/electrum-$VERSION-x86_64.AppImage"
+APPIMAGE="$DISTDIR/electrum-ravencoin-$VERSION-x86_64.AppImage"
 
 . "$CONTRIB"/build_tools_util.sh
 
@@ -131,8 +131,12 @@ info "installing electrum and its dependencies."
 #       - cryptography, as building it would need openssl 1.1, not available on ubuntu 16.04
 "$python" -m pip install --no-dependencies --no-binary :all: --no-warn-script-location \
     --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements.txt"
+"$python" -m pip install --no-dependencies --no-binary :all: --no-warn-script-location \
+    --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-ravencoin.txt"
 "$python" -m pip install --no-dependencies --no-binary :all: --only-binary PyQt5,PyQt5-Qt5,cryptography --no-warn-script-location \
     --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-binaries.txt"
+"$python" -m pip install --no-binary :all: --no-warn-script-location \
+    --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-ravencoin-binaries.txt"
 "$python" -m pip install --no-dependencies --no-binary :all: --no-warn-script-location \
     --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-hw.txt"
 
@@ -148,8 +152,8 @@ cp "/usr/lib/x86_64-linux-gnu/libzbar.so.0" "$APPDIR/usr/lib/libzbar.so.0"
 
 
 info "desktop integration."
-cp "$PROJECT_ROOT/electrum.desktop" "$APPDIR/electrum.desktop"
-cp "$PROJECT_ROOT/electrum/gui/icons/electrum.png" "$APPDIR/electrum.png"
+cp "$PROJECT_ROOT/electrum-ravencoin.desktop" "$APPDIR/electrum-ravencoin.desktop"
+cp "$PROJECT_ROOT/electrum/gui/icons/electrum-ravencoin.png" "$APPDIR/electrum-ravencoin.png"
 
 
 # add launcher

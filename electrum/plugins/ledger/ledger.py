@@ -1,13 +1,16 @@
+import datetime
+import threading
+import time
 from struct import pack, unpack
 import hashlib
 import sys
 import traceback
 from typing import Optional, Tuple
 
-from electrum import ecc
+from electrum import ecc, constants
 from electrum import bip32
 from electrum.crypto import hash_160
-from electrum.bitcoin import int_to_hex, var_int, is_segwit_script_type, is_b58_address
+from electrum.ravencoin import int_to_hex, var_int, is_segwit_script_type, is_b58_address
 from electrum.bip32 import BIP32Node, convert_bip32_intpath_to_strpath
 from electrum.i18n import _
 from electrum.keystore import Hardware_KeyStore
@@ -21,18 +24,19 @@ from electrum.plugin import runs_in_hwd_thread, Device
 from ..hw_wallet import HW_PluginBase, HardwareClientBase
 from ..hw_wallet.plugin import is_any_tx_output_on_change_branch, validate_op_return_output, LibraryFoundButUnusable
 
-
 _logger = get_logger(__name__)
-
 
 try:
     import hid
     from btchip.btchipComm import HIDDongleHIDAPI, DongleWait
     from btchip.btchip import btchip
-    from btchip.btchipUtils import compress_public_key,format_transaction, get_regular_input_script, get_p2sh_input_script
+    from btchip.btchipUtils import compress_public_key, format_transaction, get_regular_input_script, \
+        get_p2sh_input_script
     from btchip.bitcoinTransaction import bitcoinTransaction
     from btchip.btchipFirmwareWizard import checkFirmware, updateFirmware
     from btchip.btchipException import BTChipException
+    from btchip.bitcoinVarint import writeVarint
+
     BTCHIP = True
     BTCHIP_DEBUG = False
 except ImportError as e:
@@ -41,9 +45,9 @@ except ImportError as e:
     BTCHIP = False
 
 MSG_NEEDS_FW_UPDATE_GENERIC = _('Firmware version too old. Please update at') + \
-                      ' https://www.ledgerwallet.com'
-MSG_NEEDS_FW_UPDATE_SEGWIT = _('Firmware version (or "Bitcoin" app) too old for Segwit support. Please update at') + \
-                      ' https://www.ledgerwallet.com'
+                              ' https://www.ledgerwallet.com'
+MSG_NEEDS_FW_UPDATE_SEGWIT = _('Firmware version (or "ravencoin" app) too old for Segwit support. Please update at') + \
+                             ' https://www.ledgerwallet.com'
 MULTI_OUTPUT_SUPPORT = '1.1.4'
 SEGWIT_SUPPORT = '1.1.10'
 SEGWIT_SUPPORT_SPECIAL = '1.0.4'
@@ -54,6 +58,7 @@ def test_pin_unlocked(func):
     """Function decorator to test the Ledger for being unlocked, and if not,
     raise a human-readable exception.
     """
+
     def catch_exception(self, *args, **kwargs):
         try:
             return func(self, *args, **kwargs)
@@ -62,6 +67,7 @@ def test_pin_unlocked(func):
                 raise UserFacingException(_('Your Ledger is locked. Please unlock it.'))
             else:
                 raise
+
     return catch_exception
 
 
@@ -115,8 +121,8 @@ class Ledger_Client(HardwareClientBase):
         # S-L-O-W - we don't handle the fingerprint directly, so compute
         # it manually from the previous node
         # This only happens once so it's bearable
-        #self.get_client() # prompt for the PIN before displaying the dialog if necessary
-        #self.handler.show_message("Computing master public key")
+        # self.get_client() # prompt for the PIN before displaying the dialog if necessary
+        # self.handler.show_message("Computing master public key")
         if xtype in ['p2wpkh', 'p2wsh'] and not self.supports_native_segwit():
             raise UserFacingException(MSG_NEEDS_FW_UPDATE_SEGWIT)
         if xtype in ['p2wpkh-p2sh', 'p2wsh-p2sh'] and not self.supports_segwit():
@@ -182,7 +188,9 @@ class Ledger_Client(HardwareClientBase):
             firmware = firmwareInfo['version']
             self.multiOutputSupported = versiontuple(firmware) >= versiontuple(MULTI_OUTPUT_SUPPORT)
             self.nativeSegwitSupported = versiontuple(firmware) >= versiontuple(SEGWIT_SUPPORT)
-            self.segwitSupported = self.nativeSegwitSupported or (firmwareInfo['specialVersion'] == 0x20 and versiontuple(firmware) >= versiontuple(SEGWIT_SUPPORT_SPECIAL))
+            self.segwitSupported = self.nativeSegwitSupported or (
+                    firmwareInfo['specialVersion'] == 0x20 and versiontuple(firmware) >= versiontuple(
+                SEGWIT_SUPPORT_SPECIAL))
             self.segwitTrustedInputs = versiontuple(firmware) >= versiontuple(SEGWIT_TRUSTEDINPUTS)
 
             if not checkFirmware(firmwareInfo):
@@ -201,23 +209,26 @@ class Ledger_Client(HardwareClientBase):
                 assert self.handler, "no handler for client"
                 remaining_attempts = self.dongleObject.getVerifyPinRemainingAttempts()
                 if remaining_attempts != 1:
-                    msg = "Enter your Ledger PIN - remaining attempts : " + str(remaining_attempts)
+                    msg = _("Enter your Ledger PIN - remaining attempts : {}").format(str(remaining_attempts))
                 else:
-                    msg = "Enter your Ledger PIN - WARNING : LAST ATTEMPT. If the PIN is not correct, the dongle will be wiped."
+                    msg = _("Enter your Ledger PIN - WARNING : LAST ATTEMPT. If the PIN is not correct, the dongle "
+                            "will be wiped.")
                 confirmed, p, pin = self.password_dialog(msg)
                 if not confirmed:
-                    raise UserFacingException('Aborted by user - please unplug the dongle and plug it again before retrying')
+                    raise UserFacingException(
+                        _('Aborted by user - please unplug the dongle and plug it again before retrying'))
                 pin = pin.encode()
                 self.dongleObject.verifyPin(pin)
+                self.dongleObject.setAlternateCoinVersions(constants.net.ADDRTYPE_P2PKH, constants.net.ADDRTYPE_P2SH)
         except BTChipException as e:
             if (e.sw == 0x6faa):
-                raise UserFacingException("Dongle is temporarily locked - please unplug it and replug it again")
+                raise UserFacingException(_("Dongle is temporarily locked - please unplug it and replug it again"))
             if ((e.sw & 0xFFF0) == 0x63c0):
-                raise UserFacingException("Invalid PIN - please unplug the dongle and plug it again before retrying")
+                raise UserFacingException(_("Invalid PIN - please unplug the dongle and plug it again before retrying"))
             if e.sw == 0x6f00 and e.message == 'Invalid channel':
                 # based on docs 0x6f00 might be a more general error, hence we also compare message to be sure
-                raise UserFacingException("Invalid channel.\n"
-                                          "Please make sure that 'Browser support' is disabled on your device.")
+                raise UserFacingException(_("Invalid channel.\n"
+                                            "Please make sure that 'Browser support' is disabled on your device."))
             raise e
 
     @runs_in_hwd_thread
@@ -227,7 +238,7 @@ class Ledger_Client(HardwareClientBase):
                 self.perform_hw1_preflight()
             except BTChipException as e:
                 if (e.sw == 0x6d00 or e.sw == 0x6700):
-                    raise UserFacingException(_("Device not in Bitcoin mode")) from e
+                    raise UserFacingException(_("Device not in ravencoin mode")) from e
                 raise e
             self.preflightDone = True
 
@@ -236,6 +247,235 @@ class Ledger_Client(HardwareClientBase):
         if response is None:
             return False, None, None
         return True, response, response
+
+
+class AbstractTracker:
+    def parsed_string(self):
+        raise NotImplementedError()
+
+
+class SigningTracker(AbstractTracker):
+    def __init__(self, total_inputs):
+        self.total_inputs = total_inputs
+        self.ticker = 0
+        self.start = time.time()
+        self.last_ETA = _('Calculating...')
+
+    def tick(self):
+        self.ticker += 1
+
+    def parsed_string(self):
+        line = _('Signing transaction data...\n\n')
+
+        line += _('Input: {}/{}\n\n').format(
+            self.ticker,
+            self.total_inputs)
+
+        tx_delta = self.ticker
+        sec_delta = time.time() - self.start
+        tx_left = self.total_inputs - self.ticker
+
+        eta = self.last_ETA
+        if tx_delta != 0 and sec_delta != 0:
+            secs = sec_delta / tx_delta * tx_left
+            eta = str(datetime.timedelta(seconds=round(secs)))
+
+        line += _('ETA: {}').format(eta)
+        self.last_ETA = eta
+        return line
+
+
+class ParsingTracker(AbstractTracker):
+    def __init__(self, total_tx):
+        self.total_transactions = total_tx
+        self.send_warning = False
+        if self.total_transactions > 2000:  # Arbitrary number
+            self.send_warning = True
+
+        self.ticker = 0
+
+        self.tx_count = 0
+        self.tot_tx = 0
+        self.in_count = 0
+        self.tot_in = 0
+        self.out_count = 0
+        self.tot_out = 0
+
+        self.start_time = time.time()
+        self.last_ETA = _('Computing...')
+
+    def set_tx_amt(self, amt):
+        self.tot_tx = amt
+
+    def tick_tx(self):
+        self.tx_count += 1
+        self.in_count = 0
+        self.tot_in = 0
+        self.out_count = 0
+        self.tot_out = 0
+
+    def tick_in(self):
+        self.log_info()
+        self.in_count += 1
+
+    def tick_out(self):
+        self.log_info()
+        self.out_count += 1
+
+    def set_io_amt(self, ins, outs):
+        self.tot_in = ins
+        self.tot_out = outs
+
+    def log_info(self):
+        self.ticker += 1
+        if self.ticker % 500 == 0:
+            _logger.info(self.parsed_string())
+
+    def parsed_string(self):
+        line = _('Parsing transaction data...\n\n')
+        if self.send_warning:
+            line += _('It looks there is a lot of data to parse.\n'
+                      'This occurs if you receive RVN from transactions\n'
+                      'with a lot of other outputs such as mining directly\n'
+                      'to your ledger.\n'
+                      'These long wait times are due to hardware limitations.\n'
+                      'You may want to turn off your ledger\'s auto-lock to prevent\n'
+                      'This transaction from failing due to your ledger locking.\n'
+                      'These settings can be found in:\n'
+                      'Settings > Security > Screen Saver > Off\n'
+                      'Settings > Security > Pin Lock > Off\n'
+                      'Once this transaction is complete and sent, your RVN will\n'
+                      'be consolidated and transaction parsing times will be\n'
+                      'unnoticeable in the future.\n\n')
+        line += _('Tx: {}/{}\nInputs: {}/{}\nOutputs: {}/{}\n').format(
+            self.tx_count,
+            self.tot_tx,
+            self.in_count,
+            self.tot_in,
+            self.out_count,
+            self.tot_out)
+        line += _('Total Completion: {}/{}\n').format(self.ticker, self.total_transactions)
+
+        tx_delta = self.ticker
+        sec_delta = time.time() - self.start_time
+        tx_left = self.total_transactions - self.ticker
+
+        eta = self.last_ETA
+
+        if tx_delta != 0 and sec_delta != 0:
+            secs = sec_delta / tx_delta * tx_left
+            eta = str(datetime.timedelta(seconds=round(secs)))
+
+        line += _('ETA: {}').format(eta)
+        self.last_ETA = eta
+        return line
+
+# I am not sure if python booleans are atomic
+class AtomicBoolean:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.boolean = False
+
+    def set_true(self):
+        with self.lock:
+            self.boolean = True
+
+    def set_false(self):
+        with self.lock:
+            self.boolean = False
+
+    def get_value(self):
+        with self.lock:
+            return self.boolean
+
+
+class BTChipWrapper:
+
+    def __init__(self, original):
+        self.dongle = original.dongle
+
+    # Same code as normal with counters stuck in
+    def getTrustedInput(self, atomic_boolean: AtomicBoolean, ui_tracker: ParsingTracker, transaction, index):
+        result = {}
+        # Header
+        apdu = [btchip.BTCHIP_CLA, btchip.BTCHIP_INS_GET_TRUSTED_INPUT, 0x00, 0x00]
+        params = bytearray.fromhex("%.8x" % index)
+        params.extend(transaction.version)
+        writeVarint(len(transaction.inputs), params)
+        apdu.append(len(params))
+        apdu.extend(params)
+        self.dongle.exchange(bytearray(apdu))
+        # Each input
+
+        ui_tracker.set_io_amt(len(transaction.inputs), len(transaction.outputs))
+
+        for trinput in transaction.inputs:
+            if atomic_boolean.get_value():
+                raise UserWarning()
+            apdu = [btchip.BTCHIP_CLA, btchip.BTCHIP_INS_GET_TRUSTED_INPUT, 0x80, 0x00]
+            params = bytearray(trinput.prevOut)
+            writeVarint(len(trinput.script), params)
+            apdu.append(len(params))
+            apdu.extend(params)
+            self.dongle.exchange(bytearray(apdu))
+            offset = 0
+            while True:
+                blockLength = 251
+                if ((offset + blockLength) < len(trinput.script)):
+                    dataLength = blockLength
+                else:
+                    dataLength = len(trinput.script) - offset
+                params = bytearray(trinput.script[offset: offset + dataLength])
+                if ((offset + dataLength) == len(trinput.script)):
+                    params.extend(trinput.sequence)
+                apdu = [btchip.BTCHIP_CLA, btchip.BTCHIP_INS_GET_TRUSTED_INPUT, 0x80, 0x00, len(params)]
+                apdu.extend(params)
+                self.dongle.exchange(bytearray(apdu))
+                offset += dataLength
+                if (offset >= len(trinput.script)):
+                    break
+
+            ui_tracker.tick_in()
+
+        # Number of outputs
+        apdu = [btchip.BTCHIP_CLA, btchip.BTCHIP_INS_GET_TRUSTED_INPUT, 0x80, 0x00]
+        params = []
+        writeVarint(len(transaction.outputs), params)
+        apdu.append(len(params))
+        apdu.extend(params)
+        self.dongle.exchange(bytearray(apdu))
+        # Each output
+        indexOutput = 0
+        for troutput in transaction.outputs:
+            if atomic_boolean.get_value():
+                raise UserWarning()
+            apdu = [btchip.BTCHIP_CLA, btchip.BTCHIP_INS_GET_TRUSTED_INPUT, 0x80, 0x00]
+            params = bytearray(troutput.amount)
+            writeVarint(len(troutput.script), params)
+            apdu.append(len(params))
+            apdu.extend(params)
+            self.dongle.exchange(bytearray(apdu))
+            offset = 0
+            while (offset < len(troutput.script)):
+                blockLength = 255
+                if ((offset + blockLength) < len(troutput.script)):
+                    dataLength = blockLength
+                else:
+                    dataLength = len(troutput.script) - offset
+                apdu = [btchip.BTCHIP_CLA, btchip.BTCHIP_INS_GET_TRUSTED_INPUT, 0x80, 0x00, dataLength]
+                apdu.extend(troutput.script[offset: offset + dataLength])
+                self.dongle.exchange(bytearray(apdu))
+                offset += dataLength
+
+            ui_tracker.tick_out()
+
+        # Locktime
+        apdu = [btchip.BTCHIP_CLA, btchip.BTCHIP_INS_GET_TRUSTED_INPUT, 0x80, 0x00, len(transaction.lockTime)]
+        apdu.extend(transaction.lockTime)
+        response = self.dongle.exchange(bytearray(apdu))
+        result['trustedInput'] = True
+        result['value'] = response
+        return result
 
 
 class Ledger_KeyStore(Hardware_KeyStore):
@@ -264,7 +504,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
     def get_client_electrum(self) -> Optional[Ledger_Client]:
         return self.plugin.get_client(self)
 
-    def give_error(self, message, clear_client = False):
+    def give_error(self, message, clear_client=False):
         _logger.info(message)
         if not self.signing:
             self.handler.show_error(message)
@@ -276,12 +516,14 @@ class Ledger_KeyStore(Hardware_KeyStore):
 
     def set_and_unset_signing(func):
         """Function decorator to set and unset self.signing."""
+
         def wrapper(self, *args, **kwargs):
             try:
                 self.signing = True
                 return func(self, *args, **kwargs)
             finally:
                 self.signing = False
+
         return wrapper
 
     def decrypt_message(self, pubkey, message, password):
@@ -296,8 +538,8 @@ class Ledger_KeyStore(Hardware_KeyStore):
         # prompt for the PIN before displaying the dialog if necessary
         client_ledger = self.get_client()
         client_electrum = self.get_client_electrum()
-        address_path = self.get_derivation_prefix()[2:] + "/%d/%d"%sequence
-        self.handler.show_message("Signing message ...\r\nMessage hash: "+message_hash)
+        address_path = self.get_derivation_prefix()[2:] + "/%d/%d" % sequence
+        self.handler.show_message("Signing message ...\r\nMessage hash: " + message_hash)
         try:
             info = client_ledger.signMessagePrepare(address_path, message)
             pin = ""
@@ -310,7 +552,8 @@ class Ledger_KeyStore(Hardware_KeyStore):
             signature = client_ledger.signMessageSign(pin)
         except BTChipException as e:
             if e.sw == 0x6a80:
-                self.give_error("Unfortunately, this message cannot be signed by the Ledger wallet. Only alphanumerical messages shorter than 140 characters are supported. Please remove any extra characters (tab, carriage return) and retry.")
+                self.give_error(
+                    "Unfortunately, this message cannot be signed by the Ledger wallet. Only alphanumerical messages shorter than 140 characters are supported. Please remove any extra characters (tab, carriage return) and retry.")
             elif e.sw == 0x6985:  # cancelled by user
                 return b''
             elif e.sw == 0x6982:
@@ -326,7 +569,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
             self.handler.finished()
         # Parse the ASN.1 signature
         rLength = signature[3]
-        r = signature[4 : 4 + rLength]
+        r = signature[4: 4 + rLength]
         sLength = signature[4 + rLength + 1]
         s = signature[4 + rLength + 2:]
         if rLength == 33:
@@ -338,7 +581,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
         # Pad r and s points with 0x00 bytes when the point is small to get valid signature.
         r_padded = bytes([0x00]) * (32 - len(r)) + r
         s_padded = bytes([0x00]) * (32 - len(s)) + s
-        
+
         return bytes([27 + 4 + (signature[0] & 0x01)]) + r_padded + s_padded
 
     @runs_in_hwd_thread
@@ -356,14 +599,14 @@ class Ledger_KeyStore(Hardware_KeyStore):
         p2shTransaction = False
         segwitTransaction = False
         pin = ""
-        client_ledger = self.get_client() # prompt for the PIN before displaying the dialog if necessary
+        client_ledger = self.get_client()  # prompt for the PIN before displaying the dialog if necessary
         client_electrum = self.get_client_electrum()
         assert client_electrum
 
         # Fetch inputs of the transaction to sign
         for txin in tx.inputs():
             if txin.is_coinbase_input():
-                self.give_error("Coinbase not supported")     # should never happen
+                self.give_error(_("Coinbase not supported"))  # should never happen
 
             if txin.script_type in ['p2sh']:
                 p2shTransaction = True
@@ -380,7 +623,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
 
             my_pubkey, full_path = self.find_my_pubkey_in_txinout(txin)
             if not full_path:
-                self.give_error("No matching pubkey for sign_transaction")  # should never happen
+                self.give_error(_("No matching pubkey for sign_transaction"))  # should never happen
             full_path = convert_bip32_intpath_to_strpath(full_path)[2:]
 
             redeemScript = Transaction.get_preimage_script(txin)
@@ -401,19 +644,21 @@ class Ledger_KeyStore(Hardware_KeyStore):
         if p2shTransaction:
             for txin in tx.inputs():
                 if txin.script_type != 'p2sh':
-                    self.give_error("P2SH / regular input mixed in same transaction not supported") # should never happen
+                    self.give_error(_(
+                        "P2SH / regular input mixed in same transaction not supported"))  # should never happen
 
+        # TODO: RVN Only
         txOutput = var_int(len(tx.outputs()))
         for o in tx.outputs():
-            txOutput += int_to_hex(o.value, 8)
+            txOutput += int_to_hex(o.value.rvn_value.value, 8)
             script = o.scriptpubkey.hex()
-            txOutput += var_int(len(script)//2)
+            txOutput += var_int(len(script) // 2)
             txOutput += script
         txOutput = bfh(txOutput)
 
         if not client_electrum.supports_multi_output():
             if len(tx.outputs()) > 2:
-                self.give_error("Transaction with more than 2 outputs not supported")
+                self.give_error(_("Transaction with more than 2 outputs not supported"))
         for txout in tx.outputs():
             if client_electrum.is_hw1() and txout.address and not is_b58_address(txout.address):
                 self.give_error(_("This {} device can only send to base58 addresses.").format(self.device))
@@ -444,20 +689,40 @@ class Ledger_KeyStore(Hardware_KeyStore):
                 else:
                     output = txout.address
 
-        self.handler.show_message(_("Confirm Transaction on your Ledger device..."))
+        # self.handler.show_message(_("Confirm Transaction on your Ledger device..."))
+
+        def get_parse_count():
+            c = 0
+            for utxo in inputs:
+                if not segwitTransaction and not p2shTransaction:
+                    txtmp = bitcoinTransaction(bfh(utxo[0]))
+                    c += len(txtmp.inputs) + len(txtmp.outputs)
+            return c
+
+        ui_tracker = ParsingTracker(get_parse_count())
+        ui_tracker.set_tx_amt(len(inputs))
+        atomic_b = AtomicBoolean()
+        self.handler.finished()
+        self.handler.get_ui(_('Parsing Transaction...'), atomic_b, ui_tracker)
+
         try:
             # Get trusted inputs from the original transactions
             for utxo in inputs:
+
+                if atomic_b.get_value():
+                    raise UserWarning()
+                ui_tracker.tick_tx()
+
                 sequence = int_to_hex(utxo[5], 4)
                 if segwitTransaction and not client_electrum.supports_segwit_trustedInputs():
                     tmp = bfh(utxo[3])[::-1]
                     tmp += bfh(int_to_hex(utxo[1], 4))
                     tmp += bfh(int_to_hex(utxo[6], 8))  # txin['value']
-                    chipInputs.append({'value' : tmp, 'witness' : True, 'sequence' : sequence})
+                    chipInputs.append({'value': tmp, 'witness': True, 'sequence': sequence})
                     redeemScripts.append(bfh(utxo[2]))
                 elif (not p2shTransaction) or client_electrum.supports_multi_output():
                     txtmp = bitcoinTransaction(bfh(utxo[0]))
-                    trustedInput = client_ledger.getTrustedInput(txtmp, utxo[1])
+                    trustedInput = BTChipWrapper(client_ledger).getTrustedInput(atomic_b, ui_tracker, txtmp, utxo[1])
                     trustedInput['sequence'] = sequence
                     if segwitTransaction:
                         trustedInput['witness'] = True
@@ -469,23 +734,31 @@ class Ledger_KeyStore(Hardware_KeyStore):
                 else:
                     tmp = bfh(utxo[3])[::-1]
                     tmp += bfh(int_to_hex(utxo[1], 4))
-                    chipInputs.append({'value' : tmp, 'sequence' : sequence})
+                    chipInputs.append({'value': tmp, 'sequence': sequence})
                     redeemScripts.append(bfh(utxo[2]))
 
+            self.handler.finished_ui()
+            self.handler.finished()
+            self.handler.show_message(_("Confirm Transaction on your Ledger device..."))
             # Sign all inputs
             firstTransaction = True
             inputIndex = 0
             rawTx = tx.serialize_to_network()
             client_ledger.enableAlternate2fa(False)
+
+            ui_tracker = SigningTracker(len(inputs))
+            atomic_b = AtomicBoolean()
+
             if segwitTransaction:
                 client_ledger.startUntrustedTransaction(True, inputIndex,
-                                                            chipInputs, redeemScripts[inputIndex], version=tx.version)
+                                                        chipInputs, redeemScripts[inputIndex], version=tx.version)
                 # we don't set meaningful outputAddress, amount and fees
                 # as we only care about the alternateEncoding==True branch
                 outputData = client_ledger.finalizeInput(b'', 0, 0, changePath, bfh(rawTx))
                 outputData['outputData'] = txOutput
                 if outputData['confirmationNeeded']:
                     outputData['address'] = output
+                    self.handler.finished_ui()
                     self.handler.finished()
                     # do the authenticate dialog and get pin:
                     pin = self.handler.get_auth(outputData, client=client_electrum)
@@ -493,11 +766,18 @@ class Ledger_KeyStore(Hardware_KeyStore):
                         raise UserWarning()
                     self.handler.show_message(_("Confirmed. Signing Transaction..."))
                 while inputIndex < len(inputs):
+                    if inputIndex == 0:
+                        self.handler.finished()
+                        self.handler.get_ui(_('Signing Transaction...'), atomic_b, ui_tracker)
+                    ui_tracker.tick()
+                    if atomic_b.get_value():
+                        raise UserWarning()
+
                     singleInput = [chipInputs[inputIndex]]
                     client_ledger.startUntrustedTransaction(False, 0,
                                                             singleInput, redeemScripts[inputIndex], version=tx.version)
                     inputSignature = client_ledger.untrustedHashSign(inputsPaths[inputIndex], pin, lockTime=tx.locktime)
-                    inputSignature[0] = 0x30 # force for 1.4.9+
+                    inputSignature[0] = 0x30  # force for 1.4.9+
                     my_pubkey = inputs[inputIndex][4]
                     tx.add_signature_to_txin(txin_idx=inputIndex,
                                              signing_pubkey=my_pubkey.hex(),
@@ -506,13 +786,14 @@ class Ledger_KeyStore(Hardware_KeyStore):
             else:
                 while inputIndex < len(inputs):
                     client_ledger.startUntrustedTransaction(firstTransaction, inputIndex,
-                                                                chipInputs, redeemScripts[inputIndex], version=tx.version)
+                                                            chipInputs, redeemScripts[inputIndex], version=tx.version)
                     # we don't set meaningful outputAddress, amount and fees
                     # as we only care about the alternateEncoding==True branch
                     outputData = client_ledger.finalizeInput(b'', 0, 0, changePath, bfh(rawTx))
                     outputData['outputData'] = txOutput
                     if outputData['confirmationNeeded']:
                         outputData['address'] = output
+                        self.handler.finished_ui()
                         self.handler.finished()
                         # do the authenticate dialog and get pin:
                         pin = self.handler.get_auth(outputData, client=client_electrum)
@@ -520,9 +801,16 @@ class Ledger_KeyStore(Hardware_KeyStore):
                             raise UserWarning()
                         self.handler.show_message(_("Confirmed. Signing Transaction..."))
                     else:
+                        if inputIndex == 0:
+                            self.handler.finished()
+                            self.handler.get_ui(_('Signing Transaction...'), atomic_b, ui_tracker)
+                        ui_tracker.tick()
+                        if atomic_b.get_value():
+                            raise UserWarning()
                         # Sign input with the provided PIN
-                        inputSignature = client_ledger.untrustedHashSign(inputsPaths[inputIndex], pin, lockTime=tx.locktime)
-                        inputSignature[0] = 0x30 # force for 1.4.9+
+                        inputSignature = client_ledger.untrustedHashSign(inputsPaths[inputIndex], pin,
+                                                                         lockTime=tx.locktime)
+                        inputSignature[0] = 0x30  # force for 1.4.9+
                         my_pubkey = inputs[inputIndex][4]
                         tx.add_signature_to_txin(txin_idx=inputIndex,
                                                  signing_pubkey=my_pubkey.hex(),
@@ -530,7 +818,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
                         inputIndex = inputIndex + 1
                     firstTransaction = False
         except UserWarning:
-            self.handler.show_error(_('Cancelled by user'))
+            self.give_error(_('Cancelled by user'), True)
             return
         except BTChipException as e:
             if e.sw in (0x6985, 0x6d00):  # cancelled by user
@@ -551,7 +839,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
     @set_and_unset_signing
     def show_address(self, sequence, txin_type):
         client = self.get_client()
-        address_path = self.get_derivation_prefix()[2:] + "/%d/%d"%sequence
+        address_path = self.get_derivation_prefix()[2:] + "/%d/%d" % sequence
         self.handler.show_message(_("Showing address ..."))
         segwit = is_segwit_script_type(txin_type)
         segwitNative = txin_type == 'p2wpkh'
@@ -576,25 +864,32 @@ class Ledger_KeyStore(Hardware_KeyStore):
         finally:
             self.handler.finished()
 
+
 class LedgerPlugin(HW_PluginBase):
     keystore_class = Ledger_KeyStore
     minimum_library = (0, 1, 32)
     client = None
     DEVICE_IDS = [
-                   (0x2581, 0x1807), # HW.1 legacy btchip
-                   (0x2581, 0x2b7c), # HW.1 transitional production
-                   (0x2581, 0x3b7c), # HW.1 ledger production
-                   (0x2581, 0x4b7c), # HW.1 ledger test
-                   (0x2c97, 0x0000), # Blue
-                   (0x2c97, 0x0001), # Nano-S
-                   (0x2c97, 0x0004), # Nano-X
-                   (0x2c97, 0x0005), # RFU
-                   (0x2c97, 0x0006), # RFU
-                   (0x2c97, 0x0007), # RFU
-                   (0x2c97, 0x0008), # RFU
-                   (0x2c97, 0x0009), # RFU
-                   (0x2c97, 0x000a)  # RFU
-                 ]
+        (0x2581, 0x1807),  # HW.1 legacy btchip
+        (0x2581, 0x2b7c),  # HW.1 transitional production
+        (0x2581, 0x3b7c),  # HW.1 ledger production
+        (0x2581, 0x4b7c),  # HW.1 ledger test
+        (0x2c97, 0x0000),  # Blue
+        (0x2c97, 0x0011),  # Blue app-bitcoin >= 1.5.1
+        (0x2c97, 0x0015),  # Blue app-bitcoin >= 1.5.1
+        (0x2c97, 0x0001),  # Nano-S
+        (0x2c97, 0x1011),  # Nano-S app-bitcoin >= 1.5.1
+        (0x2c97, 0x1015),  # Nano-S app-bitcoin >= 1.5.1
+        (0x2c97, 0x0004),  # Nano-X
+        (0x2c97, 0x4011),  # Nano-X app-bitcoin >= 1.5.1
+        (0x2c97, 0x4015),  # Nano-X app-bitcoin >= 1.5.1
+        (0x2c97, 0x0005),  # RFU
+        (0x2c97, 0x0006),  # RFU
+        (0x2c97, 0x0007),  # RFU
+        (0x2c97, 0x0008),  # RFU
+        (0x2c97, 0x0009),  # RFU
+        (0x2c97, 0x000a)  # RFU
+    ]
     VENDOR_IDS = (0x2c97,)
     LEDGER_MODEL_IDS = {
         0x10: "Ledger Nano S",
@@ -694,7 +989,7 @@ class LedgerPlugin(HW_PluginBase):
         device_id = device_info.device.id_
         client = self.scan_and_create_client_for_device(device_id=device_id, wizard=wizard)
         wizard.run_task_without_blocking_gui(
-            task=lambda: client.get_xpub("m/0'", 'standard'))  # TODO replace by direct derivation once Nano S > 1.1
+            task=lambda: client.get_xpub("m/175'", 'standard'))  # TODO replace by direct derivation once Nano S > 1.1
         return client
 
     def get_xpub(self, device_id, derivation, xtype, wizard):
@@ -713,7 +1008,7 @@ class LedgerPlugin(HW_PluginBase):
                                     devices=devices,
                                     allow_user_interaction=allow_user_interaction)
         # returns the client for a given keystore. can use xpub
-        #if client:
+        # if client:
         #    client.used()
         if client is not None:
             client.checkDevice()
@@ -726,7 +1021,8 @@ class LedgerPlugin(HW_PluginBase):
         if not self.show_address_helper(wallet, address, keystore):
             return
         if type(wallet) is not Standard_Wallet:
-            keystore.handler.show_error(_('This function is only available for standard wallets when using {}.').format(self.device))
+            keystore.handler.show_error(
+                _('This function is only available for standard wallets when using {}.').format(self.device))
             return
         sequence = wallet.get_address_index(address)
         txin_type = wallet.get_txin_type(address)

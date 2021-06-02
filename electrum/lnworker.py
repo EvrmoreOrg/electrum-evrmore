@@ -31,8 +31,8 @@ from .invoices import PR_TYPE_LN, PR_UNPAID, PR_EXPIRED, PR_PAID, PR_INFLIGHT, P
 from .util import NetworkRetryManager, JsonRPCClient
 from .lnutil import LN_MAX_FUNDING_SAT
 from .keystore import BIP32_KeyStore
-from .bitcoin import COIN
-from .bitcoin import opcodes, make_op_return, address_to_scripthash
+from .ravencoin import COIN
+from .ravencoin import opcodes, make_op_return, address_to_scripthash
 from .transaction import Transaction
 from .transaction import get_script_type_from_output_script
 from .crypto import sha256
@@ -52,7 +52,7 @@ from .lnchannel import ChannelState, PeerState
 from .lnrater import LNRater
 from . import lnutil
 from .lnutil import funding_output_script
-from .bitcoin import redeem_script_to_address
+from .ravencoin import redeem_script_to_address
 from .lnutil import (Outpoint, LNPeerAddr,
                      get_compressed_pubkey_from_bech32, extract_nodeid,
                      PaymentFailure, split_host_port, ConnStringFormatError,
@@ -405,9 +405,9 @@ class LNWorker(Logger, NetworkRetryManager[LNPeerAddr]):
                 return [peer]
 
         # getting desperate... let's try hardcoded fallback list of peers
-        if constants.net in (constants.BitcoinTestnet,):
+        if constants.net in (constants.RavencoinTestnet,):
             fallback_list = FALLBACK_NODE_LIST_TESTNET
-        elif constants.net in (constants.BitcoinMainnet,):
+        elif constants.net in (constants.RavencoinMainnet,):
             fallback_list = FALLBACK_NODE_LIST_MAINNET
         else:
             return []  # regtest??

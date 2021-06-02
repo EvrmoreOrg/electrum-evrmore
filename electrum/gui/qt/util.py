@@ -680,11 +680,14 @@ class MyTreeView(QTreeView):
         # overriding this might allow avoiding storing duplicate data
         return self.get_role_data_from_coordinate(row, col, role=self.ROLE_EDIT_KEY)
 
+    # TODO: Fix this; not always getting correct string values
     def get_filter_data_from_coordinate(self, row, col) -> str:
         filter_data = self.get_role_data_from_coordinate(row, col, role=self.ROLE_FILTER_DATA)
         if filter_data:
             return filter_data
         txt = self.get_text_from_coordinate(row, col)
+        if not txt:
+            txt = ''
         txt = txt.lower()
         return txt
 

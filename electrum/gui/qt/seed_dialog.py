@@ -75,11 +75,16 @@ class SeedLayout(QVBoxLayout):
                 self.on_edit()
                 if b:
                     msg = ' '.join([
-                        '<b>' + _('Warning') + ':</b>  ',
-                        _('BIP39 seeds can be imported in Electrum, so that users can access funds locked in other wallets.'),
-                        _('However, we do not generate BIP39 seeds, because they do not meet our safety standard.'),
-                        _('BIP39 seeds do not include a version number, which compromises compatibility with future software.'),
-                        _('We do not guarantee that BIP39 imports will always be supported in Electrum.'),
+                        # '<b>' + _('Warning') + ':</b>  ',
+                        # _('BIP39 seeds can be imported in Electrum, so that users can access funds locked in other wallets.'),
+                        # _('However, we do not generate BIP39 seeds, because they do not meet our safety standard.'),
+                        # _('BIP39 seeds do not include a version number, which compromises compatibility with future software.'),
+                        # _('We do not guarantee that BIP39 imports will always be supported in Electrum.'),
+                        '<b>' + _('Notice') + ':</b>  ',
+                        _('BIP39 seeds can be imported into Electrum so that users can access funds in other wallets.'),
+                        _('However, we do not generate BIP39 seeds due to some security concerns.'),
+                        _('More information can be found here:'),
+                        _('https://electrum.readthedocs.io/en/latest/seedphrase.html'),
                     ])
                 else:
                     msg = ''

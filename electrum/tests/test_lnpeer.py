@@ -12,13 +12,13 @@ from typing import Iterable, NamedTuple, Tuple, List, Dict
 
 from aiorpcx import TaskGroup, timeout_after, TaskTimeout
 
-from electrum import bitcoin
+from electrum import ravencoin
 from electrum import constants
 from electrum.network import Network
 from electrum.ecc import ECPrivkey
 from electrum import simple_config, lnutil
 from electrum.lnaddr import lnencode, LnAddr, lndecode
-from electrum.bitcoin import COIN, sha256
+from electrum.ravencoin import COIN, sha256
 from electrum.util import bh2u, create_and_start_event_loop, NetworkRetryManager, bfh
 from electrum.lnpeer import Peer, UpfrontShutdownScriptViolation
 from electrum.lnutil import LNPeerAddr, Keypair, privkey_to_pubkey
@@ -1009,8 +1009,8 @@ class TestPeer(TestCaseForTestnet):
         # create upfront shutdown script for bob, alice doesn't use upfront
         # shutdown script
         bob_uss_pub = lnutil.privkey_to_pubkey(os.urandom(32))
-        bob_uss_addr = bitcoin.pubkey_to_address('p2wpkh', bh2u(bob_uss_pub))
-        bob_uss = bfh(bitcoin.address_to_script(bob_uss_addr))
+        bob_uss_addr = ravencoin.pubkey_to_address('p2wpkh', bh2u(bob_uss_pub))
+        bob_uss = bfh(ravencoin.address_to_script(bob_uss_addr))
 
         # bob commits to close to bob_uss
         alice_channel.config[HTLCOwner.REMOTE].upfront_shutdown_script = bob_uss

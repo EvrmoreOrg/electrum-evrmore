@@ -1,6 +1,6 @@
 include LICENCE RELEASE-NOTES AUTHORS
 include README.rst
-include electrum.desktop
+include electrum-ravencoin.desktop
 include *.py
 include run_electrum
 recursive-include packages *.py

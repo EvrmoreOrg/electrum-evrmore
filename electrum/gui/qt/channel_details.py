@@ -11,7 +11,7 @@ from electrum.util import bh2u, format_time
 from electrum.lnutil import format_short_channel_id, LOCAL, REMOTE, UpdateAddHtlc, Direction
 from electrum.lnchannel import htlcsum, Channel, AbstractChannel
 from electrum.lnaddr import LnAddr, lndecode
-from electrum.bitcoin import COIN
+from electrum.ravencoin import COIN
 from electrum.wallet import Abstract_Wallet
 
 from .util import Buttons, CloseButton, ButtonsLineEdit, MessageBoxMixin

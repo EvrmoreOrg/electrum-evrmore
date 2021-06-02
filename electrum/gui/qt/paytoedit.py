@@ -30,10 +30,10 @@ from typing import NamedTuple, Sequence, Optional, List, TYPE_CHECKING
 
 from PyQt5.QtGui import QFontMetrics, QFont
 
-from electrum import bitcoin
-from electrum.util import bfh, maybe_extract_bolt11_invoice, BITCOIN_BIP21_URI_SCHEME
-from electrum.transaction import PartialTxOutput
-from electrum.bitcoin import opcodes, construct_script
+from electrum import ravencoin
+from electrum.util import bfh, maybe_extract_bolt11_invoice, BITCOIN_BIP21_URI_SCHEME, Satoshis
+from electrum.transaction import PartialTxOutput, RavenValue
+from electrum.ravencoin import opcodes, construct_script
 from electrum.logging import Logger
 from electrum.lnaddr import LnDecodeException
 
@@ -106,7 +106,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
     def parse_output(self, x) -> bytes:
         try:
             address = self.parse_address(x)
-            return bfh(bitcoin.address_to_script(address))
+            return bfh(ravencoin.address_to_script(address))
         except Exception:
             pass
         try:
@@ -143,7 +143,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
         r = line.strip()
         m = re.match('^'+RE_ALIAS+'$', r)
         address = str(m.group(2) if m else r)
-        assert bitcoin.is_address(address)
+        assert ravencoin.is_address(address)
         return address
 
     def check_text(self):
@@ -236,7 +236,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
             if is_max:
                 amount = '!'
             else:
-                amount = self.amount_edit.get_amount()
+                amount = RavenValue(Satoshis(self.amount_edit.get_amount()))
             self.outputs = [PartialTxOutput(scriptpubkey=self.payto_scriptpubkey, value=amount)]
 
         return self.outputs[:]
@@ -282,7 +282,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
         if not (('.' in key) and (not '<' in key) and (not ' ' in key)):
             return
         parts = key.split(sep=',')  # assuming single line
-        if parts and len(parts) > 0 and bitcoin.is_address(parts[0]):
+        if parts and len(parts) > 0 and ravencoin.is_address(parts[0]):
             return
         try:
             data = self.win.contacts.resolve(key)

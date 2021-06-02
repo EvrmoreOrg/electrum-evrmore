@@ -353,9 +353,9 @@ POINT_AT_INFINITY = ECPubkey(None)
 
 
 def msg_magic(message: bytes) -> bytes:
-    from .bitcoin import var_int
+    from .ravencoin import var_int
     length = bfh(var_int(len(message)))
-    return b"\x18Bitcoin Signed Message:\n" + length + message
+    return b"\x16Raven Signed Message:\n" + length + message
 
 
 def verify_signature(pubkey: bytes, sig: bytes, h: bytes) -> bool:
@@ -366,7 +366,7 @@ def verify_signature(pubkey: bytes, sig: bytes, h: bytes) -> bool:
     return True
 
 def verify_message_with_address(address: str, sig65: bytes, message: bytes, *, net=None):
-    from .bitcoin import pubkey_to_address
+    from .ravencoin import pubkey_to_address
     assert_bytes(sig65, message)
     if net is None: net = constants.net
     try:

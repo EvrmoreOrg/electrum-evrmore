@@ -30,7 +30,7 @@ from functools import partial
 from electrum.plugin import (BasePlugin, hook, Device, DeviceMgr, DeviceInfo,
                              assert_runs_in_hwd_thread, runs_in_hwd_thread)
 from electrum.i18n import _
-from electrum.bitcoin import is_address, opcodes
+from electrum.ravencoin import is_address, opcodes
 from electrum.util import bfh, versiontuple, UserFacingException
 from electrum.transaction import TxOutput, Transaction, PartialTransaction, PartialTxInput, PartialTxOutput
 from electrum.bip32 import BIP32Node

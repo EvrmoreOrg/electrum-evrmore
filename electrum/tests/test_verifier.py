@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from electrum.bitcoin import hash_encode
+from electrum.ravencoin import hash_encode
 from electrum.transaction import Transaction
 from electrum.util import bfh
 from electrum.verifier import SPV, InnerNodeOfSpvProofIsValidTx

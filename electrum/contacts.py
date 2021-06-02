@@ -25,7 +25,7 @@ import re
 import dns
 from dns.exception import DNSException
 
-from . import bitcoin
+from . import ravencoin
 from . import dnssec
 from .util import read_json_file, write_json_file, to_string
 from .logging import Logger
@@ -44,7 +44,7 @@ class Contacts(dict, Logger):
         # backward compatibility
         for k, v in self.items():
             _type, n = v
-            if _type == 'address' and bitcoin.is_address(n):
+            if _type == 'address' and ravencoin.is_address(n):
                 self.pop(k)
                 self[n] = ('address', k)
 
@@ -71,7 +71,7 @@ class Contacts(dict, Logger):
             return res
 
     def resolve(self, k):
-        if bitcoin.is_address(k):
+        if ravencoin.is_address(k):
             return {
                 'address': k,
                 'type': 'address'
@@ -92,7 +92,7 @@ class Contacts(dict, Logger):
                 'type': 'openalias',
                 'validated': validated
             }
-        raise Exception("Invalid Bitcoin address or alias", k)
+        raise Exception("Invalid ravencoin address or alias", k)
 
     def resolve_openalias(self, url):
         # support email-style addresses, per the OA standard
@@ -102,7 +102,7 @@ class Contacts(dict, Logger):
         except DNSException as e:
             self.logger.info(f'Error resolving openalias: {repr(e)}')
             return None
-        prefix = 'btc'
+        prefix = 'rvn'
         for record in records:
             string = to_string(record.strings[0], 'utf8')
             if string.startswith('oa1:' + prefix):
@@ -125,7 +125,7 @@ class Contacts(dict, Logger):
         for k, v in list(data.items()):
             if k == 'contacts':
                 return self._validate(v)
-            if not bitcoin.is_address(k):
+            if not ravencoin.is_address(k):
                 data.pop(k)
             else:
                 _type, _ = v

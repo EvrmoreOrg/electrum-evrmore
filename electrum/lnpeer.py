@@ -17,14 +17,14 @@ import aiorpcx
 from aiorpcx import TaskGroup
 
 from .crypto import sha256, sha256d
-from . import bitcoin, util
+from . import ravencoin, util
 from . import ecc
 from .ecc import sig_string_from_r_and_s, der_sig_from_sig_string
 from . import constants
 from .util import (bh2u, bfh, log_exceptions, ignore_exceptions, chunks, SilentTaskGroup,
                    UnrelatedTransactionException)
 from . import transaction
-from .bitcoin import make_op_return
+from .ravencoin import make_op_return
 from .transaction import PartialTxOutput, match_script_against_template
 from .logging import Logger
 from .lnonion import (new_onion_packet, OnionFailureCode, calc_hops_data_for_payment,
@@ -532,7 +532,7 @@ class Peer(Logger):
             static_remotekey = bfh(wallet.get_public_key(addr))
         else:
             static_remotekey = None
-        dust_limit_sat = bitcoin.DUST_LIMIT_DEFAULT_SAT_LEGACY
+        dust_limit_sat = ravencoin.DUST_LIMIT_DEFAULT_SAT_LEGACY
         reserve_sat = max(funding_sat // 100, dust_limit_sat)
         # for comparison of defaults, see
         # https://github.com/ACINQ/eclair/blob/afa378fbb73c265da44856b4ad0f2128a88ae6c6/eclair-core/src/main/resources/reference.conf#L66
@@ -689,7 +689,7 @@ class Peer(Logger):
         # -> funding created
         # replace dummy output in funding tx
         redeem_script = funding_output_script(local_config, remote_config)
-        funding_address = bitcoin.redeem_script_to_address('p2wsh', redeem_script)
+        funding_address = ravencoin.redeem_script_to_address('p2wsh', redeem_script)
         funding_output = PartialTxOutput.from_address_and_value(funding_address, funding_sat)
         dummy_output = PartialTxOutput.from_address_and_value(ln_dummy_address(), funding_sat)
         if dummy_output not in funding_tx.outputs(): raise Exception("LN dummy output (err 1)")
@@ -1360,7 +1360,7 @@ class Peer(Logger):
         self.logger.info(f"on_update_add_htlc. chan {chan.short_channel_id}. htlc={str(htlc)}")
         if chan.get_state() != ChannelState.OPEN:
             raise RemoteMisbehaving(f"received update_add_htlc while chan.get_state() != OPEN. state was {chan.get_state()!r}")
-        if cltv_expiry > bitcoin.NLOCKTIME_BLOCKHEIGHT_MAX:
+        if cltv_expiry > ravencoin.NLOCKTIME_BLOCKHEIGHT_MAX:
             asyncio.ensure_future(self.lnworker.try_force_closing(chan.channel_id))
             raise RemoteMisbehaving(f"received update_add_htlc with cltv_expiry > BLOCKHEIGHT_MAX. value was {cltv_expiry}")
         # add htlc
@@ -1748,7 +1748,7 @@ class Peer(Logger):
         if chan.config[LOCAL].upfront_shutdown_script:
             scriptpubkey = chan.config[LOCAL].upfront_shutdown_script
         else:
-            scriptpubkey = bfh(bitcoin.address_to_script(chan.sweep_address))
+            scriptpubkey = bfh(ravencoin.address_to_script(chan.sweep_address))
         assert scriptpubkey
         # wait until no more pending updates (bolt2)
         chan.set_can_send_ctx_updates(False)
@@ -1771,7 +1771,7 @@ class Peer(Logger):
         if chan.config[LOCAL].upfront_shutdown_script:
             our_scriptpubkey = chan.config[LOCAL].upfront_shutdown_script
         else:
-            our_scriptpubkey = bfh(bitcoin.address_to_script(chan.sweep_address))
+            our_scriptpubkey = bfh(ravencoin.address_to_script(chan.sweep_address))
         assert our_scriptpubkey
         # estimate fee of closing tx
         our_sig, closing_tx = chan.make_closing_tx(our_scriptpubkey, their_scriptpubkey, fee_sat=0)

@@ -1,0 +1,17 @@
+Metadata-Version: 2.1
+Name: Electrum-Ravencoin
+Version: 0.3.0
+Summary: Lightweight Ravencoin Wallet
+Home-page: https://github.com/Electrum-RVN-SIG/electrum-ravencoin
+Author: kralverde
+Author-email: electrum.raven@gmail.com
+License: MIT Licence
+Description: Lightweight Ravencoin Wallet
+Platform: UNKNOWN
+Requires-Python: >=3.6.1
+Provides-Extra: crypto
+Provides-Extra: fast
+Provides-Extra: full
+Provides-Extra: gui
+Provides-Extra: hardware
+Provides-Extra: tests

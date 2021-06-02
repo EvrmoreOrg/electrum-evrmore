@@ -1,12 +1,19 @@
 qrcode
 protobuf>=3.12
+
+# Ran sudo pip install --upgrade protobuf to fix _interal_create_key error
+
 qdarkstyle<2.9
 aiorpcx>=0.18.7,<0.19
 aiohttp>=3.3.0,<4.0.0
 aiohttp_socks>=0.3
+recordclass
 certifi
 bitstring
 attrs>=19.2.0
+x16r_hash
+x16rv2_hash
+kawpow
 
 # Note that we also need the dnspython[DNSSEC] extra which pulls in cryptography,
 # but as that is not pure-python it cannot be listed in this file!

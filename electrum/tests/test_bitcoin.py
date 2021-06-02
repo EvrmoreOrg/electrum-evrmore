@@ -1,14 +1,14 @@
 import base64
 import sys
 
-from electrum.bitcoin import (public_key_to_p2pkh, address_from_private_key,
-                              is_address, is_private_key,
-                              var_int, _op_push, address_to_script,
-                              deserialize_privkey, serialize_privkey, is_segwit_address,
-                              is_b58_address, address_to_scripthash, is_minikey,
-                              is_compressed_privkey, EncodeBase58Check, DecodeBase58Check,
-                              script_num_to_hex, push_script, add_number_to_script, int_to_hex,
-                              opcodes, base_encode, base_decode, BitcoinException)
+from electrum.ravencoin import (public_key_to_p2pkh, address_from_private_key,
+                                is_address, is_private_key,
+                                var_int, _op_push, address_to_script,
+                                deserialize_privkey, serialize_privkey, is_segwit_address,
+                                is_b58_address, address_to_scripthash, is_minikey,
+                                is_compressed_privkey, EncodeBase58Check, DecodeBase58Check,
+                                script_num_to_hex, push_script, add_number_to_script, int_to_hex,
+                                opcodes, base_encode, base_decode, BitcoinException)
 from electrum import bip32
 from electrum import segwit_addr
 from electrum.segwit_addr import DecodedBech32

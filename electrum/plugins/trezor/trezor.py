@@ -115,9 +115,9 @@ class TrezorPlugin(HW_PluginBase):
 
     firmware_URL = 'https://wallet.trezor.io'
     libraries_URL = 'https://pypi.org/project/trezor/'
-    minimum_firmware = (1, 5, 2)
+    minimum_firmware = (1, 6, 0)
     keystore_class = TrezorKeyStore
-    minimum_library = (0, 12, 0)
+    minimum_library = (0, 11, 0)
     maximum_library = (0, 13)
     SUPPORTED_XTYPES = ('standard', 'p2wpkh-p2sh', 'p2wpkh', 'p2wsh-p2sh', 'p2wsh')
     DEVICE_IDS = (TREZOR_PRODUCT_KEY,)
@@ -206,7 +206,7 @@ class TrezorPlugin(HW_PluginBase):
         return client
 
     def get_coin_name(self):
-        return "Testnet" if constants.net.TESTNET else "Bitcoin"
+        return "Ravencoin Testnet" if constants.net.TESTNET else "Ravencoin"
 
     def initialize_device(self, device_id, wizard, handler):
         # Initialization method
@@ -376,6 +376,7 @@ class TrezorPlugin(HW_PluginBase):
         client = self.get_client(keystore)
         client.show_address(address_path, script_type, multisig)
 
+    # TODO: Only RVN
     def tx_inputs(self, tx: Transaction, *, for_sig=False, keystore: 'TrezorKeyStore' = None):
         inputs = []
         for txin in tx.inputs():
@@ -405,7 +406,7 @@ class TrezorPlugin(HW_PluginBase):
                 prev_index = txin.prevout.out_idx
 
             if txin.value_sats() is not None:
-                txinputtype.amount = txin.value_sats()
+                txinputtype.amount = txin.value_sats().rvn_value.value
             txinputtype.prev_hash = prev_hash
             txinputtype.prev_index = prev_index
 
@@ -427,6 +428,7 @@ class TrezorPlugin(HW_PluginBase):
             signatures=[b''] * len(pubkeys),
             m=m)
 
+    # TODO: Currently only Ravencoin
     def tx_outputs(self, tx: PartialTransaction, *, keystore: 'TrezorKeyStore'):
 
         def create_output_by_derivation():
@@ -440,14 +442,14 @@ class TrezorPlugin(HW_PluginBase):
             assert full_path
             txoutputtype = TxOutputType(
                 multisig=multisig,
-                amount=txout.value,
+                amount=txout.value.rvn_value.value,
                 address_n=full_path,
                 script_type=script_type)
             return txoutputtype
 
         def create_output_by_address():
             txoutputtype = TxOutputType()
-            txoutputtype.amount = txout.value
+            txoutputtype.amount = txout.value.rvn_value.value
             if address:
                 txoutputtype.script_type = OutputScriptType.PAYTOADDRESS
                 txoutputtype.address = address
@@ -481,6 +483,7 @@ class TrezorPlugin(HW_PluginBase):
 
         return outputs
 
+    # TODO: RVN Only
     def electrum_tx_to_txtype(self, tx: Optional[Transaction]):
         t = TransactionType()
         if tx is None:
@@ -491,7 +494,7 @@ class TrezorPlugin(HW_PluginBase):
         t.lock_time = tx.locktime
         t.inputs = self.tx_inputs(tx)
         t.bin_outputs = [
-            TxOutputBinType(amount=o.value, script_pubkey=o.scriptpubkey)
+            TxOutputBinType(amount=o.value.rvn_value.value, script_pubkey=o.scriptpubkey)
             for o in tx.outputs()
         ]
         return t

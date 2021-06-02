@@ -54,7 +54,9 @@ class BaseCrashReporter(Logger):
     REQUEST_HELP_MESSAGE = _('To help us diagnose and fix the problem, you can send us a bug report that contains '
                              'useful debug information:')
     DESCRIBE_ERROR_MESSAGE = _("Please briefly describe what led to the error (optional):")
-    ASK_CONFIRM_SEND = _("Do you want to send this report?")
+    # ASK_CONFIRM_SEND = _("Do you want to send this report?")
+    ASK_CONFIM_SEND = _("Sorry, remote sending of crash reports has been temporarily disabled. Please ask for help "
+                         "on the Ravencoin discord. (https://discord.gg/VuubYncHz4)")
 
     def __init__(self, exctype, value, tb):
         Logger.__init__(self)

@@ -311,7 +311,7 @@ def configure_logging(config):
     verbosity_shortcuts = config.get('verbosity_shortcuts')
     _configure_stderr_logging(verbosity=verbosity, verbosity_shortcuts=verbosity_shortcuts)
 
-    log_to_file = config.get('log_to_file', False)
+    log_to_file = config.get('log_to_file', True)
     is_android = 'ANDROID_DATA' in os.environ
     if is_android:
         from jnius import autoclass

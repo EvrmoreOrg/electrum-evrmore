@@ -42,7 +42,7 @@ from typing import TYPE_CHECKING, Optional
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 is_bundle = getattr(sys, 'frozen', False)
-is_local = not is_bundle and os.path.exists(os.path.join(script_dir, "electrum.desktop"))
+is_local = not is_bundle and os.path.exists(os.path.join(script_dir, "electrum-ravencoin.desktop"))
 is_android = 'ANDROID_DATA' in os.environ
 
 if is_local:  # running from source
@@ -338,7 +338,7 @@ def main():
         config_options['portable'] = True
 
     if config_options.get('portable'):
-        config_options['electrum_path'] = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'electrum_data')
+        config_options['electrum_path'] = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'electrum_ravencoin_data')
 
     if not config_options.get('verbosity'):
         warnings.simplefilter('ignore', DeprecationWarning)
@@ -351,6 +351,8 @@ def main():
             sys.exit(1)
 
     config = SimpleConfig(config_options)
+    # Segwit is not currently supported
+    config.set_key('nosegwit', True)
 
     # set language as early as possible
     # Note: we are already too late for strings that are declared in the global scope
@@ -362,10 +364,8 @@ def main():
 
     if config.get('testnet'):
         constants.set_testnet()
-    elif config.get('regtest'):
-        constants.set_regtest()
-    elif config.get('simnet'):
-        constants.set_simnet()
+        from electrum import blockchain
+        blockchain.set_constants()
 
     cmdname = config.get('cmd')
 

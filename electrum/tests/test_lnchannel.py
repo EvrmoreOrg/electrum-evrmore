@@ -28,7 +28,7 @@ import binascii
 from pprint import pformat
 import logging
 
-from electrum import bitcoin
+from electrum import ravencoin
 from electrum import lnpeer
 from electrum import lnchannel
 from electrum import lnutil
@@ -42,7 +42,7 @@ from electrum.coinchooser import PRNG
 from . import ElectrumTestCase
 
 
-one_bitcoin_in_msat = bitcoin.COIN * 1000
+one_bitcoin_in_msat = ravencoin.COIN * 1000
 
 
 def create_channel_state(funding_txid, funding_index, funding_sat, is_initiator,
@@ -123,7 +123,7 @@ def create_test_channels(*, feerate=6000, local_msat=None, remote_msat=None,
     random_gen = PRNG(random_seed)
     funding_txid = binascii.hexlify(random_gen.get_bytes(32)).decode("ascii")
     funding_index = 0
-    funding_sat = ((local_msat + remote_msat) // 1000) if local_msat is not None and remote_msat is not None else (bitcoin.COIN * 10)
+    funding_sat = ((local_msat + remote_msat) // 1000) if local_msat is not None and remote_msat is not None else (ravencoin.COIN * 10)
     local_amount = local_msat if local_msat is not None else (funding_sat * 1000 // 2)
     remote_amount = remote_msat if remote_msat is not None else (funding_sat * 1000 // 2)
     alice_raw = [bip32("m/" + str(i)) for i in range(5)]
@@ -190,8 +190,8 @@ def create_test_channels(*, feerate=6000, local_msat=None, remote_msat=None,
     alice.config[REMOTE].next_per_commitment_point = bob_second
     bob.config[REMOTE].next_per_commitment_point = alice_second
 
-    alice._fallback_sweep_address = bitcoin.pubkey_to_address('p2wpkh', alice.config[LOCAL].payment_basepoint.pubkey.hex())
-    bob._fallback_sweep_address = bitcoin.pubkey_to_address('p2wpkh', bob.config[LOCAL].payment_basepoint.pubkey.hex())
+    alice._fallback_sweep_address = ravencoin.pubkey_to_address('p2wpkh', alice.config[LOCAL].payment_basepoint.pubkey.hex())
+    bob._fallback_sweep_address = ravencoin.pubkey_to_address('p2wpkh', bob.config[LOCAL].payment_basepoint.pubkey.hex())
 
     alice._ignore_max_htlc_value = True
     bob._ignore_max_htlc_value = True
@@ -232,7 +232,7 @@ class TestChannel(ElectrumTestCase):
         self.alice_channel, self.bob_channel = create_test_channels()
 
         self.paymentPreimage = b"\x01" * 32
-        paymentHash = bitcoin.sha256(self.paymentPreimage)
+        paymentHash = ravencoin.sha256(self.paymentPreimage)
         self.htlc_dict = {
             'payment_hash' : paymentHash,
             'amount_msat' :  one_bitcoin_in_msat,
@@ -254,7 +254,7 @@ class TestChannel(ElectrumTestCase):
         self.htlc = self.bob_channel.hm.log[REMOTE]['adds'][0]
 
     def test_concurrent_reversed_payment(self):
-        self.htlc_dict['payment_hash'] = bitcoin.sha256(32 * b'\x02')
+        self.htlc_dict['payment_hash'] = ravencoin.sha256(32 * b'\x02')
         self.htlc_dict['amount_msat'] += 1000
         self.bob_channel.add_htlc(self.htlc_dict)
         self.alice_channel.receive_htlc(self.htlc_dict)
@@ -619,9 +619,9 @@ class TestChannel(ElectrumTestCase):
         self.alice_to_bob_fee_update(0)
         force_state_transition(self.alice_channel, self.bob_channel)
 
-        self.htlc_dict['payment_hash'] = bitcoin.sha256(32 * b'\x02')
+        self.htlc_dict['payment_hash'] = ravencoin.sha256(32 * b'\x02')
         self.alice_channel.add_htlc(self.htlc_dict)
-        self.htlc_dict['payment_hash'] = bitcoin.sha256(32 * b'\x03')
+        self.htlc_dict['payment_hash'] = ravencoin.sha256(32 * b'\x03')
         self.alice_channel.add_htlc(self.htlc_dict)
         # now there are three htlcs (one was in setUp)
 
@@ -630,7 +630,7 @@ class TestChannel(ElectrumTestCase):
         # has to pay a commitment fee).
         new = dict(self.htlc_dict)
         new['amount_msat'] *= 2.5
-        new['payment_hash'] = bitcoin.sha256(32 * b'\x04')
+        new['payment_hash'] = ravencoin.sha256(32 * b'\x04')
         with self.assertRaises(lnutil.PaymentFailure) as cm:
             self.alice_channel.add_htlc(new)
         self.assertIn('Not enough local balance', cm.exception.args[0])
@@ -643,7 +643,7 @@ class TestAvailableToSpend(ElectrumTestCase):
         self.assertEqual(500000000000, bob_channel.available_to_spend(LOCAL))
 
         paymentPreimage = b"\x01" * 32
-        paymentHash = bitcoin.sha256(paymentPreimage)
+        paymentHash = ravencoin.sha256(paymentPreimage)
         htlc_dict = {
             'payment_hash' : paymentHash,
             'amount_msat' :  one_bitcoin_in_msat * 41 // 10,
@@ -686,7 +686,7 @@ class TestAvailableToSpend(ElectrumTestCase):
     def test_max_htlc_value(self):
         alice_channel, bob_channel = create_test_channels()
         paymentPreimage = b"\x01" * 32
-        paymentHash = bitcoin.sha256(paymentPreimage)
+        paymentHash = ravencoin.sha256(paymentPreimage)
         htlc_dict = {
             'payment_hash' : paymentHash,
             'amount_msat' :  one_bitcoin_in_msat * 41 // 10,
@@ -737,7 +737,7 @@ class TestChanReserve(ElectrumTestCase):
         #	Alice:	4.5
         #	Bob:	5.0
         paymentPreimage = b"\x01" * 32
-        paymentHash = bitcoin.sha256(paymentPreimage)
+        paymentHash = ravencoin.sha256(paymentPreimage)
         htlc_dict = {
             'payment_hash' : paymentHash,
             'amount_msat' :  int(.5 * one_bitcoin_in_msat),
@@ -763,14 +763,14 @@ class TestChanReserve(ElectrumTestCase):
         #	Alice:	4.5
         #	Bob:	5.0
         with self.assertRaises(lnutil.PaymentFailure):
-            htlc_dict['payment_hash'] = bitcoin.sha256(32 * b'\x02')
+            htlc_dict['payment_hash'] = ravencoin.sha256(32 * b'\x02')
             self.bob_channel.add_htlc(htlc_dict)
         with self.assertRaises(lnutil.RemoteMisbehaving):
             self.alice_channel.receive_htlc(htlc_dict)
 
     def part2(self):
         paymentPreimage = b"\x01" * 32
-        paymentHash = bitcoin.sha256(paymentPreimage)
+        paymentHash = ravencoin.sha256(paymentPreimage)
         # Now we'll add HTLC of 3.5 BTC to Alice's commitment, this should put
         # Alice's balance at 1.5 BTC.
         #
@@ -800,7 +800,7 @@ class TestChanReserve(ElectrumTestCase):
         #	Alice:	3.0
         #	Bob:	7.0
         paymentPreimage = b"\x01" * 32
-        paymentHash = bitcoin.sha256(paymentPreimage)
+        paymentHash = ravencoin.sha256(paymentPreimage)
         htlc_dict = {
             'payment_hash' : paymentHash,
             'amount_msat' :  int(2 * one_bitcoin_in_msat),
@@ -841,7 +841,7 @@ class TestDust(ElectrumTestCase):
         alice_channel, bob_channel = create_test_channels()
 
         paymentPreimage = b"\x01" * 32
-        paymentHash = bitcoin.sha256(paymentPreimage)
+        paymentHash = ravencoin.sha256(paymentPreimage)
         fee_per_kw = alice_channel.get_next_feerate(LOCAL)
         self.assertEqual(fee_per_kw, 6000)
         htlcAmt = 500 + lnutil.HTLC_TIMEOUT_WEIGHT * (fee_per_kw // 1000)

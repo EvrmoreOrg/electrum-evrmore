@@ -6,7 +6,7 @@ from typing import Optional, Dict, List, Tuple, TYPE_CHECKING, NamedTuple, Calla
 from enum import Enum, auto
 
 from .util import bfh, bh2u
-from .bitcoin import redeem_script_to_address, dust_threshold, construct_witness
+from .ravencoin import redeem_script_to_address, dust_threshold, construct_witness
 from . import ecc
 from .lnutil import (make_commitment_output_to_remote_address, make_commitment_output_to_local_witness_script,
                      derive_privkey, derive_pubkey, derive_blinded_pubkey, derive_blinded_privkey,

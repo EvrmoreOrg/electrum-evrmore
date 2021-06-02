@@ -4,10 +4,10 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules, coll
 
 import sys, os
 
-PACKAGE='Electrum'
+PACKAGE='Electrum-Ravencoin'
 PYPKG='electrum'
 MAIN_SCRIPT='run_electrum'
-ICONS_FILE=PYPKG + '/gui/icons/electrum.icns'
+ICONS_FILE=PYPKG + '/gui/icons/electrum-ravencoin.icns'
 APP_SIGN = os.environ.get('APP_SIGN', '')
 
 def fail(*msg):
@@ -101,17 +101,17 @@ a = Analysis([electrum+ MAIN_SCRIPT,
               electrum+'electrum/util.py',
               electrum+'electrum/wallet.py',
               electrum+'electrum/simple_config.py',
-              electrum+'electrum/bitcoin.py',
+              electrum+'electrum/ravencoin.py',
               electrum+'electrum/dnssec.py',
               electrum+'electrum/commands.py',
               electrum+'electrum/plugins/cosigner_pool/qt.py',
               electrum+'electrum/plugins/email_requests/qt.py',
               electrum+'electrum/plugins/trezor/qt.py',
-              electrum+'electrum/plugins/safe_t/client.py',
-              electrum+'electrum/plugins/safe_t/qt.py',
-              electrum+'electrum/plugins/keepkey/qt.py',
+              #electrum+'electrum/plugins/safe_t/client.py',
+              #electrum+'electrum/plugins/safe_t/qt.py',
+              #electrum+'electrum/plugins/keepkey/qt.py',
               electrum+'electrum/plugins/ledger/qt.py',
-              electrum+'electrum/plugins/coldcard/qt.py',
+              #electrum+'electrum/plugins/coldcard/qt.py',
               ],
              binaries=binaries,
              datas=datas,

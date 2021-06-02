@@ -6,11 +6,11 @@ import attr
 
 from .json_db import StoredObject
 from .i18n import _
-from .util import age, InvoiceError
+from .util import age, InvoiceError, Satoshis
 from .lnaddr import lndecode, LnAddr
 from . import constants
-from .bitcoin import COIN, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC
-from .transaction import PartialTxOutput
+from .ravencoin import COIN, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC
+from .transaction import PartialTxOutput, RavenValue
 
 if TYPE_CHECKING:
     from .paymentrequest import PaymentRequest
@@ -98,7 +98,7 @@ class Invoice(StoredObject):
                 status_str = _('Expires') + ' ' + age(expiration, include_seconds=True)
         return status_str
 
-    def get_amount_sat(self) -> Union[int, Decimal, str, None]:
+    def get_amount_sat(self) -> Union[RavenValue, str, None]:
         """Returns a decimal satoshi amount, or '!' or None."""
         raise NotImplementedError()
 
@@ -114,7 +114,7 @@ class Invoice(StoredObject):
 @attr.s
 class OnchainInvoice(Invoice):
     message = attr.ib(type=str, kw_only=True)
-    amount_sat = attr.ib(kw_only=True)  # type: Union[int, str]  # in satoshis. can be '!'
+    amount_sat = attr.ib(kw_only=True)  # type: Union[RavenValue, str]  # in satoshis. can be '!'
     exp = attr.ib(type=int, kw_only=True, validator=attr.validators.instance_of(int))
     time = attr.ib(type=int, kw_only=True, validator=attr.validators.instance_of(int))
     id = attr.ib(type=str, kw_only=True)
@@ -127,13 +127,19 @@ class OnchainInvoice(Invoice):
         """returns the first address, to be displayed in GUI"""
         return self.outputs[0].address
 
-    def get_amount_sat(self) -> Union[int, str]:
-        return self.amount_sat or 0
+    def get_amount_sat(self) -> Union[RavenValue, str]:
+        if self.amount_sat == '!':
+            return '!'
+        return self.amount_sat or RavenValue()
 
     @amount_sat.validator
     def _validate_amount(self, attribute, value):
         if isinstance(value, int):
-            if not (0 <= value <= TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN):
+            self.amount_sat = value = RavenValue(value)
+        elif isinstance(value, Dict):
+            self.amount_sat = value = RavenValue.from_json(value)
+        if isinstance(value, RavenValue):
+            if not (0 <= value.rvn_value <= TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN):
                 raise InvoiceError(f"amount is out-of-bounds: {value!r} sat")
         elif isinstance(value, str):
             if value != "!":
@@ -192,11 +198,11 @@ class LNInvoice(Invoice):
         amount = int(amount_btc * COIN * 1000) if amount_btc else None
         return amount or self.amount_msat
 
-    def get_amount_sat(self) -> Union[Decimal, None]:
+    def get_amount_sat(self) -> Union[RavenValue, None]:
         amount_msat = self.get_amount_msat()
         if amount_msat is None:
             return None
-        return Decimal(amount_msat) / 1000
+        return RavenValue(Satoshis(Decimal(amount_msat) / 1000))
 
     @property
     def exp(self) -> int:

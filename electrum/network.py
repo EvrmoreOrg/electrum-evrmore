@@ -48,13 +48,13 @@ from .util import (log_exceptions, ignore_exceptions,
                    bfh, SilentTaskGroup, make_aiohttp_session, send_exception_to_crash_reporter,
                    is_hash256_str, is_non_negative_integer, MyEncoder, NetworkRetryManager,
                    nullcontext)
-from .bitcoin import COIN
+from .ravencoin import COIN
 from . import constants
 from . import blockchain
-from . import bitcoin
+from . import ravencoin
 from . import dns_hacks
 from .transaction import Transaction
-from .blockchain import Blockchain, HEADER_SIZE
+from .blockchain import Blockchain
 from .interface import (Interface, PREFERRED_NETWORK_PROTOCOL,
                         RequestTimedOut, NetworkTimeout, BUCKET_NAME_OF_ONION_SERVERS,
                         NetworkException, RequestCorrupted, ServerAddr)
@@ -874,6 +874,25 @@ class Network(Logger, NetworkRetryManager[ServerAddr]):
 
     @best_effort_reliable
     @catch_server_exceptions
+    async def listasset_for_scripthash(self, sh: str) -> List[dict]:
+        if not is_hash256_str(sh):
+            raise Exception(f"{repr(sh)} is not a scripthash")
+        return await self.interface.session.send_request('blockchain.scripthash.listassets', [sh])
+
+    @best_effort_reliable
+    @catch_server_exceptions
+    async def get_meta_for_asset(self, name: str) -> dict:
+        return await self.interface.session.send_request('blockchain.asset.get_meta', [name])
+
+    @best_effort_reliable
+    @catch_server_exceptions
+    async def get_asset_balance_for_scripthash(self, sh: str) -> dict:
+        if not is_hash256_str(sh):
+            raise Exception(f"{repr(sh)} is not a scripthash")
+        return await self.interface.session.send_request('blockchain.scripthash.get_asset_balance', [sh])
+
+    @best_effort_reliable
+    @catch_server_exceptions
     async def get_merkle_for_transaction(self, tx_hash: str, tx_height: int) -> dict:
         return await self.interface.get_merkle_for_transaction(tx_hash=tx_hash, tx_height=tx_height)
 
@@ -1008,7 +1027,7 @@ class Network(Logger, NetworkRetryManager[ServerAddr]):
             r"bad-txns-too-many-sigops": None,
             r"mempool min fee not met":
                 ("mempool min fee not met\n" +
-                 _("Your transaction is paying a fee that is so low that the bitcoin node cannot "
+                 _("Your transaction is paying a fee that is so low that the ravencoin node cannot "
                    "fit it into its mempool. The mempool is already full of hundreds of megabytes "
                    "of transactions that all pay higher fees. Try to increase the fee.")),
             r"min relay fee not met": None,
@@ -1175,14 +1194,6 @@ class Network(Logger, NetworkRetryManager[ServerAddr]):
         but it is the tip of that branch (even if main interface is behind).
         """
         return self.blockchain().height()
-
-    def export_checkpoints(self, path):
-        """Run manually to generate blockchain checkpoints.
-        Kept for console use only.
-        """
-        cp = self.blockchain().get_checkpoints()
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write(json.dumps(cp, indent=4))
 
     async def _start(self):
         assert not self.taskgroup

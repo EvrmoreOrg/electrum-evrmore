@@ -9,7 +9,7 @@ from electrum.lnutil import ShortChannelID
 from electrum.lnonion import (OnionHopsDataSingle, new_onion_packet,
                               process_onion_packet, _decode_onion_error, decode_onion_error,
                               OnionFailureCode, OnionPacket)
-from electrum import bitcoin, lnrouter
+from electrum import ravencoin, lnrouter
 from electrum.constants import BitcoinTestnet
 from electrum.simple_config import SimpleConfig
 from electrum.lnrouter import PathEdge, LiquidityHintMgr, DEFAULT_PENALTY_PROPORTIONAL_MILLIONTH, DEFAULT_PENALTY_BASE_MSAT, fee_for_edge_msat

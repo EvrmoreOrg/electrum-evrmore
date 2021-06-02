@@ -28,7 +28,7 @@ import aiorpcx
 
 from .util import bh2u, TxMinedInfo, NetworkJobOnDefaultServer
 from .crypto import sha256d
-from .bitcoin import hash_decode, hash_encode
+from .ravencoin import hash_decode, hash_encode
 from .transaction import Transaction
 from .blockchain import hash_header
 from .interface import GracefulDisconnect

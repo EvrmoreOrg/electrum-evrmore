@@ -32,7 +32,7 @@ from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont
 from PyQt5.QtWidgets import QAbstractItemView, QMenu, QLabel, QHBoxLayout
 
 from electrum.i18n import _
-from electrum.transaction import PartialTxInput
+from electrum.transaction import PartialTxInput, RavenValue
 
 from .util import MyTreeView, ColorScheme, MONOSPACE_FONT, EnterButton
 
@@ -86,10 +86,17 @@ class UTXOList(MyTreeView):
         if self._spend_set is not None:
             coins = [self._utxo_dict[x] for x in self._spend_set]
             coins = self._filter_frozen_coins(coins)
-            amount = sum(x.value_sats() for x in coins)
-            amount_str = self.parent.format_amount_and_units(amount)
+            amount = sum([x.value_sats() for x in coins], RavenValue())
+            amt = ''
+            rvn = amount.rvn_value
+            assets = amount.assets
+            amt += self.parent.format_amount_and_units(rvn)
+            if assets:
+                amt += ', '
+                assets = ['{}: {}'.format(asset, self.parent.config.format_amount(val)) for asset, val in assets.items()]
+                amt += ', '.join(assets)
             num_outputs_str = _("{} outputs available ({} total)").format(len(coins), len(utxos))
-            self.parent.set_coincontrol_msg(_("Coin control active") + f': {num_outputs_str}, {amount_str}')
+            self.parent.set_coincontrol_msg(_("Coin control active") + f': {num_outputs_str}, {amt}')
         else:
             self.parent.set_coincontrol_msg(None)
 
@@ -100,7 +107,17 @@ class UTXOList(MyTreeView):
         name_short = utxo.prevout.txid.hex()[:16] + '...' + ":%d" % utxo.prevout.out_idx
         self._utxo_dict[name] = utxo
         label = self.wallet.get_label_for_txid(utxo.prevout.txid.hex()) or self.wallet.get_label(address)
-        amount = self.parent.format_amount(utxo.value_sats(), whitespaces=True)
+
+        rvn_val = utxo.value_sats().rvn_value.value
+        if rvn_val != 0:
+            amount = self.parent.format_amount(rvn_val, whitespaces=True)
+            amount += ' RVN'
+        else:
+            # There should only be one asset per utxo
+            asset, amt = list(utxo.value_sats().assets.items())[0]
+            amount = self.parent.format_amount(amt.value, whitespaces=True)
+            amount += ' ' + asset
+
         labels = [name_short, address, label, amount, '%d'%height]
         utxo_item = [QStandardItem(x) for x in labels]
         self.set_editability(utxo_item)

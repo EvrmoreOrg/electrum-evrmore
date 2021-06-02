@@ -7,7 +7,7 @@ from electrum.gui import messages
 from electrum.gui.kivy.i18n import _
 from electrum.lnaddr import lndecode
 from electrum.util import bh2u
-from electrum.bitcoin import COIN
+from electrum.ravencoin import COIN
 import electrum.simple_config as config
 from electrum.logging import Logger
 from electrum.lnutil import ln_dummy_address, extract_nodeid, ConnStringFormatError

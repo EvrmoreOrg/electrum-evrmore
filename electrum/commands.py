@@ -41,8 +41,8 @@ from typing import Optional, TYPE_CHECKING, Dict, List
 from .import util, ecc
 from .util import (bfh, bh2u, format_satoshis, json_decode, json_normalize,
                    is_hash256_str, is_hex_str, to_bytes)
-from . import bitcoin
-from .bitcoin import is_address,  hash_160, COIN
+from . import ravencoin
+from .ravencoin import is_address,  hash_160, COIN
 from .bip32 import BIP32Node
 from .i18n import _
 from .transaction import (Transaction, multisig_script, TxOutput, PartialTransaction, PartialTxOutput,
@@ -257,8 +257,8 @@ class Commands:
     @command('')
     async def restore(self, text, passphrase=None, password=None, encrypt_file=True, wallet_path=None):
         """Restore a wallet from text. Text can be a seed phrase, a master
-        public key, a master private key, a list of bitcoin addresses
-        or bitcoin private keys.
+        public key, a master private key, a list of ravencoin addresses
+        or ravencoin private keys.
         If you want to be prompted for an argument, type '?' or ':' (concealed)
         """
         # TODO create a separate command that blocks until wallet is synced
@@ -333,7 +333,7 @@ class Commands:
         """Return the transaction history of any address. Note: This is a
         walletless server query, results are not checked by SPV.
         """
-        sh = bitcoin.address_to_scripthash(address)
+        sh = ravencoin.address_to_scripthash(address)
         return await self.network.get_history_for_scripthash(sh)
 
     @command('w')
@@ -353,7 +353,7 @@ class Commands:
         """Returns the UTXO list of any address. Note: This
         is a walletless server query, results are not checked by SPV.
         """
-        sh = bitcoin.address_to_scripthash(address)
+        sh = ravencoin.address_to_scripthash(address)
         return await self.network.listunspent_for_scripthash(sh)
 
     @command('')
@@ -379,7 +379,7 @@ class Commands:
                 txin.nsequence = nsequence
             sec = txin_dict.get('privkey')
             if sec:
-                txin_type, privkey, compressed = bitcoin.deserialize_privkey(sec)
+                txin_type, privkey, compressed = ravencoin.deserialize_privkey(sec)
                 pubkey = ecc.ECPrivkey(privkey).get_public_key_hex(compressed=compressed)
                 keypairs[pubkey] = privkey, compressed
                 txin.script_type = txin_type
@@ -399,10 +399,10 @@ class Commands:
         # TODO this command should be split in two... (1) *_with_wallet, (2) *_with_privkey
         tx = tx_from_any(tx)
         if privkey:
-            txin_type, privkey2, compressed = bitcoin.deserialize_privkey(privkey)
+            txin_type, privkey2, compressed = ravencoin.deserialize_privkey(privkey)
             pubkey = ecc.ECPrivkey(privkey2).get_public_key_bytes(compressed=compressed)
             for txin in tx.inputs():
-                if txin.address and txin.address == bitcoin.pubkey_to_address(txin_type, pubkey.hex()):
+                if txin.address and txin.address == ravencoin.pubkey_to_address(txin_type, pubkey.hex()):
                     txin.pubkeys = [pubkey]
                     txin.script_type = txin_type
             tx.sign({pubkey.hex(): (privkey2, compressed)})
@@ -428,7 +428,7 @@ class Commands:
         """Create multisig address"""
         assert isinstance(pubkeys, list), (type(num), type(pubkeys))
         redeem_script = multisig_script(pubkeys, num)
-        address = bitcoin.hash160_to_p2sh(hash_160(bfh(redeem_script)))
+        address = ravencoin.hash160_to_p2sh(hash_160(bfh(redeem_script)))
         return {'address':address, 'redeemScript':redeem_script}
 
     @command('w')
@@ -509,7 +509,7 @@ class Commands:
         """Return the balance of any address. Note: This is a walletless
         server query, results are not checked by SPV.
         """
-        sh = bitcoin.address_to_scripthash(address)
+        sh = ravencoin.address_to_scripthash(address)
         out = await self.network.get_balance_for_scripthash(sh)
         out["confirmed"] =  str(Decimal(out["confirmed"])/COIN)
         out["unconfirmed"] =  str(Decimal(out["unconfirmed"])/COIN)
@@ -1210,6 +1210,37 @@ class Commands:
             'onchain_amount': format_satoshis(onchain_amount_sat),
         }
 
+    @command('n')
+    def getaddressassets(self, address):
+        """Returns the Asset list of any address. Note: This
+        is a walletless server query, results are not checked by SPV.
+        """
+        sh = ravencoin.address_to_scripthash(address)
+        return self.network.run_from_another_thread(self.network.listasset_for_scripthash(sh))
+
+    @command('n')
+    def getassetaddressbalance(self, address):
+        """Return the asset balance of any address. Note: This is a walletless
+        server query, results are not checked by SPV.
+        """
+        sh = ravencoin.address_to_scripthash(address)
+        out = self.network.run_from_another_thread(self.network.get_asset_balance_for_scripthash(sh))
+        for key, value in out["confirmed"].items():
+            val = str(Decimal(value) / COIN)
+            out["confirmed"][key] = val
+        for key, value in out["unconfirmed"].items():
+            val = str(Decimal(value) / COIN)
+            out["unconfirmed"][key] = val
+        return out
+
+    @command('n')
+    def getassetdata(self, name):
+        return self.network.run_from_another_thread(self.network.get_meta_for_asset(name))
+
+    @command('n')
+    def getserverpeers(self):
+        return self.network.interface.session.send_request('server.peers.subscribe')
+
 
 def eval_bool(x: str) -> bool:
     if x == 'false': return False
@@ -1232,8 +1263,8 @@ param_descriptions = {
     'pubkey': 'Public key',
     'message': 'Clear text message. Use quotes if it contains spaces.',
     'encrypted': 'Encrypted message',
-    'amount': 'Amount to be sent (in BTC). Type \'!\' to send the maximum available.',
-    'requested_amount': 'Requested amount (in BTC).',
+    'amount': 'Amount to be sent (in rvn). Type \'!\' to send the maximum available.',
+    'requested_amount': 'Requested amount (in rvn).',
     'outputs': 'list of ["address", amount]',
     'redeem_script': 'redeem script (hexadecimal)',
     'lightning_amount': "Amount sent or received in a submarine swap. Set it to 'dryrun' to receive a value",
@@ -1253,7 +1284,7 @@ command_options = {
     'labels':      ("-l", "Show the labels of listed addresses"),
     'nocheck':     (None, "Do not verify aliases"),
     'imax':        (None, "Maximum number of inputs"),
-    'fee':         ("-f", "Transaction fee (absolute, in BTC)"),
+    'fee':         ("-f", "Transaction fee (absolute, in rvn)"),
     'feerate':     (None, "Transaction fee rate (in sat/byte)"),
     'from_addr':   ("-F", "Source address (must be a wallet address; use sweep to spend from non-wallet address)."),
     'from_coins':  (None, "Source coins (must be in wallet; use sweep to spend from non-wallet address)."),
@@ -1274,7 +1305,7 @@ command_options = {
     'timeout':     (None, "Timeout in seconds"),
     'force':       (None, "Create new address beyond gap limit, if no more addresses are available."),
     'pending':     (None, "Show only pending requests."),
-    'push_amount': (None, 'Push initial amount (in BTC)'),
+    'push_amount': (None, 'Push initial amount (in rvn)'),
     'expired':     (None, "Show only expired requests."),
     'paid':        (None, "Show only paid requests."),
     'show_addresses': (None, "Show input and output addresses"),
@@ -1398,8 +1429,8 @@ def add_global_options(parser):
     group.add_argument("-D", "--dir", dest="electrum_path", help="electrum directory")
     group.add_argument("-P", "--portable", action="store_true", dest="portable", default=False, help="Use local 'electrum_data' directory")
     group.add_argument("--testnet", action="store_true", dest="testnet", default=False, help="Use Testnet")
-    group.add_argument("--regtest", action="store_true", dest="regtest", default=False, help="Use Regtest")
-    group.add_argument("--simnet", action="store_true", dest="simnet", default=False, help="Use Simnet")
+    # group.add_argument("--regtest", action="store_true", dest="regtest", default=False, help="Use Regtest")
+    # group.add_argument("--simnet", action="store_true", dest="simnet", default=False, help="Use Simnet")
     group.add_argument("-o", "--offline", action="store_true", dest="offline", default=False, help="Run offline")
 
 def add_wallet_option(parser):
@@ -1415,12 +1446,14 @@ def get_parser():
     subparsers = parser.add_subparsers(dest='cmd', metavar='<command>')
     # gui
     parser_gui = subparsers.add_parser('gui', description="Run Electrum's Graphical User Interface.", help="Run GUI (default)")
-    parser_gui.add_argument("url", nargs='?', default=None, help="bitcoin URI (or bip70 file)")
+    # TODO: Are ravencoin urls a thing?
+    # parser_gui.add_argument("url", nargs='?', default=None, help="bitcoin URI (or bip70 file)")
     parser_gui.add_argument("-g", "--gui", dest="gui", help="select graphical user interface", choices=['qt', 'kivy', 'text', 'stdio'])
     parser_gui.add_argument("-m", action="store_true", dest="hide_gui", default=False, help="hide GUI on startup")
     parser_gui.add_argument("-L", "--lang", dest="language", default=None, help="default language used in GUI")
     parser_gui.add_argument("--daemon", action="store_true", dest="daemon", default=False, help="keep daemon running after GUI is closed")
-    parser_gui.add_argument("--nosegwit", action="store_true", dest="nosegwit", default=False, help="Do not create segwit wallets")
+    # Segwit is not current supported
+    # parser_gui.add_argument("--nosegwit", action="store_true", dest="nosegwit", default=True, help="Do not create segwit wallets")
     add_wallet_option(parser_gui)
     add_network_options(parser_gui)
     add_global_options(parser_gui)

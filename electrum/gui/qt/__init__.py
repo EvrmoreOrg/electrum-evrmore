@@ -105,7 +105,7 @@ class ElectrumGui(Logger):
         if hasattr(QtCore.Qt, "AA_ShareOpenGLContexts"):
             QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
         if hasattr(QGuiApplication, 'setDesktopFileName'):
-            QGuiApplication.setDesktopFileName('electrum.desktop')
+            QGuiApplication.setDesktopFileName('electrum-ravencoin.desktop')
         self.gui_thread = threading.current_thread()
         self.config = config
         self.daemon = daemon
@@ -114,7 +114,7 @@ class ElectrumGui(Logger):
         self.efilter = OpenFileEventFilter(self.windows)
         self.app = QElectrumApplication(sys.argv)
         self.app.installEventFilter(self.efilter)
-        self.app.setWindowIcon(read_QIcon("electrum.png"))
+        self.app.setWindowIcon(read_QIcon("electrum-ravencoin.png"))
         self._cleaned_up = False
         # timer
         self.timer = QTimer(self.app)
@@ -142,7 +142,7 @@ class ElectrumGui(Logger):
         self.tray.show()
 
     def set_dark_theme_if_needed(self):
-        use_dark_theme = self.config.get('qt_gui_color_theme', 'default') == 'dark'
+        use_dark_theme = self.config.get('qt_gui_color_theme', 'dark') == 'dark'
         if use_dark_theme:
             try:
                 import qdarkstyle

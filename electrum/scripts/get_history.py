@@ -3,7 +3,7 @@
 import sys
 import asyncio
 
-from electrum import bitcoin
+from electrum import ravencoin
 from electrum.network import Network
 from electrum.util import json_encode, print_msg, create_and_start_event_loop, log_exceptions
 from electrum.simple_config import SimpleConfig
@@ -24,7 +24,7 @@ network.start()
 @log_exceptions
 async def f():
     try:
-        sh = bitcoin.address_to_scripthash(addr)
+        sh = ravencoin.address_to_scripthash(addr)
         hist = await network.get_history_for_scripthash(sh)
         print_msg(json_encode(hist))
     finally:

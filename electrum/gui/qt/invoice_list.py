@@ -102,13 +102,15 @@ class InvoiceList(MyTreeView):
             if item.is_lightning():
                 icon_name = 'lightning.png'
             else:
-                icon_name = 'bitcoin.png'
+                icon_name = 'ravencoin.png'
                 if item.bip70:
                     icon_name = 'seal.png'
             status = self.parent.wallet.get_invoice_status(item)
             status_str = item.get_status_str(status)
             message = item.message
             amount = item.get_amount_sat()
+            if amount != '!':
+                amount = amount.rvn_value.value
             timestamp = item.time or 0
             date_str = format_time(timestamp) if timestamp else _('Unknown')
             amount_str = self.parent.format_amount(amount, whitespaces=True)
@@ -157,7 +159,7 @@ class InvoiceList(MyTreeView):
             menu.addAction(_("Details"), lambda: self.parent.show_lightning_invoice(invoice))
         else:
             if len(invoice.outputs) == 1:
-                menu.addAction(_("Copy Address"), lambda: self.parent.do_copy(invoice.get_address(), title='Bitcoin Address'))
+                menu.addAction(_("Copy Address"), lambda: self.parent.do_copy(invoice.get_address(), title='ravencoin Address'))
             menu.addAction(_("Details"), lambda: self.parent.show_onchain_invoice(invoice))
         status = wallet.get_invoice_status(invoice)
         if status == PR_UNPAID:

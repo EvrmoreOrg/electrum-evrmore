@@ -582,8 +582,8 @@ class ChannelDB(SqlDB):
     @classmethod
     def verify_channel_announcement(cls, payload) -> None:
         h = sha256d(payload['raw'][2+256:])
-        pubkeys = [payload['node_id_1'], payload['node_id_2'], payload['bitcoin_key_1'], payload['bitcoin_key_2']]
-        sigs = [payload['node_signature_1'], payload['node_signature_2'], payload['bitcoin_signature_1'], payload['bitcoin_signature_2']]
+        pubkeys = [payload['node_id_1'], payload['node_id_2'], payload['ravencoin_key_1'], payload['ravencoin_key_2']]
+        sigs = [payload['node_signature_1'], payload['node_signature_2'], payload['ravencoin_signature_1'], payload['ravencoin_signature_2']]
         for pubkey, sig in zip(pubkeys, sigs):
             if not ecc.verify_signature(pubkey, sig, h):
                 raise InvalidGossipMsg('signature failed')

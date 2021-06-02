@@ -31,7 +31,7 @@ from PyQt5.QtWidgets import  QVBoxLayout, QLabel, QGridLayout, QPushButton, QLin
 from electrum.i18n import _
 from electrum.util import NotEnoughFunds, NoDynamicFeeEstimates
 from electrum.plugin import run_hook
-from electrum.transaction import Transaction, PartialTransaction
+from electrum.transaction import Transaction, PartialTransaction, RavenValue
 from electrum.simple_config import FEERATE_WARNING_HIGH_FEE, FEE_RATIO_HIGH_WARNING
 from electrum.wallet import InternalAddressCorruption
 
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 class TxEditor:
 
     def __init__(self, *, window: 'ElectrumWindow', make_tx,
-                 output_value: Union[int, str] = None, is_sweep: bool):
+                 output_value: Union[RavenValue, str] = None, is_sweep: bool):
         self.main_window = window
         self.make_tx = make_tx
         self.output_value = output_value
@@ -110,7 +110,7 @@ class TxEditor:
             self.tx = None
             self.main_window.show_error(str(e))
             raise
-        use_rbf = bool(self.config.get('use_rbf', True))
+        use_rbf = bool(self.config.get('use_rbf', False))
         self.tx.set_rbf(use_rbf)
 
     def have_enough_funds_assuming_zero_fees(self) -> bool:
@@ -139,7 +139,7 @@ class ConfirmTxDialog(TxEditor, WindowModalDialog):
         grid.addWidget(QLabel(_("Amount to be sent") + ": "), 0, 0)
         grid.addWidget(self.amount_label, 0, 1)
 
-        msg = _('Bitcoin transactions are in general not free. A transaction fee is paid by the sender of the funds.') + '\n\n'\
+        msg = _('Ravencoin transactions are in general not free. A transaction fee is paid by the sender of the funds.') + '\n\n'\
               + _('The amount of fee can be decided freely by the sender. However, transactions with low fees take more time to be processed.') + '\n\n'\
               + _('A suggested fee is automatically added to this field. You may override it. The suggested fee increases with the size of the transaction.')
         self.fee_label = QLabel('')
@@ -213,17 +213,18 @@ class ConfirmTxDialog(TxEditor, WindowModalDialog):
         self.pw.setEnabled(enable)
         self.send_button.setEnabled(enable)
 
+    # TODO: Currently only for RVN
     def _update_amount_label(self):
         tx = self.tx
         if self.output_value == '!':
             if tx:
                 amount = tx.output_value()
-                amount_str = self.main_window.format_amount_and_units(amount)
+                amount_str = self.main_window.format_amount_and_units(amount.rvn_value)
             else:
                 amount_str = "max"
         else:
             amount = self.output_value
-            amount_str = self.main_window.format_amount_and_units(amount)
+            amount_str = self.main_window.format_amount_and_units(amount.rvn_value)
         self.amount_label.setText(amount_str)
 
     def update(self):

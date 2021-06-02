@@ -81,7 +81,16 @@ class AmountEdit(FreezableLineEdit):
         self.setText("%d"%x)
 
 
-class BTCAmountEdit(AmountEdit):
+class PayToAmountEdit(AmountEdit):
+    def setAmount(self, amount_sat):
+        if amount_sat is None:
+            self.setText(" ")  # Space forces repaint in case units changed
+        else:
+            self.setText(format_satoshis_plain(amount_sat, decimal_point=self.decimal_point()))
+        self.repaint()  # macOS hack for #6269
+
+
+class RVNAmountEdit(AmountEdit):
 
     def __init__(self, decimal_point, is_int=False, parent=None):
         AmountEdit.__init__(self, self._base_unit, is_int, parent)
@@ -114,7 +123,7 @@ class BTCAmountEdit(AmountEdit):
         self.repaint()  # macOS hack for #6269
 
 
-class FeerateEdit(BTCAmountEdit):
+class FeerateEdit(RVNAmountEdit):
 
     def __init__(self, decimal_point, is_int=False, parent=None):
         super().__init__(decimal_point, is_int, parent)
@@ -124,7 +133,7 @@ class FeerateEdit(BTCAmountEdit):
         return 'sat/byte'
 
     def get_amount(self):
-        sat_per_byte_amount = BTCAmountEdit.get_amount(self)
+        sat_per_byte_amount = RVNAmountEdit.get_amount(self)
         return quantize_feerate(sat_per_byte_amount)
 
     def setAmount(self, amount):

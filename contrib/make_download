@@ -30,18 +30,18 @@ string = string.replace("##VERSION_ANDROID##", version_android)
 string = string.replace("##VERSION_APK##", APK_VERSION)
 
 files = {
-    'tgz': "Electrum-%s.tar.gz" % version,
-    'appimage': "electrum-%s-x86_64.AppImage" % version,
-    'zip': "Electrum-%s.zip" % version,
-    'mac': "electrum-%s.dmg" % version_mac,
-    'win': "electrum-%s.exe" % version_win,
-    'win_setup': "electrum-%s-setup.exe" % version_win,
-    'win_portable': "electrum-%s-portable.exe" % version_win,
+    'tgz': "Electrum-Ravencoin-%s.tar.gz" % version,
+    'appimage': "electrum-ravencoin-%s-x86_64.AppImage" % version,
+    'zip': "Electrum-Ravencoin-%s.zip" % version,
+    'mac': "electrum-ravencoin-%s.dmg" % version_mac,
+    'win': "electrum-ravencoin-%s.exe" % version_win,
+    'win_setup': "electrum-ravencoin-%s-setup.exe" % version_win,
+    'win_portable': "electrum-ravencoin-%s-portable.exe" % version_win,
 }
 
 for k, n in files.items():
     path = "dist/%s"%n
-    link = "https://download.electrum.org/%s/%s"%(version,n)
+    link = ""%(version,n)
     if not os.path.exists(path):
         os.system("wget -q %s -O %s" % (link, path))
     if not os.path.getsize(path):

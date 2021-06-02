@@ -14,7 +14,7 @@ from electrum.wallet import (Abstract_Wallet, Standard_Wallet, create_new_wallet
                              restore_wallet_from_text, Imported_Wallet, Wallet)
 from electrum.exchange_rate import ExchangeBase, FxThread
 from electrum.util import TxMinedInfo, InvalidPassword
-from electrum.bitcoin import COIN
+from electrum.ravencoin import COIN
 from electrum.wallet_db import WalletDB
 from electrum.simple_config import SimpleConfig
 from electrum import util

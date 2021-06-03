@@ -47,6 +47,7 @@ from .bip32 import BIP32Node
 from .i18n import _
 from .transaction import (Transaction, multisig_script, TxOutput, PartialTransaction, PartialTxOutput,
                           tx_from_any, PartialTxInput, TxOutpoint)
+from .interface import MAX_INCOMING_MSG_SIZE
 from .invoices import PR_PAID, PR_UNPAID, PR_UNKNOWN, PR_EXPIRED
 from .synchronizer import Notifier
 from .wallet import Abstract_Wallet, create_new_wallet, restore_wallet_from_text, Deterministic_Wallet
@@ -191,6 +192,19 @@ class Commands:
     async def commands(self):
         """List of commands"""
         return ' '.join(sorted(known_commands.keys()))
+
+    @command('')
+    async def wheres_my_stuff(self):
+        return util.user_dir()
+
+    @command('')
+    async def change_max_receive_amount(self, amt: int):
+        old_max = self.config.get('network_max_incoming_msg_size', MAX_INCOMING_MSG_SIZE)
+        self.config.set_key('network_max_incoming_msg_size', amt, True)
+        return "Your max receive amount has been changed to {} bytes. " \
+               "It was {} bytes. " \
+               "The default is {} bytes. " \
+               "Restart electrum-ravencoin for the effect to take place.".format(amt, old_max, MAX_INCOMING_MSG_SIZE)
 
     @command('n')
     async def getinfo(self):

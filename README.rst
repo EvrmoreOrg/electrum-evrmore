@@ -26,10 +26,6 @@ Electrum - Lightweight Ravencoin client
 Getting started
 ===============
 
-(*If you've come here looking to simply run Electrum,* `you may download it here`_.)
-
-.. _you may download it here: https://electrum.org/#download
-
 Electrum itself is pure Python, and so are most of the required dependencies,
 but not everything. The following sections describe how to run from source, but here
 is a TL;DR::

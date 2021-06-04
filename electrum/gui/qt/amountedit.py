@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QLineEdit, QStyle, QStyleOptionFrame)
 from .util import char_width_in_lineedit, ColorScheme
 
 from electrum.util import (format_satoshis_plain, decimal_point_to_base_unit_name,
-                           FEERATE_PRECISION, quantize_feerate)
+                           FEERATE_PRECISION, quantize_feerate, base_units_list)
 
 
 class FreezableLineEdit(QLineEdit):
@@ -81,15 +81,6 @@ class AmountEdit(FreezableLineEdit):
         self.setText("%d"%x)
 
 
-class PayToAmountEdit(AmountEdit):
-    def setAmount(self, amount_sat):
-        if amount_sat is None:
-            self.setText(" ")  # Space forces repaint in case units changed
-        else:
-            self.setText(format_satoshis_plain(amount_sat, decimal_point=self.decimal_point()))
-        self.repaint()  # macOS hack for #6269
-
-
 class RVNAmountEdit(AmountEdit):
 
     def __init__(self, decimal_point, is_int=False, parent=None):
@@ -121,6 +112,12 @@ class RVNAmountEdit(AmountEdit):
         else:
             self.setText(format_satoshis_plain(amount_sat, decimal_point=self.decimal_point()))
         self.repaint()  # macOS hack for #6269
+
+
+class PayToAmountEdit(RVNAmountEdit):
+    def __init__(self, decimal_point, asset_base_unit, is_int=False, parent=None):
+        AmountEdit.__init__(self, asset_base_unit, is_int, parent)
+        self.decimal_point = lambda: decimal_point() if asset_base_unit() in base_units_list else 8
 
 
 class FeerateEdit(RVNAmountEdit):

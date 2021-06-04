@@ -1411,10 +1411,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.receive_address_e.setToolTip("")
 
     def refresh_send_tab(self):
-        self.to_send_combo.clear()
-        balance = sum(self.wallet.get_balance(), RavenValue())
-        self.send_options = ['RVN'] + sorted([asset for asset, bal in balance.assets.items() if bal != 0])
-        self.to_send_combo.addItems(self.send_options)
+        # Don't interrupt us when we're on this tab
+        if self.tabs.currentIndex() != self.tabs.indexOf(self.send_tab):
+            self.to_send_combo.clear()
+            balance = sum(self.wallet.get_balance(), RavenValue())
+            self.send_options = [util.decimal_point_to_base_unit_name(self.get_decimal_point())] + \
+                                sorted([asset for asset, bal in balance.assets.items() if bal != 0])
+            self.to_send_combo.addItems(self.send_options)
 
     def create_send_tab(self):
         # A 4-column grid layout.  All the stretch is in the last column.
@@ -1427,12 +1430,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         # Let user choose to send RVN or Asset
         self.to_send_combo = QComboBox()
-        self.refresh_send_tab()
 
-        def label():
-            return self.send_options[self.to_send_combo.currentIndex()]
-        self.amount_e = PayToAmountEdit(label)
-        self.amount_e = RVNAmountEdit(self.get_decimal_point)
+        # self.amount_e = RVNAmountEdit(self.get_decimal_point)
+        self.amount_e = PayToAmountEdit(self.get_decimal_point,
+                                        lambda: self.send_options[self.to_send_combo.currentIndex()][:3])
 
         self.payto_e = PayToEdit(self)
         self.payto_e.addPasteButton(self.app)
@@ -1481,19 +1482,21 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         grid.addWidget(amount_label, 4, 0)
         grid.addWidget(self.amount_e, 4, 1)
 
-        #grid.addWidget(self.to_send_combo, 4, 2)
+        grid.addWidget(self.to_send_combo, 4, 2)
 
         self.fiat_send_e = AmountEdit(self.fx.get_currency if self.fx else '')
         if not self.fx or not self.fx.is_enabled():
             self.fiat_send_e.setVisible(False)
-        grid.addWidget(self.fiat_send_e, 4, 2)
+        grid.addWidget(self.fiat_send_e, 4, 3)
         self.amount_e.frozen.connect(
             lambda: self.fiat_send_e.setFrozen(self.amount_e.isReadOnly()))
+        self.to_send_combo.currentIndexChanged.connect(
+            lambda: self.fiat_send_e.setVisible(self.to_send_combo.currentIndex() == 0))
 
         self.max_button = EnterButton(_("Max"), self.spend_max)
         self.max_button.setFixedWidth(100)
         self.max_button.setCheckable(True)
-        grid.addWidget(self.max_button, 4, 3)
+        grid.addWidget(self.max_button, 4, 4)
 
         self.save_button = EnterButton(_("Save"), self.do_save_invoice)
         self.send_button = EnterButton(_("Pay") + "...", self.do_pay)

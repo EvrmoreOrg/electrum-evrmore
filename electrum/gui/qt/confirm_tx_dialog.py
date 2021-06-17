@@ -22,7 +22,7 @@
 # ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
+import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional, Union
 
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 class TxEditor:
 
     def __init__(self, *, window: 'ElectrumWindow', make_tx,
-                 output_value: Union[RavenValue, str] = None, is_sweep: bool):
+                 output_value: RavenValue = None, is_sweep: bool):
         self.main_window = window
         self.make_tx = make_tx
         self.output_value = output_value
@@ -87,6 +87,7 @@ class TxEditor:
             self.not_enough_funds = False
             self.no_dynfee_estimates = False
         except NotEnoughFunds:
+            logging.exception('Not enough funds called update_tx')
             self.not_enough_funds = True
             self.tx = None
             if fallback_to_zero_fee:
@@ -127,7 +128,7 @@ class TxEditor:
 class ConfirmTxDialog(TxEditor, WindowModalDialog):
     # set fee and return password (after pw check)
 
-    def __init__(self, *, window: 'ElectrumWindow', make_tx, output_value: Union[int, str], is_sweep: bool):
+    def __init__(self, *, window: 'ElectrumWindow', make_tx, output_value: RavenValue, is_sweep: bool):
 
         TxEditor.__init__(self, window=window, make_tx=make_tx, output_value=output_value, is_sweep=is_sweep)
         WindowModalDialog.__init__(self, window, _("Confirm Transaction"))
@@ -239,7 +240,7 @@ class ConfirmTxDialog(TxEditor, WindowModalDialog):
         if not tx:
             return
 
-        fee = tx.get_fee()
+        fee = tx.get_fee().rvn_value.value  # Fee will only be rvn
         assert fee is not None
         self.fee_label.setText(self.main_window.format_amount_and_units(fee))
         x_fee = run_hook('get_tx_extra_fee', self.wallet, tx)
@@ -249,7 +250,7 @@ class ConfirmTxDialog(TxEditor, WindowModalDialog):
             self.extra_fee_value.setVisible(True)
             self.extra_fee_value.setText(self.main_window.format_amount_and_units(x_fee_amount))
 
-        amount = tx.output_value() if self.output_value == '!' else self.output_value
+        amount = self.output_value
         tx_size = tx.estimated_size()
         fee_warning_tuple = self.wallet.get_tx_fee_warning(
             invoice_amt=amount, tx_size=tx_size, fee=fee)

@@ -194,6 +194,20 @@ class Commands:
         return ' '.join(sorted(known_commands.keys()))
 
     @command('')
+    async def address_to_h160(self, address: str):
+        _, hash_160_ = ravencoin.b58_address_to_hash160(address)
+        return hash_160_.hex()
+
+    @command('')
+    async def h160_to_address(self, h160: str, addr_type: int):
+        h160 = bytes.fromhex(h160)
+        return ravencoin.hash160_to_b58_address(h160, addr_type)
+
+    @command('n')
+    async def send_custom_script(self, function: str, *args):
+        return await self.network.interface.session.send_request(function, args)
+
+    @command('')
     async def wheres_my_stuff(self):
         return util.user_dir()
 
@@ -706,11 +720,11 @@ class Commands:
 
         return json_normalize(wallet.get_detailed_history(**kwargs))
 
-    @command('w')
-    async def lightning_history(self, show_fiat=False, wallet: Abstract_Wallet = None):
-        """ lightning history """
-        lightning_history = wallet.lnworker.get_history() if wallet.lnworker else []
-        return json_normalize(lightning_history)
+    #@command('w')
+    #async def lightning_history(self, show_fiat=False, wallet: Abstract_Wallet = None):
+    #    """ lightning history """
+    #    lightning_history = wallet.lnworker.get_history() if wallet.lnworker else []
+    #    return json_normalize(lightning_history)
 
     @command('w')
     async def setlabel(self, key, label, wallet: Abstract_Wallet = None):
@@ -884,12 +898,12 @@ class Commands:
         wallet.save_db()
         return wallet.export_request(req)
 
-    @command('wn')
-    async def add_lightning_request(self, amount, memo='', expiration=3600, wallet: Abstract_Wallet = None):
-        amount_sat = int(satoshis(amount))
-        key = await wallet.lnworker._add_request_coro(amount_sat, memo, expiration)
-        wallet.save_db()
-        return wallet.get_formatted_request(key)
+    #@command('wn')
+    #async def add_lightning_request(self, amount, memo='', expiration=3600, wallet: Abstract_Wallet = None):
+    #    amount_sat = int(satoshis(amount))
+    #    key = await wallet.lnworker._add_request_coro(amount_sat, memo, expiration)
+    #    wallet.save_db()
+    #    return wallet.get_formatted_request(key)
 
     @command('w')
     async def addtransaction(self, tx, wallet: Abstract_Wallet = None):
@@ -1015,84 +1029,84 @@ class Commands:
             'channels': [c.funding_outpoint.to_str() for c in p.channels.values()],
         } for p in lnworker.peers.values()]
 
-    @command('wpn')
-    async def open_channel(self, connection_string, amount, push_amount=0, password=None, wallet: Abstract_Wallet = None):
-        funding_sat = satoshis(amount)
-        push_sat = satoshis(push_amount)
-        coins = wallet.get_spendable_coins(None)
-        node_id, rest = extract_nodeid(connection_string)
-        funding_tx = wallet.lnworker.mktx_for_open_channel(
-            coins=coins,
-            funding_sat=funding_sat,
-            node_id=node_id,
-            fee_est=None)
-        chan, funding_tx = await wallet.lnworker._open_channel_coroutine(
-            connect_str=connection_string,
-            funding_tx=funding_tx,
-            funding_sat=funding_sat,
-            push_sat=push_sat,
-            password=password)
-        return chan.funding_outpoint.to_str()
+    #@command('wpn')
+    #async def open_channel(self, connection_string, amount, push_amount=0, password=None, wallet: Abstract_Wallet = None):
+    #    funding_sat = satoshis(amount)
+    #    push_sat = satoshis(push_amount)
+    #    coins = wallet.get_spendable_coins(None)
+    #    node_id, rest = extract_nodeid(connection_string)
+    #    funding_tx = wallet.lnworker.mktx_for_open_channel(
+    #        coins=coins,
+    #        funding_sat=funding_sat,
+    #        node_id=node_id,
+    #        fee_est=None)
+    #    chan, funding_tx = await wallet.lnworker._open_channel_coroutine(
+    #        connect_str=connection_string,
+    #        funding_tx=funding_tx,
+    #        funding_sat=funding_sat,
+    #        push_sat=push_sat,
+    #        password=password)
+    #    return chan.funding_outpoint.to_str()
 
     @command('')
     async def decode_invoice(self, invoice: str):
         invoice = LNInvoice.from_bech32(invoice)
         return invoice.to_debug_json()
 
-    @command('wn')
-    async def lnpay(self, invoice, attempts=1, timeout=30, wallet: Abstract_Wallet = None):
-        lnworker = wallet.lnworker
-        lnaddr = lnworker._check_invoice(invoice)
-        payment_hash = lnaddr.paymenthash
-        wallet.save_invoice(LNInvoice.from_bech32(invoice))
-        success, log = await lnworker.pay_invoice(invoice, attempts=attempts)
-        return {
-            'payment_hash': payment_hash.hex(),
-            'success': success,
-            'preimage': lnworker.get_preimage(payment_hash).hex() if success else None,
-            'log': [x.formatted_tuple() for x in log]
-        }
+    #@command('wn')
+    #async def lnpay(self, invoice, attempts=1, timeout=30, wallet: Abstract_Wallet = None):
+    #    lnworker = wallet.lnworker
+    #    lnaddr = lnworker._check_invoice(invoice)
+    #    payment_hash = lnaddr.paymenthash
+    #    wallet.save_invoice(LNInvoice.from_bech32(invoice))
+    #    success, log = await lnworker.pay_invoice(invoice, attempts=attempts)
+    #    return {
+    #        'payment_hash': payment_hash.hex(),
+    #        'success': success,
+    #        'preimage': lnworker.get_preimage(payment_hash).hex() if success else None,
+    #        'log': [x.formatted_tuple() for x in log]
+    #    }
 
-    @command('w')
-    async def nodeid(self, wallet: Abstract_Wallet = None):
-        listen_addr = self.config.get('lightning_listen')
-        return bh2u(wallet.lnworker.node_keypair.pubkey) + (('@' + listen_addr) if listen_addr else '')
+    #@command('w')
+    #async def nodeid(self, wallet: Abstract_Wallet = None):
+    #    listen_addr = self.config.get('lightning_listen')
+    #    return bh2u(wallet.lnworker.node_keypair.pubkey) + (('@' + listen_addr) if listen_addr else '')
 
-    @command('w')
-    async def list_channels(self, wallet: Abstract_Wallet = None):
-        # FIXME: we need to be online to display capacity of backups
-        from .lnutil import LOCAL, REMOTE, format_short_channel_id
-        channels = list(wallet.lnworker.channels.items())
-        backups = list(wallet.lnworker.channel_backups.items())
-        return [
-            {
-                'type': 'CHANNEL',
-                'short_channel_id': format_short_channel_id(chan.short_channel_id) if chan.short_channel_id else None,
-                'channel_id': chan.channel_id.hex(),
-                'channel_point': chan.funding_outpoint.to_str(),
-                'state': chan.get_state().name,
-                'peer_state': chan.peer_state.name,
-                'remote_pubkey': bh2u(chan.node_id),
-                'local_balance': chan.balance(LOCAL)//1000,
-                'remote_balance': chan.balance(REMOTE)//1000,
-                'local_reserve': chan.config[REMOTE].reserve_sat, # their config has our reserve
-                'remote_reserve': chan.config[LOCAL].reserve_sat,
-                'local_unsettled_sent': chan.balance_tied_up_in_htlcs_by_direction(LOCAL, direction=SENT) // 1000,
-                'remote_unsettled_sent': chan.balance_tied_up_in_htlcs_by_direction(REMOTE, direction=SENT) // 1000,
-            } for channel_id, chan in channels
-        ] + [
-            {
-                'type': 'BACKUP',
-                'short_channel_id': format_short_channel_id(chan.short_channel_id) if chan.short_channel_id else None,
-                'channel_id': chan.channel_id.hex(),
-                'channel_point': chan.funding_outpoint.to_str(),
-                'state': chan.get_state().name,
-            } for channel_id, chan in backups
-        ]
+    #@command('w')
+    #async def list_channels(self, wallet: Abstract_Wallet = None):
+    #    # FIXME: we need to be online to display capacity of backups
+    #    from .lnutil import LOCAL, REMOTE, format_short_channel_id
+    #    channels = list(wallet.lnworker.channels.items())
+    #    backups = list(wallet.lnworker.channel_backups.items())
+    #    return [
+    #        {
+    #            'type': 'CHANNEL',
+    #            'short_channel_id': format_short_channel_id(chan.short_channel_id) if chan.short_channel_id else None,
+    #            'channel_id': chan.channel_id.hex(),
+    #            'channel_point': chan.funding_outpoint.to_str(),
+    #            'state': chan.get_state().name,
+    #            'peer_state': chan.peer_state.name,
+    #            'remote_pubkey': bh2u(chan.node_id),
+    #            'local_balance': chan.balance(LOCAL)//1000,
+    #            'remote_balance': chan.balance(REMOTE)//1000,
+    #            'local_reserve': chan.config[REMOTE].reserve_sat, # their config has our reserve
+    #            'remote_reserve': chan.config[LOCAL].reserve_sat,
+    #            'local_unsettled_sent': chan.balance_tied_up_in_htlcs_by_direction(LOCAL, direction=SENT) // 1000,
+    #            'remote_unsettled_sent': chan.balance_tied_up_in_htlcs_by_direction(REMOTE, direction=SENT) // 1000,
+    #        } for channel_id, chan in channels
+    #    ] + [
+    #        {
+    #            'type': 'BACKUP',
+    #            'short_channel_id': format_short_channel_id(chan.short_channel_id) if chan.short_channel_id else None,
+    #            'channel_id': chan.channel_id.hex(),
+    #            'channel_point': chan.funding_outpoint.to_str(),
+    #            'state': chan.get_state().name,
+    #        } for channel_id, chan in backups
+    #    ]
 
-    @command('wn')
-    async def dumpgraph(self, wallet: Abstract_Wallet = None):
-        return wallet.lnworker.channel_db.to_dict()
+    #@command('wn')
+    #async def dumpgraph(self, wallet: Abstract_Wallet = None):
+    #    return wallet.lnworker.channel_db.to_dict()
 
     @command('n')
     async def inject_fees(self, fees):
@@ -1100,14 +1114,14 @@ class Commands:
         fee_est = ast.literal_eval(fees)
         self.network.update_fee_estimates(fee_est=fee_est)
 
-    @command('wn')
-    async def enable_htlc_settle(self, b: bool, wallet: Abstract_Wallet = None):
-        wallet.lnworker.enable_htlc_settle = b
+    #@command('wn')
+    #async def enable_htlc_settle(self, b: bool, wallet: Abstract_Wallet = None):
+    #    wallet.lnworker.enable_htlc_settle = b
 
-    @command('n')
-    async def clear_ln_blacklist(self):
-        if self.network.path_finder:
-            self.network.path_finder.liquidity_hints.clear_blacklist()
+    #@command('n')
+    #async def clear_ln_blacklist(self):
+    #    if self.network.path_finder:
+    #        self.network.path_finder.liquidity_hints.clear_blacklist()
 
     @command('n')
     async def reset_liquidity_hints(self):
@@ -1119,110 +1133,110 @@ class Commands:
         l = wallet.get_invoices()
         return [wallet.export_invoice(x) for x in l]
 
-    @command('wn')
-    async def close_channel(self, channel_point, force=False, wallet: Abstract_Wallet = None):
-        txid, index = channel_point.split(':')
-        chan_id, _ = channel_id_from_funding_tx(txid, int(index))
-        coro = wallet.lnworker.force_close_channel(chan_id) if force else wallet.lnworker.close_channel(chan_id)
-        return await coro
+    #@command('wn')
+    #async def close_channel(self, channel_point, force=False, wallet: Abstract_Wallet = None):
+    #    txid, index = channel_point.split(':')
+    #    chan_id, _ = channel_id_from_funding_tx(txid, int(index))
+    #    coro = wallet.lnworker.force_close_channel(chan_id) if force else wallet.lnworker.close_channel(chan_id)
+    #    return await coro
 
-    @command('wn')
-    async def request_force_close(self, channel_point, connection_string=None, wallet: Abstract_Wallet = None):
-        """
-        Requests the remote to force close a channel.
-        If a connection string is passed, can be used without having state or any backup for the channel.
-        Assumes that channel was originally opened with the same local peer (node_keypair).
-        """
-        txid, index = channel_point.split(':')
-        chan_id, _ = channel_id_from_funding_tx(txid, int(index))
-        await wallet.lnworker.request_force_close(chan_id, connect_str=connection_string)
+    #@command('wn')
+    #async def request_force_close(self, channel_point, connection_string=None, wallet: Abstract_Wallet = None):
+    #    """
+    #    Requests the remote to force close a channel.
+    #    If a connection string is passed, can be used without having state or any backup for the channel.
+    #    Assumes that channel was originally opened with the same local peer (node_keypair).
+    #    """
+    #    txid, index = channel_point.split(':')
+    #    chan_id, _ = channel_id_from_funding_tx(txid, int(index))
+    #    await wallet.lnworker.request_force_close(chan_id, connect_str=connection_string)
 
-    @command('w')
-    async def export_channel_backup(self, channel_point, wallet: Abstract_Wallet = None):
-        txid, index = channel_point.split(':')
-        chan_id, _ = channel_id_from_funding_tx(txid, int(index))
-        return wallet.lnworker.export_channel_backup(chan_id)
+    #@command('w')
+    #async def export_channel_backup(self, channel_point, wallet: Abstract_Wallet = None):
+    #    txid, index = channel_point.split(':')
+    #    chan_id, _ = channel_id_from_funding_tx(txid, int(index))
+    #    return wallet.lnworker.export_channel_backup(chan_id)
 
-    @command('w')
-    async def import_channel_backup(self, encrypted, wallet: Abstract_Wallet = None):
-        return wallet.lnworker.import_channel_backup(encrypted)
+    #@command('w')
+    #async def import_channel_backup(self, encrypted, wallet: Abstract_Wallet = None):
+    #    return wallet.lnworker.import_channel_backup(encrypted)
 
-    @command('wn')
-    async def get_channel_ctx(self, channel_point, iknowwhatimdoing=False, wallet: Abstract_Wallet = None):
-        """ return the current commitment transaction of a channel """
-        if not iknowwhatimdoing:
-            raise Exception("WARNING: this command is potentially unsafe.\n"
-                            "To proceed, try again, with the --iknowwhatimdoing option.")
-        txid, index = channel_point.split(':')
-        chan_id, _ = channel_id_from_funding_tx(txid, int(index))
-        chan = wallet.lnworker.channels[chan_id]
-        tx = chan.force_close_tx()
-        return tx.serialize()
+    #@command('wn')
+    #async def get_channel_ctx(self, channel_point, iknowwhatimdoing=False, wallet: Abstract_Wallet = None):
+    #    """ return the current commitment transaction of a channel """
+    #    if not iknowwhatimdoing:
+    #        raise Exception("WARNING: this command is potentially unsafe.\n"
+    #                        "To proceed, try again, with the --iknowwhatimdoing option.")
+    #    txid, index = channel_point.split(':')
+    #    chan_id, _ = channel_id_from_funding_tx(txid, int(index))
+    #    chan = wallet.lnworker.channels[chan_id]
+    #    tx = chan.force_close_tx()
+    #    return tx.serialize()
 
-    @command('wn')
-    async def get_watchtower_ctn(self, channel_point, wallet: Abstract_Wallet = None):
-        """ return the local watchtower's ctn of channel. used in regtests """
-        return await self.network.local_watchtower.sweepstore.get_ctn(channel_point, None)
+    #@command('wn')
+    #async def get_watchtower_ctn(self, channel_point, wallet: Abstract_Wallet = None):
+    #    """ return the local watchtower's ctn of channel. used in regtests """
+    #    return await self.network.local_watchtower.sweepstore.get_ctn(channel_point, None)
 
-    @command('wnp')
-    async def normal_swap(self, onchain_amount, lightning_amount, password=None, wallet: Abstract_Wallet = None):
-        """
-        Normal submarine swap: send on-chain BTC, receive on Lightning
-        Note that your funds will be locked for 24h if you do not have enough incoming capacity.
-        """
-        sm = wallet.lnworker.swap_manager
-        if lightning_amount == 'dryrun':
-            await sm.get_pairs()
-            onchain_amount_sat = satoshis(onchain_amount)
-            lightning_amount_sat = sm.get_recv_amount(onchain_amount_sat, is_reverse=False)
-            txid = None
-        elif onchain_amount == 'dryrun':
-            await sm.get_pairs()
-            lightning_amount_sat = satoshis(lightning_amount)
-            onchain_amount_sat = sm.get_send_amount(lightning_amount_sat, is_reverse=False)
-            txid = None
-        else:
-            lightning_amount_sat = satoshis(lightning_amount)
-            onchain_amount_sat = satoshis(onchain_amount)
-            txid = await wallet.lnworker.swap_manager.normal_swap(
-                lightning_amount_sat=lightning_amount_sat,
-                expected_onchain_amount_sat=onchain_amount_sat,
-                password=password,
-            )
-        return {
-            'txid': txid,
-            'lightning_amount': format_satoshis(lightning_amount_sat),
-            'onchain_amount': format_satoshis(onchain_amount_sat),
-        }
+    #@command('wnp')
+    #async def normal_swap(self, onchain_amount, lightning_amount, password=None, wallet: Abstract_Wallet = None):
+    #    """
+    #    Normal submarine swap: send on-chain BTC, receive on Lightning
+    #    Note that your funds will be locked for 24h if you do not have enough incoming capacity.
+    #    """
+    #    sm = wallet.lnworker.swap_manager
+    #    if lightning_amount == 'dryrun':
+    #        await sm.get_pairs()
+    #        onchain_amount_sat = satoshis(onchain_amount)
+    #        lightning_amount_sat = sm.get_recv_amount(onchain_amount_sat, is_reverse=False)
+    #        txid = None
+    #    elif onchain_amount == 'dryrun':
+    #        await sm.get_pairs()
+    #        lightning_amount_sat = satoshis(lightning_amount)
+    #        onchain_amount_sat = sm.get_send_amount(lightning_amount_sat, is_reverse=False)
+    #        txid = None
+    #    else:
+    #        lightning_amount_sat = satoshis(lightning_amount)
+    #        onchain_amount_sat = satoshis(onchain_amount)
+    #        txid = await wallet.lnworker.swap_manager.normal_swap(
+    #            lightning_amount_sat=lightning_amount_sat,
+    #            expected_onchain_amount_sat=onchain_amount_sat,
+    #            password=password,
+    #        )
+    #    return {
+    #        'txid': txid,
+    #        'lightning_amount': format_satoshis(lightning_amount_sat),
+    #        'onchain_amount': format_satoshis(onchain_amount_sat),
+    #    }
 
-    @command('wn')
-    async def reverse_swap(self, lightning_amount, onchain_amount, wallet: Abstract_Wallet = None):
-        """Reverse submarine swap: send on Lightning, receive on-chain
-        """
-        sm = wallet.lnworker.swap_manager
-        if onchain_amount == 'dryrun':
-            await sm.get_pairs()
-            lightning_amount_sat = satoshis(lightning_amount)
-            onchain_amount_sat = sm.get_recv_amount(lightning_amount_sat, is_reverse=True)
-            success = None
-        elif lightning_amount == 'dryrun':
-            await sm.get_pairs()
-            onchain_amount_sat = satoshis(onchain_amount)
-            lightning_amount_sat = sm.get_send_amount(onchain_amount_sat, is_reverse=True)
-            success = None
-        else:
-            lightning_amount_sat = satoshis(lightning_amount)
-            claim_fee = sm.get_claim_fee()
-            onchain_amount_sat = satoshis(onchain_amount + claim_fee)
-            success = await wallet.lnworker.swap_manager.reverse_swap(
-                lightning_amount_sat=lightning_amount_sat,
-                expected_onchain_amount_sat=onchain_amount_sat,
-            )
-        return {
-            'success': success,
-            'lightning_amount': format_satoshis(lightning_amount_sat),
-            'onchain_amount': format_satoshis(onchain_amount_sat),
-        }
+    #@command('wn')
+    #async def reverse_swap(self, lightning_amount, onchain_amount, wallet: Abstract_Wallet = None):
+    #    """Reverse submarine swap: send on Lightning, receive on-chain
+    #    """
+    #    sm = wallet.lnworker.swap_manager
+    #    if onchain_amount == 'dryrun':
+    #        await sm.get_pairs()
+    #        lightning_amount_sat = satoshis(lightning_amount)
+    #        onchain_amount_sat = sm.get_recv_amount(lightning_amount_sat, is_reverse=True)
+    #        success = None
+    #    elif lightning_amount == 'dryrun':
+    #        await sm.get_pairs()
+    #        onchain_amount_sat = satoshis(onchain_amount)
+    #        lightning_amount_sat = sm.get_send_amount(onchain_amount_sat, is_reverse=True)
+    #        success = None
+    #    else:
+    #        lightning_amount_sat = satoshis(lightning_amount)
+    #        claim_fee = sm.get_claim_fee()
+    #        onchain_amount_sat = satoshis(onchain_amount + claim_fee)
+    #        success = await wallet.lnworker.swap_manager.reverse_swap(
+    #            lightning_amount_sat=lightning_amount_sat,
+    #            expected_onchain_amount_sat=onchain_amount_sat,
+    #        )
+    #    return {
+    #        'success': success,
+    #        'lightning_amount': format_satoshis(lightning_amount_sat),
+    #        'onchain_amount': format_satoshis(onchain_amount_sat),
+    #    }
 
     @command('n')
     def getaddressassets(self, address):

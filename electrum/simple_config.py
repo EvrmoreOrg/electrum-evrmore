@@ -606,6 +606,7 @@ class SimpleConfig(Logger):
         # to be consistent with what is displayed in the GUI,
         # the calculation needs to use the same precision:
         fee_per_byte = quantize_feerate(fee_per_byte)
+        fee_per_byte = quantize_feerate(fee_per_byte)
         return round(fee_per_byte * size)
 
     def update_fee_estimates(self, nblock_target: int, fee_per_kb: int):

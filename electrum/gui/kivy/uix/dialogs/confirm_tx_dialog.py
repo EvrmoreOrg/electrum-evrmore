@@ -150,7 +150,8 @@ class ConfirmTxDialog(FeeSliderDialog, Factory.Popup):
             self.app.show_error(repr(e))
             return
         self.ids.ok_button.disabled = False
-        amount = self.amount if self.amount != '!' else tx.output_value()
+        amount = self.amount if (self.amount.rvn_value != '!'
+                                 and all(val != '!' for val in self.amount.assets.values())) else tx.output_value()
         tx_size = tx.estimated_size()
         fee = tx.get_fee()
         self.ids.fee_label.text = self.app.format_amount_and_units(fee)

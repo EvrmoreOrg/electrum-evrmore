@@ -25,7 +25,7 @@
 #   - Imported_Wallet: imported addresses or single keys, 0 or 1 keystore
 #   - Standard_Wallet: one HD keystore, P2PKH-like scripts
 #   - Multisig_Wallet: several HD keystores, M-of-N OP_CHECKMULTISIG scripts
-
+import decimal
 import os
 import sys
 import random
@@ -686,13 +686,18 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                                mature_only=True,
                                confirmed_funding_only=confirmed_only,
                                nonlocal_only=nonlocal_only)
-        # Assets utxos cannot be included in normal RVN transactions
-        utxos = [utxo for utxo in utxos if (not self.is_frozen_coin(utxo) and  # Add the utxo if it is not frozen and
-                                            (
-                                            (not asset and len(utxo.value_sats().assets) == 0) or  # Its not an asset if we are looking or rvn or
-                                            asset in utxo.value_sats().assets.keys()  # It has the asset if we are looking for the asset
-                                            )
-                                            )]
+
+        # If we don't want a RVN transactions, omit all asset transactions
+        # If we want an asset transaction, include all transactions that include that asset and
+        # RVN transactions for the fee
+
+        def is_utxo_good(utxo: PartialTxInput) -> bool:
+            if self.is_frozen_coin(utxo):
+                return False
+            assets = utxo.value_sats().assets.keys()
+            return asset in assets or len(assets) == 0
+
+        utxos = [utxo for utxo in utxos if is_utxo_good(utxo)]
         return utxos
 
     @abstractmethod
@@ -758,10 +763,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         height = self.get_local_height()
         if pr:
             return OnchainInvoice.from_bip70_payreq(pr, height)
-        if '!' in (x.value for x in outputs):
-            amount = '!'
-        else:
-            amount = sum([x.value for x in outputs], RavenValue())
+        amount = \
+            sum([RavenValue(0, {x.asset: x.value}) if x.asset else RavenValue(x.value) for x in outputs], RavenValue())
         timestamp = None
         exp = None
         if URI:
@@ -869,7 +872,11 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         invoice_amounts = defaultdict(
             lambda: RavenValue())  # type: Dict[bytes, RavenValue]  # scriptpubkey -> value_sats
         for txo in invoice.outputs:  # type: PartialTxOutput
-            invoice_amounts[txo.scriptpubkey] += RavenValue(1) if txo.value == '!' else txo.value
+            if txo.asset:
+                value = RavenValue(0, {txo.asset: txo.value})
+            else:
+                value = RavenValue(txo.value)
+            invoice_amounts[txo.scriptpubkey] += value
         relevant_txs = []
         with self.transaction_lock:
             for invoice_scriptpubkey, invoice_amt in invoice_amounts.items():
@@ -1266,6 +1273,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
     def get_change_addresses_for_new_transaction(
             self, preferred_change_addr=None, *, allow_reuse: bool = True,
+            force_addresses : int = None,
     ) -> List[str]:
         change_addrs = []
         if preferred_change_addr:
@@ -1293,7 +1301,18 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             # in which case this is a no-op
             self.check_address_for_corruption(addr)
         max_change = self.max_change_outputs if self.multiple_change else 1
-        return change_addrs[:max_change]
+        change_addrs = change_addrs[:max_change]
+        if force_addresses:
+            addrs = self.calc_unused_change_addresses()
+            if addrs:
+                change_addrs += addrs[:force_addresses - len(change_addrs)]
+            else:
+                if not allow_reuse:
+                    return change_addrs
+                addrs = self.get_change_addresses(slice_start=-self.gap_limit_for_change)
+                for _ in range(force_addresses - len(change_addrs)):
+                    change_addrs += [random.choice(addrs)] if addrs else []
+        return change_addrs
 
     def get_single_change_address_for_new_transaction(
             self, preferred_change_addr=None, *, allow_reuse: bool = True,
@@ -1342,7 +1361,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         # check outputs
         i_max = None
         for i, o in enumerate(outputs):
-            if o.value == '!':
+            if o.max:
                 if i_max is not None:
                     raise MultipleSpendMaxTxOutputs()
                 i_max = i
@@ -1352,6 +1371,15 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
         for item in coins:
             self.add_input_info(item)
+
+        assets = set()
+        for utxo in outputs:
+            assets.add(utxo.asset)
+        assets.discard(None)
+        asset_divs = {asset: self.get_asset_meta(asset).divisions
+                      for asset in assets}
+
+        force_addresses = 2 if assets else None
 
         # Fee estimator
         if fee is None:
@@ -1392,14 +1420,16 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 txo = []
                 old_change_addrs = []
             # change address. if empty, coin_chooser will set it
-            change_addrs = self.get_change_addresses_for_new_transaction(change_addr or old_change_addrs)
+            change_addrs = self.get_change_addresses_for_new_transaction(change_addr or old_change_addrs,
+                                                                         force_addresses=force_addresses)
             tx = coin_chooser.make_tx(
                 coins=coins,
                 inputs=txi,
                 outputs=list(outputs) + txo,
                 change_addrs=change_addrs,
                 fee_estimator_vb=fee_estimator,
-                dust_threshold=self.dust_threshold())
+                dust_threshold=self.dust_threshold(),
+                asset_divs=asset_divs)
         else:
             # "spend max" branch
             # note: This *will* spend inputs with negative effective value (if there are any).
@@ -1409,13 +1439,20 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             # note: Actually it might be the case that not all UTXOs from the wallet are
             #       being spent if the user manually selected UTXOs.
             sendable = sum(map(lambda c: c.value_sats(), coins), RavenValue())
-            outputs[i_max].value = RavenValue(0)
+            outputs[i_max].value = Satoshis(0)
             tx = PartialTransaction.from_io(list(coins), list(outputs))
             fee = fee_estimator(tx.estimated_size())
             amount = sendable - tx.output_value() - RavenValue(fee)
-            if amount.rvn_value < 0:
+            if amount < RavenValue(0):
                 raise NotEnoughFunds()
-            outputs[i_max].value = amount
+            assets = amount.assets
+            if len(assets) == 0:
+                outputs[i_max].value = amount.rvn_value
+            else:
+                asset, v = list(assets.items())[0]
+                outputs[i_max].asset = asset
+                outputs[i_max].value = v
+
             tx = PartialTransaction.from_io(list(coins), list(outputs))
 
         # Timelock tx to current height.
@@ -2585,7 +2622,10 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             fee: int) -> Optional[Tuple[bool, str, str]]:
 
         feerate = Decimal(fee) / tx_size  # sat/byte
-        fee_ratio = Decimal(fee) / invoice_amt.rvn_value.value if invoice_amt else 1
+        try:
+            fee_ratio = Decimal(fee) / invoice_amt.rvn_value.value if invoice_amt else 1
+        except decimal.DivisionByZero:  # For assets
+            fee_ratio = 0
         long_warning = None
         short_warning = None
         allow_send = True

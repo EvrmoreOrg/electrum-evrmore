@@ -115,7 +115,7 @@ class AddressSynchronizer(Logger):
     def get_addresses(self):
         return sorted(self.db.get_history())
 
-    def get_asset_meta(self, asset):
+    def get_asset_meta(self, asset) -> AssetMeta:
         return self.db.get_asset_meta(asset)
 
     def get_assets(self):
@@ -173,7 +173,11 @@ class AddressSynchronizer(Logger):
                 pass
         tx = self.db.get_transaction(prevout_hash)
         if tx:
-            return tx.outputs()[prevout_n].value
+            txout = tx.outputs()[prevout_n]
+            if txout.asset:
+                return RavenValue(0, {txout.asset: txout.value})
+            else:
+                return RavenValue(txout.value)
         return None
 
     def get_txout_address(self, txo: TxOutput) -> Optional[str]:
@@ -330,6 +334,11 @@ class AddressSynchronizer(Logger):
             # add outputs
             for n, txo in enumerate(tx.outputs()):
                 v = txo.value
+                asset = txo.asset
+                if asset:
+                    v = RavenValue(0, {asset: v})
+                else:
+                    v = RavenValue(v)
                 ser = tx_hash + ':%d'%n
                 scripthash = ravencoin.script_to_scripthash(txo.scriptpubkey)
                 self.db.add_prevout_by_scripthash(scripthash, prevout=TxOutpoint.from_str(ser), value=v)
@@ -718,9 +727,13 @@ class AddressSynchronizer(Logger):
                 elif v_in is not None:
                     v_in += value
             for txout in tx.outputs():
-                v_out += txout.value
+                if txout.asset:
+                    txout_v = RavenValue(0, {txout.asset: txout.value})
+                else:
+                    txout_v = RavenValue(txout.value)
+                v_out += txout_v
                 if self.is_mine(txout.address):
-                    v_out_mine += txout.value
+                    v_out_mine += txout_v
                     is_relevant = True
         delta = v_out_mine - v_in_mine
         if v_in is not None:

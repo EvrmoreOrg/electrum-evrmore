@@ -1433,7 +1433,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         # self.amount_e = RVNAmountEdit(self.get_decimal_point)
         self.amount_e = PayToAmountEdit(self.get_decimal_point,
-                                        lambda: self.send_options[self.to_send_combo.currentIndex()][:3])
+                                        lambda: self.send_options[self.to_send_combo.currentIndex()][:4])
 
         self.payto_e = PayToEdit(self)
         self.payto_e.addPasteButton(self.app)
@@ -1541,14 +1541,21 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         run_hook('create_send_tab', grid)
         return w
 
+    def get_asset_from_spend_tab(self) -> Optional[str]:
+        combo_index = self.to_send_combo.currentIndex()
+        if combo_index != 0:
+            return self.send_options[combo_index]
+        return None
+
     def spend_max(self):
         if run_hook('abort_send', self):
             return
+        asset = self.get_asset_from_spend_tab()
         outputs = self.payto_e.get_outputs(True)
         if not outputs:
             return
         make_tx = lambda fee_est: self.wallet.make_unsigned_transaction(
-            coins=self.get_coins(),
+            coins=self.get_coins(asset=asset),
             outputs=outputs,
             fee=fee_est,
             is_sweep=False)
@@ -1574,7 +1581,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         amount = tx.output_value()
         __, x_fee_amount = run_hook('get_tx_extra_fee', self.wallet, tx) or (None, 0)
         amount_after_all_fees = amount - RavenValue(x_fee_amount)
-        self.amount_e.setAmount(amount_after_all_fees.rvn_value.value)
+        assets = amount_after_all_fees.assets
+        if len(assets) == 0:
+            to_show = amount_after_all_fees.rvn_value.value
+        else:
+            __, v = list(assets.items())[0]
+            to_show = v.value
+        self.amount_e.setAmount(to_show)
         # show tooltip explaining max amount
         mining_fee = tx.get_fee()
         mining_fee_str = self.format_amount_and_units(mining_fee)
@@ -1736,7 +1749,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 if pubkey_msg != '' and len(pubkey_msg) < 40:
                     outputs.append(
                         PartialTxOutput(
-                            value=RavenValue(),
+                            value=0,
                             scriptpubkey=
                             b'\x6a' +
                             len(pubkey_msg).to_bytes(1, 'big', signed=False) +
@@ -1785,16 +1798,17 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.pay_lightning_invoice(invoice.invoice, amount_msat=invoice.get_amount_msat())
         elif invoice.type == PR_TYPE_ONCHAIN:
             assert isinstance(invoice, OnchainInvoice)
-            self.pay_onchain_dialog(self.get_coins(), invoice.outputs)
+            a = self.get_asset_from_spend_tab()
+            self.pay_onchain_dialog(self.get_coins(asset=a), invoice.outputs)
         else:
             raise Exception('unknown invoice type')
 
-    def get_coins(self, *, nonlocal_only=False) -> Sequence[PartialTxInput]:
+    def get_coins(self, *, asset: str = None, nonlocal_only=False) -> Sequence[PartialTxInput]:
         coins = self.get_manually_selected_coins()
         if coins is not None:
             return coins
         else:
-            return self.wallet.get_spendable_coins(None, nonlocal_only=nonlocal_only)
+            return self.wallet.get_spendable_coins(None, nonlocal_only=nonlocal_only, asset=asset)
 
     def get_manually_selected_coins(self) -> Optional[Sequence[PartialTxInput]]:
         """Return a list of selected coins or None.
@@ -1832,12 +1846,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             outputs=outputs,
             fee=fee_est,
             is_sweep=is_sweep)
-        output_values = [x.value for x in outputs]
-        if output_values.count('!') > 1:
-            self.show_error(_("More than one output set to spend max"))
-            return
 
-        output_value = '!' if '!' in output_values else sum(output_values, RavenValue())
+        output_value = \
+            sum([RavenValue(0, {x.asset: x.value}) if x.asset else RavenValue(x.value) for x in outputs], RavenValue())
+
         conf_dlg = ConfirmTxDialog(window=self, make_tx=make_tx, output_value=output_value, is_sweep=is_sweep)
         if conf_dlg.not_enough_funds:
             # Check if we had enough funds excluding fees,
@@ -1866,7 +1878,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             def sign_done(success):
                 if success:
                     self.broadcast_or_show(tx)
-
             self.sign_tx_with_password(tx, callback=sign_done, password=password,
                                        external_keypairs=external_keypairs)
         else:
@@ -1885,6 +1896,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.show_error(_("You can't broadcast a transaction without a live network connection."))
             self.show_transaction(tx)
             return
+        for out in tx.outputs():
+            print(out.scriptpubkey)
         self.broadcast_transaction(tx)
 
     @protected

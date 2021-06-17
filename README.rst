@@ -9,22 +9,17 @@ Electrum - Lightweight Ravencoin client
   Homepage: https://electrum.org/
 
 
-.. image:: https://travis-ci.org/spesmilo/electrum.svg?branch=master
-    :target: https://travis-ci.org/spesmilo/electrum
-    :alt: Build Status
-.. image:: https://coveralls.io/repos/github/spesmilo/electrum/badge.svg?branch=master
-    :target: https://coveralls.io/github/spesmilo/electrum?branch=master
-    :alt: Test coverage statistics
 .. image:: https://d322cqt584bo4o.cloudfront.net/electrum/localized.svg
-    :target: https://crowdin.com/project/electrum
+    :target: https://www.transifex.com/ravencoin/electrum-ravencoin/
     :alt: Help translate Electrum online
-
 
 
 
 
 Getting started
 ===============
+
+Interested in a pre-built binary? Find them `here`_. Otherwise, continue reading.
 
 Electrum itself is pure Python, and so are most of the required dependencies,
 but not everything. The following sections describe how to run from source, but here
@@ -63,6 +58,7 @@ If you would like hardware wallet support, see `this`_.
 .. _pycryptodomex: https://github.com/Legrandin/pycryptodome
 .. _cryptography: https://github.com/pyca/cryptography
 .. _this: https://github.com/spesmilo/electrum-docs/blob/master/hardware-linux.rst
+.. _here: https://github.com/Electrum-RVN-SIG/electrum-ravencoin/releases
 
 Running from tar.gz
 -------------------

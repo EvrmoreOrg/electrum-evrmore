@@ -14,7 +14,7 @@ from electrum.invoices import (PR_TYPE_ONCHAIN, PR_TYPE_LN, PR_DEFAULT_EXPIRATIO
                                PR_PAID, PR_UNKNOWN, PR_EXPIRED, PR_INFLIGHT,
                                LNInvoice, pr_expiration_values, Invoice, OnchainInvoice)
 from electrum import ravencoin, constants
-from electrum.transaction import tx_from_any, PartialTxOutput
+from electrum.transaction import tx_from_any, PartialTxOutput, RavenValue
 from electrum.util import (parse_URI, InvalidBitcoinURI, TxMinedInfo, maybe_extract_bolt11_invoice,
                            InvoiceError, format_time)
 from electrum.lnaddr import lndecode
@@ -312,7 +312,7 @@ class SendScreen(CScreen, Logger):
                     if not ravencoin.is_address(address):
                         self.app.show_error(_('Invalid Ravencoin Address') + ':\n' + address)
                         return
-                    outputs = [PartialTxOutput.from_address_and_value(address, amount)]
+                    outputs = [PartialTxOutput.from_address_and_value(address, RavenValue(amount))]
                     return self.app.wallet.create_invoice(
                         outputs=outputs,
                         message=message,

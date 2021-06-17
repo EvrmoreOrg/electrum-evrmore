@@ -647,7 +647,11 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
         o_text.setReadOnly(True)
         cursor = o_text.textCursor()
         for o in self.tx.outputs():
-            addr, v = o.get_ui_address_str(), o.value
+            addr = o.get_ui_address_str()
+            if o.asset:
+                v = RavenValue(0, {o.asset: o.value})
+            else:
+                v = RavenValue(o.value)
             cursor.insertText(addr, text_format(addr))
             if v != RavenValue():
                 cursor.insertText('\t', ext)
@@ -970,7 +974,7 @@ class PreviewTxDialog(BaseTxDialog, TxEditor):
 
         assert tx is not None
         size = tx.estimated_size()
-        fee = tx.get_fee()
+        fee = tx.get_fee().rvn_value.value
 
         self.size_e.setAmount(size)
         fiat_fee = self.main_window.format_fiat_and_units(fee)

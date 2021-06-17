@@ -30,7 +30,7 @@ from typing import NamedTuple, Sequence, Optional, List, TYPE_CHECKING
 
 from PyQt5.QtGui import QFontMetrics, QFont
 
-from electrum import ravencoin
+from electrum import ravencoin, assets
 from electrum.util import bfh, maybe_extract_bolt11_invoice, BITCOIN_BIP21_URI_SCHEME, Satoshis
 from electrum.transaction import PartialTxOutput, RavenValue
 from electrum.ravencoin import opcodes, construct_script
@@ -67,6 +67,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
         Logger.__init__(self)
         self.win = win
         self.amount_edit = win.amount_e
+        self.send_combo = win.to_send_combo
         self.setFont(QFont(MONOSPACE_FONT))
         self.document().contentsChanged.connect(self.update_size)
         self.heightMin = 0
@@ -233,11 +234,19 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
 
     def get_outputs(self, is_max):
         if self.payto_scriptpubkey:
+            asset = self.win.get_asset_from_spend_tab()
+            script = self.payto_scriptpubkey
             if is_max:
-                amount = '!'
+                amount_rval = sum([txin.value_sats() for txin in self.win.get_coins(asset=asset)], RavenValue())
+                if asset:
+                    amount = amount_rval.assets.get(asset, Satoshis(0))
+                else:
+                    amount = amount_rval.rvn_value
             else:
-                amount = RavenValue(Satoshis(self.amount_edit.get_amount()))
-            self.outputs = [PartialTxOutput(scriptpubkey=self.payto_scriptpubkey, value=amount)]
+                amount = Satoshis(self.amount_edit.get_amount())
+            if asset:
+                script = assets.create_transfer_asset_script(script, asset, amount)
+            self.outputs = [PartialTxOutput(scriptpubkey=script, value=amount, asset=asset, is_max=is_max)]
 
         return self.outputs[:]
 

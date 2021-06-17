@@ -145,8 +145,8 @@ class BaseWizard(Logger):
         ])
         wallet_kinds = [
             ('standard',  _("Standard wallet")),
-            ('2fa', _("Wallet with two-factor authentication")),
-            ('multisig',  _("Multi-signature wallet")),
+            #('2fa', _("Wallet with two-factor authentication")),
+            ('multisig',  _("Multi-signature wallet (advanced)")),
             ('imported',  _("Import Ravencoin addresses or private keys")),
         ]
         choices = [pair for pair in wallet_kinds if pair[0] in wallet_types]
@@ -185,9 +185,9 @@ class BaseWizard(Logger):
             action = 'choose_keystore'
         elif choice == 'multisig':
             action = 'choose_multisig'
-        elif choice == '2fa':
-            self.load_2fa()
-            action = self.plugin.get_action(self.data)
+        #elif choice == '2fa':
+        #    self.load_2fa()
+        #    action = self.plugin.get_action(self.data)
         elif choice == 'imported':
             action = 'import_addresses_or_keys'
         self.run(action)

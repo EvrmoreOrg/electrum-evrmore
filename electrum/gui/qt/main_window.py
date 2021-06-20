@@ -68,7 +68,7 @@ from electrum.util import (format_time,
 from electrum.invoices import PR_TYPE_ONCHAIN, PR_TYPE_LN, PR_DEFAULT_EXPIRATION_WHEN_CREATING, Invoice
 from electrum.invoices import PR_PAID, PR_FAILED, pr_expiration_values, LNInvoice, OnchainInvoice
 from electrum.transaction import (Transaction, PartialTxInput,
-                                  PartialTransaction, PartialTxOutput, RavenValue)
+                                  PartialTransaction, PartialTxOutput, RavenValue, script_GetOp)
 from electrum.wallet import (Multisig_Wallet, CannotBumpFee, Abstract_Wallet,
                              sweep_preparations, InternalAddressCorruption,
                              CannotDoubleSpendTx, CannotCPFP)
@@ -558,7 +558,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 self.setGeometry(100, 100, 950, 500)
 
     def watching_only_changed(self):
-        name = "Electrum Testnet" if constants.net.TESTNET else "Electrum"
+        name = "Electrum Ravencoin Testnet" if constants.net.TESTNET else "Electrum Ravencoin"
         title = '%s %s  -  %s' % (name, ELECTRUM_VERSION,
                                   self.wallet.basename())
         extra = [self.wallet.db.get('wallet_type', '?')]
@@ -1896,8 +1896,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.show_error(_("You can't broadcast a transaction without a live network connection."))
             self.show_transaction(tx)
             return
-        for out in tx.outputs():
-            print(out.scriptpubkey)
+
         self.broadcast_transaction(tx)
 
     @protected

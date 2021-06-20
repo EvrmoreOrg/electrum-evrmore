@@ -906,26 +906,34 @@ class Transaction:
         if _type in ('address', 'unknown') and estimate_size:
             _type = self.guess_txintype_from_address(txin.address)
         if _type == 'p2pk':
-            return construct_script([sig_list[0]])
+            script = construct_script([sig_list[0]])
         elif _type == 'p2sh':
             # put op_0 before script
             redeem_script = multisig_script(pubkeys, txin.num_sig)
-            return construct_script([0, *sig_list, redeem_script])
+            script =  construct_script([0, *sig_list, redeem_script])
         elif _type == 'p2pkh':
-            return construct_script([sig_list[0], pubkeys[0]])
+            script = construct_script([sig_list[0], pubkeys[0]])
         elif _type in ['p2wpkh', 'p2wsh']:
-            return ''
+            script = ''
         elif _type == 'p2wpkh-p2sh':
             redeem_script = ravencoin.p2wpkh_nested_script(pubkeys[0])
-            return construct_script([redeem_script])
+            script = construct_script([redeem_script])
         elif _type == 'p2wsh-p2sh':
             if estimate_size:
                 witness_script = ''
             else:
                 witness_script = self.get_preimage_script(txin)
             redeem_script = ravencoin.p2wsh_nested_script(witness_script)
-            return construct_script([redeem_script])
-        raise UnknownTxinType(f'cannot construct scriptSig for txin_type: {_type}')
+            script = construct_script([redeem_script])
+        else:
+            raise UnknownTxinType(f'cannot construct scriptSig for txin_type: {_type}')
+
+        a = txin.value_sats().assets
+        #if a:
+        #    asset, amt = list(a.items())[0]
+        #    script = assets.create_transfer_asset_script(bytes.fromhex(script), asset, amt).hex()
+
+        return script
 
     @classmethod
     def get_preimage_script(cls, txin: 'PartialTxInput') -> str:
@@ -1087,6 +1095,13 @@ class Transaction:
         """Return an estimate of serialized output size in bytes."""
         script = ravencoin.address_to_script(address)
         return cls.estimated_output_size_for_script(script)
+
+    @classmethod
+    def estimated_output_size_for_address_with_asset(cls, address: str, asset: str) -> int:
+        """Return an estimate of serialized output size in bytes."""
+        script = ravencoin.address_to_script(address)
+        est_raw = cls.estimated_output_size_for_script(script)
+        return est_raw + 1 + 1 + 3 + 1 + 1 + len(asset) + 8 + 1
 
     @classmethod
     def estimated_output_size_for_script(cls, script: str) -> int:
@@ -1572,7 +1587,12 @@ class PartialTxInput(TxInput, PSBTSection):
     @property
     def scriptpubkey(self) -> Optional[bytes]:
         if self._trusted_address is not None:
-            return bfh(ravencoin.address_to_script(self._trusted_address))
+            a = self.value_sats().assets
+            script = bfh(ravencoin.address_to_script(self._trusted_address))
+            #if a:
+            #    asset, amt = list(a.items())[0]
+            #    script = assets.create_transfer_asset_script(script, asset, amt)
+            return script
         if self.utxo:
             out_idx = self.prevout.out_idx
             return self.utxo.outputs()[out_idx].scriptpubkey

@@ -1273,46 +1273,45 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
     def get_change_addresses_for_new_transaction(
             self, preferred_change_addr=None, *, allow_reuse: bool = True,
-            force_addresses : int = None,
+            extra_addresses: int = 0,
     ) -> List[str]:
-        change_addrs = []
-        if preferred_change_addr:
-            if isinstance(preferred_change_addr, (list, tuple)):
-                change_addrs = list(preferred_change_addr)
-            else:
-                change_addrs = [preferred_change_addr]
-        elif self.use_change:
+
+        def append_change_addrs(change_addrs: List):
             # Recalc and get unused change addresses
             addrs = self.calc_unused_change_addresses()
             # New change addresses are created only after a few
             # confirmations.
             if addrs:
                 # if there are any unused, select all
-                change_addrs = addrs
+                change_addrs += addrs
             else:
                 # if there are none, take one randomly from the last few
                 if not allow_reuse:
                     return []
                 addrs = self.get_change_addresses(slice_start=-self.gap_limit_for_change)
-                change_addrs = [random.choice(addrs)] if addrs else []
+                change_addrs += [random.choice(addrs)] if addrs else []
+
+        change_addrs = []
+        if preferred_change_addr:
+            if isinstance(preferred_change_addr, (list, tuple)):
+                change_addrs = list(preferred_change_addr)
+            else:
+                change_addrs = [preferred_change_addr]
+            for _ in range(extra_addresses):
+                append_change_addrs(change_addrs)
+        elif self.use_change:
+            append_change_addrs(change_addrs)
+            for _ in range(extra_addresses):
+                append_change_addrs(change_addrs)
         for addr in change_addrs:
             assert is_address(addr), f"not valid bitcoin address: {addr}"
             # note that change addresses are not necessarily ismine
             # in which case this is a no-op
             self.check_address_for_corruption(addr)
-        max_change = self.max_change_outputs if self.multiple_change else 1
-        change_addrs = change_addrs[:max_change]
-        if force_addresses:
-            addrs = self.calc_unused_change_addresses()
-            if addrs:
-                change_addrs += addrs[:force_addresses - len(change_addrs)]
-            else:
-                if not allow_reuse:
-                    return change_addrs
-                addrs = self.get_change_addresses(slice_start=-self.gap_limit_for_change)
-                for _ in range(force_addresses - len(change_addrs)):
-                    change_addrs += [random.choice(addrs)] if addrs else []
-        return change_addrs
+        max_change = self.max_change_outputs + extra_addresses \
+            if self.multiple_change \
+            else 1 + extra_addresses
+        return change_addrs[:max_change]
 
     def get_single_change_address_for_new_transaction(
             self, preferred_change_addr=None, *, allow_reuse: bool = True,
@@ -1379,7 +1378,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         asset_divs = {asset: self.get_asset_meta(asset).divisions
                       for asset in assets}
 
-        force_addresses = 2 if assets else None
+        extra_addresses = len(assets)
 
         # Fee estimator
         if fee is None:
@@ -1421,7 +1420,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 old_change_addrs = []
             # change address. if empty, coin_chooser will set it
             change_addrs = self.get_change_addresses_for_new_transaction(change_addr or old_change_addrs,
-                                                                         force_addresses=force_addresses)
+                                                                         extra_addresses=extra_addresses)
             tx = coin_chooser.make_tx(
                 coins=coins,
                 inputs=txi,

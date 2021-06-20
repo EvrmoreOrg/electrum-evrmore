@@ -796,7 +796,6 @@ class AddressSynchronizer(Logger):
                     sent[txi] = height
         return received, sent
 
-
     def get_addr_outputs(self, address: str) -> Dict[TxOutpoint, PartialTxInput]:
         coins, spent = self.get_addr_io(address)
         out = {}

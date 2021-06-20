@@ -223,7 +223,7 @@ class CoinChooserBase(Logger):
         if not output_amounts_rvn:
             # Append an amount for the vout after our transaction fee
             output_amounts_rvn = [Satoshis(max(0, tx.get_fee().rvn_value.value -
-                                      fee_estimator_numchange(1 + len(asset_divisions.keys()))))]
+                                  fee_estimator_numchange(1, asset_divisions.keys())))]
 
         # Don't split change of less than 0.02 BTC
         max_change_rvn = max(max([o.value for o in output_amounts_rvn]) * 1.25, 0.02 * COIN)
@@ -234,7 +234,7 @@ class CoinChooserBase(Logger):
             # tx.get_fee() returns our ins - outs
             # i.e. what should be going in our vouts
             change_amount_rvn = max(0, tx.get_fee().rvn_value.value -
-                                    fee_estimator_numchange(n + len(asset_divisions.keys())))
+                                    fee_estimator_numchange(n, asset_divisions.keys()))
             if change_amount_rvn // n <= max_change_rvn:
                 break
 
@@ -314,7 +314,17 @@ class CoinChooserBase(Logger):
 
         # This takes a count of change outputs and returns a tx fee
         output_weight = 4 * Transaction.estimated_output_size_for_address(change_addrs[0])
-        fee_estimator_numchange = lambda count: fee_estimator_w(tx_weight + count * output_weight)
+
+        def fee_estimator_assets(assets: List[str]) -> int:
+            weight = 0
+            for asset in assets:
+                weight += 4 * Transaction.estimated_output_size_for_address_with_asset(change_addrs[0], asset)
+            return weight
+
+        def fee_estimator_numchange(rvn_count: int, assets: List[str]) -> int:
+            return fee_estimator_w(tx_weight + rvn_count * output_weight +
+                                   fee_estimator_assets(assets))
+
         change = self._change_outputs(tx, change_addrs, fee_estimator_numchange, dust_threshold, asset_divs)
         tx.add_outputs(change)
 

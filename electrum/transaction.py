@@ -34,7 +34,7 @@ import io
 import base64
 from typing import (Sequence, Union, NamedTuple, Tuple, Optional, Iterable,
                     Callable, List, Dict, Set, TYPE_CHECKING)
-from collections import defaultdict, Counter
+from collections import defaultdict
 from enum import IntEnum
 import itertools
 import binascii
@@ -122,16 +122,28 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
     def __add__(self, other):
         if isinstance(other, RavenValue):
             v_r = self.rvn_value + other.rvn_value
-            v_a = Counter(self.assets) + Counter(other.assets)
-            return RavenValue(v_r, dict(v_a))
+            v_a = self.assets
+            for k, v in other.assets.items():
+                if k in v_a:
+                    v_a[k] += v
+                else:
+                    v_a[k] = v
+            return RavenValue(v_r, v_a)
         else:
             raise ValueError('RavenValue required')
 
     def __sub__(self, other):
         if isinstance(other, RavenValue):
             v_r = self.rvn_value - other.rvn_value
-            v_a = Counter(self.assets) - Counter(other.assets)
-            return RavenValue(v_r, dict(v_a))
+            v_a = self.assets
+            for k, v in other.assets.items():
+                if k in v_a:
+                    v_a[k] -= v
+                    if v_a[k] == 0:
+                        del v_a[k]
+                else:
+                    v_a[k] = -v
+            return RavenValue(v_r, v_a)
         else:
             raise ValueError('RavenValue required')
 
@@ -141,7 +153,7 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
             for asset, val in self.assets:
                 self.__asset_value[asset] = val * other
         else:
-            raise ValueError('RavenValue required')
+            raise ValueError('int required')
 
     def __eq__(self, other):
         if not isinstance(other, RavenValue):
@@ -152,6 +164,20 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
         k1 = hash(self.__rvn_value)
         k2 = hash(frozenset(self.__asset_value.items()))
         return int((k1 + k2) * (k1 + k2 + 1) / 2 + k2)
+
+    def __lt__(self, other):
+        if isinstance(other, RavenValue):
+            if self.__rvn_value >= other.__rvn_value:
+                return False
+            o_a = other.assets
+            for asset, amt in self.__asset_value.items():
+                if asset not in o_a:
+                    return False
+                if amt >= o_a[asset]:
+                    return False
+            return True
+        else:
+            raise ValueError('RavenValue required')
 
     def __copy__(self):
         return RavenValue(self.__rvn_value, self.__asset_value)
@@ -172,7 +198,9 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
         return d
 
     def is_incoming(self):
-        return self.rvn_value > 0 or (len(self.__asset_value) > 0 and list(self.__asset_value.values())[0] > 0)
+        # 0 >= if receiving assets or RVN
+        # <0 for the fee spent
+        return self.rvn_value >= 0
 
 
 class AssetMeta(NamedTuple):
@@ -940,24 +968,32 @@ class Transaction:
         if txin.witness_script:
             if opcodes.OP_CODESEPARATOR in [x[0] for x in script_GetOp(txin.witness_script)]:
                 raise Exception('OP_CODESEPARATOR black magic is not supported')
-            return txin.witness_script.hex()
+            raise NotImplementedError()
+            # return txin.witness_script.hex()
         if not txin.is_segwit() and txin.redeem_script:
             if opcodes.OP_CODESEPARATOR in [x[0] for x in script_GetOp(txin.redeem_script)]:
                 raise Exception('OP_CODESEPARATOR black magic is not supported')
-            return txin.redeem_script.hex()
+            raise NotImplementedError()
+            #return txin.redeem_script.hex()
 
         pubkeys = [pk.hex() for pk in txin.pubkeys]
         if txin.script_type in ['p2sh', 'p2wsh', 'p2wsh-p2sh']:
-            return multisig_script(pubkeys, txin.num_sig)
+            script = multisig_script(pubkeys, txin.num_sig)
         elif txin.script_type in ['p2pkh', 'p2wpkh', 'p2wpkh-p2sh']:
             pubkey = pubkeys[0]
             pkh = bh2u(hash_160(bfh(pubkey)))
-            return ravencoin.pubkeyhash_to_p2pkh_script(pkh)
+            script = ravencoin.pubkeyhash_to_p2pkh_script(pkh)
         elif txin.script_type == 'p2pk':
             pubkey = pubkeys[0]
-            return ravencoin.public_key_to_p2pk_script(pubkey)
+            script = ravencoin.public_key_to_p2pk_script(pubkey)
         else:
             raise UnknownTxinType(f'cannot construct preimage_script for txin_type: {txin.script_type}')
+
+        a = txin.value_sats().assets
+        if a:
+            asset, amt = list(a.items())[0]
+            script = assets.create_transfer_asset_script(bytes.fromhex(script), asset, amt).hex()
+        return script
 
     @classmethod
     def serialize_input(self, txin: TxInput, script: str) -> str:

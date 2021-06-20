@@ -128,7 +128,7 @@ def strip_unneeded(bkts: List[Bucket], needs_more) -> List[Bucket]:
         while needed == {None}:
             bucket_value_sum += get_rvn_bucket_value()
             needed = needs_more(get_buckets(), bucket_value_sum=bucket_value_sum)
-            if needed and rvn_ptr+1 == len(bkts_rvn):
+            if needed == {None} and rvn_ptr+1 == len(bkts_rvn):
                 raise Exception("keeping all RVN buckets is still not enough: {}".format(bucket_value_sum))
             rvn_ptr += 1
         while needed and needed != {None}:
@@ -136,7 +136,7 @@ def strip_unneeded(bkts: List[Bucket], needs_more) -> List[Bucket]:
             increment_asset_ptr(asset)
             bucket_value_sum += get_asset_bucket_value(asset)
             needed = needs_more(get_buckets(), bucket_value_sum=bucket_value_sum)
-            if needed and is_asset_done(asset):
+            if needed and needed != {None} and is_asset_done(asset):
                 raise Exception("keeping all {} buckets is still not enough: {}".format(asset, bucket_value_sum))
 
     return get_buckets()

@@ -170,7 +170,7 @@ class RavencoinTestnet(AbstractNet):
         'p2wsh': 0x02575483,  # Vpub
     }
     XPUB_HEADERS_INV = inv_dict(XPUB_HEADERS)
-    BIP44_COIN_TYPE = 175
+    BIP44_COIN_TYPE = 1
 
     BURN_AMOUNTS = BurnAmounts(
         IssueAssetBurnAmount=500,

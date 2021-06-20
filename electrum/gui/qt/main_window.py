@@ -1460,7 +1460,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         vis = self.config.get('enable_op_return_messages', False)
         self.pubkey_e = FreezableLineEdit()
-        self.pubkey_e.setMaxLength(39)  # Maximum length of an OP_RETURN message is 40. 1 byte for message length
+        self.pubkey_e.setMaxLength(40)  # Maximum length of an OP_RETURN message is 40. 1 byte for message length
         self.pubkey_e.setMinimumWidth(700)
         msg = _('OP_RETURN message.') + '\n\n' \
               + _('A short message to be encoded in a null pubkey') + ' ' \

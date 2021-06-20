@@ -1442,7 +1442,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             tx = PartialTransaction.from_io(list(coins), list(outputs))
             fee = fee_estimator(tx.estimated_size())
             amount = sendable - tx.output_value() - RavenValue(fee)
-            if amount < RavenValue(0):
+            if amount < RavenValue():
                 raise NotEnoughFunds()
             assets = amount.assets
             if len(assets) == 0:

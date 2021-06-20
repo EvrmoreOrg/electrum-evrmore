@@ -86,42 +86,60 @@ class ScoredCandidate(NamedTuple):
     tx: PartialTransaction
     buckets: List[Bucket]
 
-def strip_unneeded(bkts: List[Bucket], sufficient_funds) -> List[Bucket]:
+def strip_unneeded(bkts: List[Bucket], needs_more) -> List[Bucket]:
     '''Remove buckets that are unnecessary in achieving the spend amount'''
-    if sufficient_funds([], bucket_value_sum=RavenValue()):
+    if not needs_more([], bucket_value_sum=RavenValue()):
         # none of the buckets are needed
         return []
-    is_good = False
-    bkts = sorted(bkts, key=lambda bkt: bkt.value.rvn_value.value, reverse=True)
+
+    a = sum([b.value for b in bkts], RavenValue()).assets.keys()
+
+    bkts_rvn = sorted([b for b in bkts if b.value.rvn_value.value != 0],
+                      key=lambda bkt: bkt.value.rvn_value.value, reverse=True)
+
+    bkts_asset = {asset: sorted([b for b in bkts if asset in b.value.assets.keys()],
+                                key=lambda bkt: bkt.value.assets[asset].value) for asset in a}
+
+    rvn_ptr = 0
+
+    asset_ptr = {asset: -1 for asset in a}
+
+    def get_rvn_bucket_value() -> RavenValue:
+        return bkts_rvn[rvn_ptr].value
+
+    def get_asset_bucket_value(asset) -> RavenValue:
+        return bkts_asset[asset][asset_ptr[asset]].value
+
+    def is_asset_done(asset):
+        return asset_ptr[asset]+1 == len(bkts_asset[asset])
+
+    def increment_asset_ptr(asset):
+        ptr = asset_ptr[asset]
+        asset_ptr[asset] = ptr + 1
+
+    def get_buckets() -> List[Bucket]:
+        return bkts_rvn[:rvn_ptr+1] + \
+               [bkt for asset, asset_bkts in bkts_asset.items() for bkt in asset_bkts[:asset_ptr[asset]+1]]
+
     bucket_value_sum = RavenValue()
-    for i in range(len(bkts)):
-        bucket_value_sum += (bkts[i]).value
-        if sufficient_funds(bkts[:i+1], bucket_value_sum=bucket_value_sum):
-            bkts = bkts[:i+1]
-            is_good = True
-            break
 
-    if not is_good:
-        raise Exception("keeping all buckets is still not enough")
+    needed = {None}
+    while needed:
+        while needed == {None}:
+            bucket_value_sum += get_rvn_bucket_value()
+            needed = needs_more(get_buckets(), bucket_value_sum=bucket_value_sum)
+            if needed and rvn_ptr+1 == len(bkts_rvn):
+                raise Exception("keeping all RVN buckets is still not enough: {}".format(bucket_value_sum))
+            rvn_ptr += 1
+        while needed and needed != {None}:
+            asset = next(iter(needed))
+            increment_asset_ptr(asset)
+            bucket_value_sum += get_asset_bucket_value(asset)
+            needed = needs_more(get_buckets(), bucket_value_sum=bucket_value_sum)
+            if needed and is_asset_done(asset):
+                raise Exception("keeping all {} buckets is still not enough: {}".format(asset, bucket_value_sum))
 
-    common_assets = set()
-    for bkt in bkts:
-        common_assets.update(bkt.value.assets)
-    for asset in common_assets:
-        is_good = False
-        bkts = sorted(bkts, key=lambda bkt: bkt.value.assets.get(asset, Satoshis(0)).value, reverse=True)
-        bucket_value_sum = RavenValue()
-        for i in range(len(bkts)):
-            bucket_value_sum += (bkts[i]).value
-            if sufficient_funds(bkts[:i + 1], bucket_value_sum=bucket_value_sum):
-                bkts = bkts[:i + 1]
-                is_good = True
-                break
-
-        if not is_good:
-            raise Exception("keeping all buckets is still not enough")
-
-    return bkts
+    return get_buckets()
 
 
 class CoinChooserBase(Logger):
@@ -386,24 +404,24 @@ class CoinChooserBase(Logger):
             i = Transaction.virtual_size_from_weight(weight)
             return fee_estimator_vb(i)
 
-        def sufficient_funds(buckets, *, bucket_value_sum: RavenValue):
+        def needs_more(buckets, *, bucket_value_sum: RavenValue):
             '''Given a list of buckets, return True if it has enough
             value to pay for the transaction'''
             # assert bucket_value_sum == sum(bucket.value for bucket in buckets)  # expensive!
             total_input = input_value + bucket_value_sum
             if total_input.rvn_value < spent_amount.rvn_value:  # shortcut for performance
-                return False
+                return {None}
             in_assets = total_input.assets
             out_assets = spent_amount.assets
             for asset in out_assets:
                 if asset not in in_assets:
-                    return False
+                    return {asset}
                 if in_assets[asset] < out_assets[asset]:
-                    return False
+                    return {asset}
             # any bitcoin tx must have at least 1 input by consensus
             # (check we add some new UTXOs now or already have some fixed inputs)
             if not buckets and not inputs:
-                return False
+                return {None}
             # note re performance: so far this was constant time
             # what follows is linear in len(buckets)
             total_weight = self._get_tx_weight(buckets, base_weight=base_weight)
@@ -414,13 +432,13 @@ class CoinChooserBase(Logger):
             out_assets = spent_amount.assets
             ret_val = total_input.rvn_value >= total_out.rvn_value
             if not ret_val:
-                return ret_val
+                return {None}
             for asset in out_assets:
                 if asset not in in_assets:
-                    return False
+                    return {asset}
                 if in_assets[asset] < out_assets[asset]:
-                    return False
-            return True
+                    return {asset}
+            return set()
 
         def tx_from_buckets(buckets):
             return self._construct_tx_from_selected_buckets(buckets=buckets,
@@ -441,7 +459,7 @@ class CoinChooserBase(Logger):
                                             len(b.value.assets) > 0, all_buckets))
 
         # Choose a subset of the buckets
-        scored_candidate = self.choose_buckets(all_buckets, sufficient_funds,
+        scored_candidate = self.choose_buckets(all_buckets, needs_more,
                                                self.penalty_func(base_tx, tx_from_buckets=tx_from_buckets))
         tx = scored_candidate.tx
 
@@ -451,16 +469,16 @@ class CoinChooserBase(Logger):
         return tx
 
     def choose_buckets(self, buckets: List[Bucket],
-                       sufficient_funds: Callable,
+                       needs_more: Callable,
                        penalty_func: Callable[[List[Bucket]], ScoredCandidate]) -> ScoredCandidate:
         raise NotImplemented('To be subclassed')
 
 
 class CoinChooserRandom(CoinChooserBase):
-    def bucket_candidates_any(self, buckets: List[Bucket], sufficient_funds) -> List[List[Bucket]]:
+    def bucket_candidates_any(self, buckets: List[Bucket], needs_more) -> List[List[Bucket]]:
         '''Returns a list of bucket sets.'''
         if not buckets:
-            if sufficient_funds([], bucket_value_sum=RavenValue()):
+            if not needs_more([], bucket_value_sum=RavenValue()):
                 return [[]]
             else:
                 raise NotEnoughFunds()
@@ -469,7 +487,7 @@ class CoinChooserRandom(CoinChooserBase):
 
         # Add all singletons
         for n, bucket in enumerate(buckets):
-            if sufficient_funds([bucket], bucket_value_sum=bucket.value):
+            if not needs_more([bucket], bucket_value_sum=bucket.value):
                 candidates.add((n,))
 
         # And now some random ones
@@ -485,7 +503,7 @@ class CoinChooserRandom(CoinChooserBase):
                 bucket = buckets[index]
                 bkts.append(bucket)
                 bucket_value_sum += bucket.value
-                if sufficient_funds(bkts, bucket_value_sum=bucket_value_sum):
+                if not needs_more(bkts, bucket_value_sum=bucket_value_sum):
                     candidates.add(tuple(sorted(permutation[:count + 1])))
                     break
             else:
@@ -493,10 +511,10 @@ class CoinChooserRandom(CoinChooserBase):
                 raise NotEnoughFunds()
 
         candidates = [[buckets[n] for n in c] for c in candidates]
-        return [strip_unneeded(c, sufficient_funds) for c in candidates]
+        return [strip_unneeded(c, needs_more) for c in candidates]
 
     def bucket_candidates_prefer_confirmed(self, buckets: List[Bucket],
-                                           sufficient_funds) -> List[List[Bucket]]:
+                                           needs_more) -> List[List[Bucket]]:
         """Returns a list of bucket sets preferring confirmed coins.
 
         Any bucket can be:
@@ -520,7 +538,7 @@ class CoinChooserRandom(CoinChooserBase):
             try:
                 def sfunds(bkts, *, bucket_value_sum: RavenValue):
                     bucket_value_sum += already_selected_buckets_value_sum
-                    return sufficient_funds(already_selected_buckets + bkts,
+                    return needs_more(already_selected_buckets + bkts,
                                             bucket_value_sum=bucket_value_sum)
 
                 candidates = self.bucket_candidates_any(bkts_choose_from, sfunds)
@@ -532,10 +550,10 @@ class CoinChooserRandom(CoinChooserBase):
             raise NotEnoughFunds()
 
         candidates = [(already_selected_buckets + c) for c in candidates]
-        return [strip_unneeded(c, sufficient_funds) for c in candidates]
+        return [strip_unneeded(c, needs_more) for c in candidates]
 
-    def choose_buckets(self, buckets, sufficient_funds, penalty_func):
-        candidates = self.bucket_candidates_prefer_confirmed(buckets, sufficient_funds)
+    def choose_buckets(self, buckets, needs_more, penalty_func):
+        candidates = self.bucket_candidates_prefer_confirmed(buckets, needs_more)
         scored_candidates = [penalty_func(cand) for cand in candidates]
         winner = min(scored_candidates, key=lambda x: x.penalty)
         self.logger.info(f"Total number of buckets: {len(buckets)}")

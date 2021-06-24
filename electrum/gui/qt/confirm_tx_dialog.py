@@ -123,8 +123,6 @@ class TxEditor:
             return True
 
 
-
-
 class ConfirmTxDialog(TxEditor, WindowModalDialog):
     # set fee and return password (after pw check)
 

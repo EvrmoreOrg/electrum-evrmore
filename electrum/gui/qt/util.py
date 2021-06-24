@@ -386,8 +386,9 @@ def text_dialog(
     if dialog.exec_():
         return txt.toPlainText()
 
+
 class ChoicesLayout(object):
-    def __init__(self, msg, choices, on_clicked=None, checked_index=0):
+    def __init__(self, msg, choices, on_clicked=None, checked_index=0, horizontal=False):
         vbox = QVBoxLayout()
         if len(msg) > 50:
             vbox.addWidget(WWLabel(msg))
@@ -395,7 +396,7 @@ class ChoicesLayout(object):
         gb2 = QGroupBox(msg)
         vbox.addWidget(gb2)
 
-        vbox2 = QVBoxLayout()
+        vbox2 = QHBoxLayout() if horizontal else QVBoxLayout()
         gb2.setLayout(vbox2)
 
         self.group = group = QButtonGroup()
@@ -929,6 +930,51 @@ class TaskThread(QThread):
         self.tasks.put(None)
         self.exit()
         self.wait()
+
+
+class ComplexLineEdit(QWidget):
+    #https://gist.github.com/stilManiac/1851fdbd77c8c5fa3053d8081d64ece4
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        layout = QHBoxLayout()
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self.prefix_widget = QLabel()
+        #self.prefix_widget.setFixedHeight(26)
+        layout.addWidget(self.prefix_widget)
+
+        self.lineEdit = QLineEdit()
+        #self.lineEdit.setFixedHeight(26)
+        layout.addWidget(self.lineEdit)
+
+        self.suffix_widget = QLabel()
+        #self.suffix_widget.setFixedHeight(26)
+        layout.addWidget(self.suffix_widget)
+
+        self.setLayout(layout)
+
+    def setText(self, text):
+        self.lineEdit.setText(text)
+
+    def text(self):
+        return self.lineEdit.text()
+
+    def set_prefix(self, text):
+        self.prefix_widget.setText(text)
+
+    def get_prefix(self):
+        return self.prefix_widget.text()
+
+    def set_suffix(self, text):
+        self.suffix_widget.setText(text)
+
+    def setPrefixStyle(self, style: str):
+        self.prefix_widget.setStyleSheet(style)
+
+    def setSuffixStyle(self, style: str):
+        self.suffix_widget.setStyleSheet(style)
 
 
 class ColorSchemeItem:

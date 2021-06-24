@@ -47,7 +47,7 @@ from PyQt5.QtWidgets import (QMessageBox, QComboBox, QSystemTrayIcon, QTabWidget
                              QHBoxLayout, QPushButton, QScrollArea, QTextEdit,
                              QShortcut, QMainWindow, QCompleter, QInputDialog,
                              QWidget, QSizePolicy, QStatusBar, QToolTip, QDialog,
-                             QMenu, QAction, QStackedWidget, QToolButton)
+                             QMenu, QAction, QStackedWidget, QToolButton, )
 
 import electrum
 from electrum.gui import messages
@@ -95,7 +95,7 @@ from .util import (read_QIcon, ColorScheme, text_dialog, icon_path, WaitingDialo
                    filename_field, address_field, char_width_in_lineedit, webopen,
                    TRANSACTION_FILE_EXTENSION_FILTER_ANY, MONOSPACE_FONT,
                    getOpenFileName, getSaveFileName, BlockingWaitingDialog)
-from .util import ButtonsTextEdit, ButtonsLineEdit
+from .util import ButtonsTextEdit, ButtonsLineEdit, ComplexLineEdit
 from .installwizard import WIF_HELP_TEXT
 from .history_list import HistoryList, HistoryModel
 from .update_checker import UpdateCheck, UpdateCheckThread
@@ -103,6 +103,7 @@ from .channels_list import ChannelsList
 from .confirm_tx_dialog import ConfirmTxDialog
 from .transaction_dialog import PreviewTxDialog
 from .rbf_dialog import BumpFeeDialog, DSCancelDialog
+from ...assets import is_main_asset_name_good, is_sub_asset_name_good, is_unique_asset_name_good
 
 if TYPE_CHECKING:
     from . import ElectrumGui
@@ -223,12 +224,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.receive_tab = self.create_receive_tab()
         self.addresses_tab = self.create_addresses_tab()
         self.assets_tab = self.create_assets_tab()
+        self.workspace_tab = self.create_workspace_tab()
         self.utxo_tab = self.create_utxo_tab()
         self.console_tab = self.create_console_tab()
         self.contacts_tab = self.create_contacts_tab()
         # self.channels_tab = self.create_channels_tab()
         tabs.addTab(self.create_history_tab(), read_QIcon("tab_history.png"), _('History'))
         tabs.addTab(self.assets_tab, read_QIcon('tab_assets.png'), _('Assets'))
+        tabs.addTab(self.workspace_tab, read_QIcon('NA'), _('Workspace'))
         tabs.addTab(self.send_tab, read_QIcon("tab_send.png"), _('Send'))
         tabs.addTab(self.receive_tab, read_QIcon("tab_receive.png"), _('Receive'))
 
@@ -1069,6 +1072,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         # self.channels_list.update_rows.emit(wallet)
         self.update_completions()
         self.refresh_send_tab()
+        self.refresh_workspace_tab()
 
     # def create_channels_tab(self):
     #     self.channels_list = ChannelsList(self)
@@ -1540,6 +1544,163 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         w.searchable_list = self.invoice_list
         run_hook('create_send_tab', grid)
         return w
+
+    def refresh_workspace_tab(self):
+        # Don't interrupt us when we're on this tab
+        if self.tabs.currentIndex() != self.tabs.indexOf(self.workspace_tab):
+            self.aval_owner_combo.clear()
+            owned_assets = sum(self.wallet.get_balance(), RavenValue()).assets.keys()
+            asset_data = self.wallet.get_assets()
+            owners = [n for n in owned_assets if n[-1] == '!' and n[:-1] not in asset_data]
+            self.aval_owner_options = ['Select a parent'] + \
+                                sorted([n[:-1] for n in owners])
+            self.aval_owner_combo.addItems(self.aval_owner_options)
+
+    def create_workspace_tab(self):
+
+        self.aval_owner_combo = QComboBox()
+        self.aval_owner_combo.setCurrentIndex(0)
+        self.aval_owner_combo.setVisible(False)
+
+        c_grid = QGridLayout()
+        c_grid.setSpacing(4)
+
+        self.asset_name = ComplexLineEdit()
+        self.asset_name.lineEdit.setMaxLength(31)
+        self.asset_name.setPrefixStyle(ColorScheme.GRAY.as_stylesheet())
+        self.asset_availability_text = QLabel()
+        self.asset_availability_text.setAlignment(Qt.AlignCenter)
+
+
+        def on_type_click(clayout_obj):
+            self.asset_availability_text.setText('')
+            i = clayout_obj.selected_index()
+            i2 = self.aval_owner_combo.currentIndex()
+            self.aval_owner_combo.setVisible(i != 0)
+            if i == 0 or i2 == 0:
+                self.asset_name.lineEdit.setMaxLength(31)
+                self.asset_name.set_prefix('')
+                return
+            text = self.aval_owner_options[i2]
+            self.asset_name.lineEdit.setMaxLength(31 - len(text))
+            if i == 1:
+                self.asset_name.set_prefix(text+'/')
+            else:
+                self.asset_name.set_prefix(text+'#')
+
+        create_asset_options = ['Main', 'Sub', 'Unique']
+        self.create_options_layout = ChoicesLayout('Select an asset type', create_asset_options, on_type_click,
+                                                        horizontal=True)
+
+        def on_combo_change():
+            self.asset_availability_text.setText('')
+            i = self.create_options_layout.selected_index()
+            i2 = self.aval_owner_combo.currentIndex()
+            self.aval_owner_combo.setVisible(i != 0)
+            if i == 0 or i2 == 0:
+                self.asset_name.set_prefix('')
+                self.asset_name.lineEdit.setMaxLength(31)
+                return
+            text = self.aval_owner_options[i2]
+            self.asset_name.lineEdit.setMaxLength(31 - len(text))
+            if i == 1:
+                self.asset_name.set_prefix(text + '/')
+            else:
+                self.asset_name.set_prefix(text + '#')
+
+        self.aval_owner_combo.currentIndexChanged.connect(on_combo_change)
+
+        #create_options = QWidget()
+        #create_options.setLayout(self.create_options_layout.layout())
+        #c_grid.addWidget(create_options, 1, 0)
+
+        #c_grid.setColumnStretch(3, 1)
+        msg = _('The asset name.') + '\n\n' \
+             + _(
+            'This name must be unique.')
+        name_label = HelpLabel(_('Asset Name'), msg)
+        c_grid.addWidget(name_label, 2, 0)
+        c_grid.addWidget(self.aval_owner_combo, 2, 1)
+        c_grid.addWidget(self.asset_name, 2, 2)
+
+        self.asset_name_error_message = QLabel()
+        self.asset_name_error_message.setStyleSheet(ColorScheme.RED.as_stylesheet())
+        self.asset_name_error_message.setAlignment(Qt.AlignCenter)
+
+        def check_asset_name():
+            self.asset_availability_text.setText('')
+            name = self.asset_name.text()
+            if not name:
+                self.asset_name_error_message.setText('')
+                return
+            i = self.create_options_layout.selected_index()
+            if i == 0:
+                error = is_main_asset_name_good(name)
+                if error == 'SIZE':
+                    if len(name) < 3:
+                        error = None
+                    else:
+                        error = "You may only use capital letters, numbers, '_', and '.'"
+            elif i == 1:
+                error = is_sub_asset_name_good(name)
+            else:
+                error = is_unique_asset_name_good(name)
+            if error:
+                self.asset_name_error_message.setText(error)
+                return False
+            else:
+                self.asset_name_error_message.setText('')
+                return True
+
+        def check_availability():
+            asset = self.asset_name.get_prefix() + self.asset_name.text()
+            if self.create_options_layout.selected_index() == 0 and len(asset) < 3:
+                self.asset_name_error_message.setText('Main assets must be more than 3 characters.')
+                return
+            if not check_asset_name():
+                return
+            self.check_asset_availability(asset)
+
+        self.check_button = EnterButton(_("Check Availability"), check_availability)
+        c_grid.addWidget(self.check_button, 2, 3)
+
+        self.asset_name.lineEdit.textChanged.connect(check_asset_name)
+
+        c_grid.addWidget(self.asset_name_error_message, 3, 2)
+        c_grid.addWidget(self.asset_availability_text, 3, 3)
+
+        create_w = QWidget()
+        widgetA = QWidget()
+        widgetA.setLayout(self.create_options_layout.layout())
+        widgetB = QWidget()
+        widgetB.setLayout(c_grid)
+        create_l = QGridLayout()
+        create_l.addWidget(widgetA, 0, 0)
+        create_l.addWidget(widgetB, 1, 0)
+        create_w.setLayout(create_l)
+
+
+        reissue_w = QWidget()
+
+        layout = QGridLayout()
+        w = QWidget()
+        w.setLayout(layout)
+        tabwidget = QTabWidget()
+        tabwidget.addTab(create_w, "Create Assets")
+        tabwidget.addTab(reissue_w, "Reissue Assets")
+        layout.addWidget(tabwidget, 0, 0)
+        return w
+
+    def check_asset_availability(self, asset):
+        self.run_coroutine_from_thread(self.network.get_meta_for_asset(asset), self.update_screen_based_on_asset_result)
+
+    def update_screen_based_on_asset_result(self, result):
+        if result:
+            self.asset_availability_text.setText('Asset Unavailable')
+            self.asset_availability_text.setStyleSheet(ColorScheme.RED.as_stylesheet())
+        else:
+            self.asset_availability_text.setText('Asset Available')
+            self.asset_availability_text.setStyleSheet(ColorScheme.GREEN.as_stylesheet())
 
     def get_asset_from_spend_tab(self) -> Optional[str]:
         combo_index = self.to_send_combo.currentIndex()

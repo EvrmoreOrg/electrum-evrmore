@@ -25,7 +25,7 @@ import threading
 import asyncio
 import itertools
 from collections import defaultdict
-from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple, NamedTuple, Sequence, List
+from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple, NamedTuple, Sequence, List, Iterable
 
 from aiorpcx import TaskGroup
 
@@ -118,7 +118,7 @@ class AddressSynchronizer(Logger):
     def get_asset_meta(self, asset) -> AssetMeta:
         return self.db.get_asset_meta(asset)
 
-    def get_assets(self):
+    def get_assets(self) -> Iterable[str]:
         return self.db.get_assets()
 
     def get_address_history(self, addr: str) -> Sequence[Tuple[str, int]]:

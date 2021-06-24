@@ -1,0 +1,13 @@
+from electrum import assets
+
+script = bytes.fromhex('76a914ba82b5d3a4a858e0e3e18ca46061510e1b926f8388acc04a72766e711853594e54482f5055422f53434f5443485f42415443485f3100743ba40b0000000200011220942f2059feaf0a65861b6b65c026e18f9d1e6c3e3463b5b0e956dda2c8c39bb875')
+
+data = assets.pull_meta_from_create_or_reissue_script(script)
+
+print(data)
+
+script = bytes.fromhex('76a914f1d70d527ea42c2d5839aa1796e9ac7f2dd1bf3288acc03b72766e720a44414b4f5441434f494e000000000000000008011220daaf763ab455f2340aa1c8942736b6b1beaa5a7dab094cee2139b98e30dd956875')
+
+data = assets.pull_meta_from_create_or_reissue_script(script)
+
+print(data)

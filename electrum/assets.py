@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 import re
-from electrum.ravencoin import opcodes, push_script
+from typing import Dict
+
+from electrum.ravencoin import opcodes, push_script, base_encode
+from electrum import transaction
 
 DOUBLE_PUNCTUATION = "^.*[._]{2,}.*$"
 LEADING_PUNCTUATION = "^[._].*$"
@@ -10,6 +13,66 @@ RAVEN_NAMES = "^RVN$|^RAVEN$|^RAVENCOIN$|^#RVN$|^#RAVEN$|^#RAVENCOIN$"
 MAIN_CHECK = "^[A-Z0-9._]{3,}$"
 SUB_CHECK ="^[A-Z0-9._]+$"
 UNIQUE_CHECK = "^[-A-Za-z0-9@$%&*()[\\]{}_.?:]+$"
+
+
+class BadAssetScript(Exception): pass
+
+
+def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
+    if script[-1] != 0x75:
+        raise BadAssetScript('No OP_DROP')
+    ops = transaction.script_GetOp(script)
+    rvn_ptr = -1
+    for op, _, ptr in ops:
+        if op == opcodes.OP_RVN_ASSET:
+            rvn_ptr = ptr - 1
+            break
+    if not rvn_ptr > 0:
+        raise BadAssetScript('No OP_RVN_ASSET')
+    if script[rvn_ptr+1:rvn_ptr+4] == b'rvn':
+        rvn_ptr += 4
+    else:
+        rvn_ptr += 5
+    type = bytes([script[rvn_ptr]])
+    if type not in (b'q', b'r'):
+        raise BadAssetScript('Not an asset creation script')
+
+    rvn_ptr += 1
+    if type == b'q':
+        name_len = script[rvn_ptr]
+        name = script[rvn_ptr+1:rvn_ptr+1+name_len]
+        sats = script[rvn_ptr+1+name_len:rvn_ptr+1+name_len+8]
+        divs = script[rvn_ptr+1+name_len+8]
+        reis = script[rvn_ptr+1+name_len+8+1]
+        has_i = script[rvn_ptr+1+name_len+8+1+1]
+        ifps = None
+        if has_i != 0:
+            ifps = script[rvn_ptr+1+name_len+8+1+1+1:rvn_ptr+1+name_len+8+1+1+1+34]
+        return {
+            'name': name.decode('ascii'),
+            'sats': int.from_bytes(sats, 'little'),
+            'divisions': divs,
+            'reissuable': reis,
+            'has_ipfs': has_i,
+            'ipfs': base_encode(ifps, base=58) if ifps else None
+        }
+    else:
+        name_len = script[rvn_ptr]
+        name = script[rvn_ptr + 1:rvn_ptr + 1 + name_len]
+        sats = script[rvn_ptr + 1 + name_len:rvn_ptr + 1 + name_len + 8]
+        divs = script[rvn_ptr + 1 + name_len + 8]
+        reis = script[rvn_ptr + 1 + name_len + 8 + 1]
+        ifps = None
+        if rvn_ptr + 1 + name_len + 8 + 1 + 1 != len(script) - 1:
+            ifps = script[rvn_ptr + 1 + name_len + 8 + 1 + 1:rvn_ptr + 1 + name_len + 8 + 1 + 1 + 34]
+        return {
+            'name': name.decode('ascii'),
+            'sats': int.from_bytes(sats, 'little'),
+            'divisions': divs,
+            'reissuable': reis,
+            'has_ipfs': 0 if not ifps else 1,
+            'ipfs': base_encode(ifps, base=58) if ifps else None
+        }
 
 def create_transfer_asset_script(standard: bytes, asset: str, value: int):
     asset_header = b'rvnt'.hex()

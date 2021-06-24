@@ -19,6 +19,8 @@ Electrum - Lightweight Ravencoin client
 Getting started
 ===============
 
+Contact us on `Discord`_!
+
 Interested in a pre-built binary? Find them `here`_. Otherwise, continue reading.
 
 Electrum itself is pure Python, and so are most of the required dependencies,
@@ -59,6 +61,7 @@ If you would like hardware wallet support, see `this`_.
 .. _cryptography: https://github.com/pyca/cryptography
 .. _this: https://github.com/spesmilo/electrum-docs/blob/master/hardware-linux.rst
 .. _here: https://github.com/Electrum-RVN-SIG/electrum-ravencoin/releases
+.. _Discord: https://discord.gg/VuubYncHz4
 
 Running from tar.gz
 -------------------

@@ -31,6 +31,7 @@ import logging
 from aiorpcx import TaskGroup, run_in_thread, RPCError
 
 from . import util
+from .assets import pull_meta_from_create_or_reissue_script, BadAssetScript
 from .transaction import Transaction, PartialTransaction, AssetMeta, RavenValue
 from .util import bh2u, make_aiohttp_session, NetworkJobOnDefaultServer, random_shuffled_copy
 from .ravencoin import address_to_scripthash, is_address
@@ -306,6 +307,59 @@ class Synchronizer(SynchronizerBase):
             self._stale_metadata[asset] = await self.taskgroup.spawn(disconnect_if_still_stale)
 
         else:
+
+            # Verify information
+            async def request_and_verify_metadata_against(height: int, tx_hash: str, idx: int, meta: Dict):
+                self._requests_sent += 1
+                try:
+                    async with self._network_request_semaphore:
+                        raw_tx = await self.interface.get_transaction(tx_hash)
+                except RPCError as e:
+                    # most likely, "No such mempool or blockchain transaction"
+                    raise
+                finally:
+                    self._requests_answered += 1
+                tx = Transaction(raw_tx)
+                if tx_hash != tx.txid():
+                    raise SynchronizerFailure(f"received tx does not match expected txid ({tx_hash} != {tx.txid()})")
+                await self.wallet.verifier.request_and_verfiy_proof(tx_hash, height)
+                try:
+                    vout = tx.outputs()[idx]
+                except IndexError:
+                    raise SynchronizerFailure(f"Non-existant vout {idx}")
+                script = vout.scriptpubkey
+                try:
+                    data = pull_meta_from_create_or_reissue_script(script)
+                except (BadAssetScript, IndexError):
+                    raise SynchronizerFailure(f"Bad asset script {script})")
+                if data['name'] != asset:
+                    raise SynchronizerFailure(f"Not our asset! {asset} vs {data['name']}")
+                for key, value in meta.items():
+                    if data[key] != value:
+                        raise SynchronizerFailure(f"Metadata mismatch: {value} vs {data[key]}")
+
+            prev_source = result.get('source_prev', None)
+            source = result['source']
+            if prev_source:
+                prev_height = prev_source['height']
+                prev_txid = prev_source['tx_hash']
+                prev_idx = prev_source['tx_pos']
+                await request_and_verify_metadata_against(prev_height, prev_txid, prev_idx, {'divisions': result['divisions']})
+                d = dict()
+                d['reissuable'] = result['reissuable']
+                d['has_ipfs'] = result['has_ipfs']
+                if d['has_ipfs']:
+                    d['ipfs'] = result['ipfs']
+                height = source['height']
+                txid = source['tx_hash']
+                idx = source['tx_pos']
+                await request_and_verify_metadata_against(height, txid, idx, d)
+            else:
+                height = source['height']
+                txid = source['tx_hash']
+                idx = source['tx_pos']
+                await request_and_verify_metadata_against(height, txid, idx, result)
+
             ownr = asset[-1] == '!'
             divs = result['divisions']
             reis = False if result['reissuable'] == 0 else True

@@ -1364,6 +1364,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 if i_max is not None:
                     raise MultipleSpendMaxTxOutputs()
                 i_max = i
+        if i_max and len(outputs) > 1:
+            raise MultipleSpendMaxTxOutputs()
 
         if fee is None and self.config.fee_per_kb() is None:
             raise NoDynamicFeeEstimates()
@@ -1390,37 +1392,52 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         else:
             raise Exception(f'Invalid argument fee: {fee}')
 
-        if i_max is None:
-            # Let the coin chooser select the coins to spend
-            coin_chooser = coinchooser.get_coin_chooser(self.config)
-            # If there is an unconfirmed RBF tx, merge with it
-            base_tx = self.get_unconfirmed_base_tx_for_batching()
-            if self.config.get('batch_rbf', False) and base_tx:
-                # make sure we don't try to spend change from the tx-to-be-replaced:
-                coins = [c for c in coins if c.prevout.txid.hex() != base_tx.txid()]
-                is_local = self.get_tx_height(base_tx.txid()).height == TX_HEIGHT_LOCAL
-                base_tx = PartialTransaction.from_tx(base_tx)
-                base_tx.add_info_from_wallet(self)
-                base_tx_fee = base_tx.get_fee()
-                relayfeerate = Decimal(self.relayfee()) / 1000
-                original_fee_estimator = fee_estimator
+        #if i_max is None:
+        #We can no longer "just spend everything" for max with assets
 
-                def fee_estimator(size: Union[int, float, Decimal]) -> int:
-                    size = Decimal(size)
-                    lower_bound = base_tx_fee + round(size * relayfeerate)
-                    lower_bound = lower_bound if not is_local else 0
-                    return int(max(lower_bound, original_fee_estimator(size)))
+        # Let the coin chooser select the coins to spend
+        coin_chooser = coinchooser.get_coin_chooser(self.config)
+        # If there is an unconfirmed RBF tx, merge with it
+        base_tx = self.get_unconfirmed_base_tx_for_batching()
+        if self.config.get('batch_rbf', False) and base_tx:
+            # make sure we don't try to spend change from the tx-to-be-replaced:
+            coins = [c for c in coins if c.prevout.txid.hex() != base_tx.txid()]
+            is_local = self.get_tx_height(base_tx.txid()).height == TX_HEIGHT_LOCAL
+            base_tx = PartialTransaction.from_tx(base_tx)
+            base_tx.add_info_from_wallet(self)
+            base_tx_fee = base_tx.get_fee()
+            relayfeerate = Decimal(self.relayfee()) / 1000
+            original_fee_estimator = fee_estimator
 
-                txi = base_tx.inputs()
-                txo = list(filter(lambda o: not self.is_change(o.address), base_tx.outputs()))
-                old_change_addrs = [o.address for o in base_tx.outputs() if self.is_change(o.address)]
-            else:
-                txi = []
-                txo = []
-                old_change_addrs = []
-            # change address. if empty, coin_chooser will set it
-            change_addrs = self.get_change_addresses_for_new_transaction(change_addr or old_change_addrs,
-                                                                         extra_addresses=extra_addresses)
+            def fee_estimator(size: Union[int, float, Decimal]) -> int:
+                size = Decimal(size)
+                lower_bound = base_tx_fee + round(size * relayfeerate)
+                lower_bound = lower_bound if not is_local else 0
+                return int(max(lower_bound, original_fee_estimator(size)))
+
+            txi = base_tx.inputs()
+            txo = list(filter(lambda o: not self.is_change(o.address), base_tx.outputs()))
+            old_change_addrs = [o.address for o in base_tx.outputs() if self.is_change(o.address)]
+        else:
+            txi = []
+            txo = []
+            old_change_addrs = []
+        # change address. if empty, coin_chooser will set it
+        change_addrs = self.get_change_addresses_for_new_transaction(change_addr or old_change_addrs,
+                                                                     extra_addresses=extra_addresses)
+
+        if i_max is not None and not outputs[0].asset:
+            # We want to spend all RVN, leave enough to spend the fee
+            sendable = sum(map(lambda c: c.value_sats(), coins), RavenValue())
+            outputs[i_max].value = Satoshis(0)
+            tx = PartialTransaction.from_io(list(coins), list(outputs))
+            fee = fee_estimator(tx.estimated_size())
+            amount = sendable - tx.output_value() - RavenValue(fee)
+            if amount < RavenValue():
+                raise NotEnoughFunds()
+            outputs[i_max].value = amount.rvn_value
+            tx = PartialTransaction.from_io(list(coins), list(outputs))
+        else:
             tx = coin_chooser.make_tx(
                 coins=coins,
                 inputs=txi,
@@ -1429,7 +1446,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 fee_estimator_vb=fee_estimator,
                 dust_threshold=self.dust_threshold(),
                 asset_divs=asset_divs)
-        else:
+        #else:
             # "spend max" branch
             # note: This *will* spend inputs with negative effective value (if there are any).
             #       Given as the user is spending "max", and so might be abandoning the wallet,
@@ -1437,22 +1454,22 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             #       forever. see #5433
             # note: Actually it might be the case that not all UTXOs from the wallet are
             #       being spent if the user manually selected UTXOs.
-            sendable = sum(map(lambda c: c.value_sats(), coins), RavenValue())
-            outputs[i_max].value = Satoshis(0)
-            tx = PartialTransaction.from_io(list(coins), list(outputs))
-            fee = fee_estimator(tx.estimated_size())
-            amount = sendable - tx.output_value() - RavenValue(fee)
-            if amount < RavenValue():
-                raise NotEnoughFunds()
-            assets = amount.assets
-            if len(assets) == 0:
-                outputs[i_max].value = amount.rvn_value
-            else:
-                asset, v = list(assets.items())[0]
-                outputs[i_max].asset = asset
-                outputs[i_max].value = v
+        #    sendable = sum(map(lambda c: c.value_sats(), [c for c in coins if c.value_sats().assets]), RavenValue())
+        #   outputs[i_max].value = Satoshis(0)
+        #    tx = PartialTransaction.from_io(list(coins), list(outputs))
+        #    fee = fee_estimator(tx.estimated_size())
+        #    amount = sendable - tx.output_value() - RavenValue(fee)
+        #    if amount < RavenValue():
+        #        raise NotEnoughFunds()
+        #    assets = amount.assets
+        #    if len(assets) == 0:
+        #        outputs[i_max].value = amount.rvn_value
+        #    else:
+        #       asset, v = list(assets.items())[0]
+        #        outputs[i_max].asset = asset
+        #        outputs[i_max].value = v
 
-            tx = PartialTransaction.from_io(list(coins), list(outputs))
+        #    tx = PartialTransaction.from_io(list(coins), list(outputs))
 
         # Timelock tx to current height.
         tx.locktime = get_locktime_for_new_transaction(self.network)

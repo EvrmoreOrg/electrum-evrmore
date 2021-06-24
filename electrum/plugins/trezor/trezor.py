@@ -442,14 +442,14 @@ class TrezorPlugin(HW_PluginBase):
             assert full_path
             txoutputtype = TxOutputType(
                 multisig=multisig,
-                amount=txout.value.rvn_value.value,
+                amount=txout.value.value,
                 address_n=full_path,
                 script_type=script_type)
             return txoutputtype
 
         def create_output_by_address():
             txoutputtype = TxOutputType()
-            txoutputtype.amount = txout.value.rvn_value.value
+            txoutputtype.amount = txout.value.value
             if address:
                 txoutputtype.script_type = OutputScriptType.PAYTOADDRESS
                 txoutputtype.address = address
@@ -465,6 +465,9 @@ class TrezorPlugin(HW_PluginBase):
         for txout in tx.outputs():
             address = txout.address
             use_create_by_derivation = False
+
+            if txout.asset:
+                raise UserFacingException(_("Trezor does not currently support asset transactions"))
 
             if txout.is_mine and not has_change:
                 # prioritise hiding outputs on the 'change' branch from user
@@ -493,8 +496,12 @@ class TrezorPlugin(HW_PluginBase):
         t.version = tx.version
         t.lock_time = tx.locktime
         t.inputs = self.tx_inputs(tx)
+        for o in tx.outputs():
+            if o.asset:
+                raise UserFacingException(_("Trezor does not currently support asset transactions"))
+
         t.bin_outputs = [
-            TxOutputBinType(amount=o.value.rvn_value.value, script_pubkey=o.scriptpubkey)
+            TxOutputBinType(amount=o.value.value, script_pubkey=o.scriptpubkey)
             for o in tx.outputs()
         ]
         return t

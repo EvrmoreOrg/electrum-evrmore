@@ -300,10 +300,10 @@ class CoinChooserBase(Logger):
         return ret_amt
 
     def _change_outputs(self, tx: PartialTransaction, change_addrs, fee_estimator_numchange,
-                        dust_threshold, asset_divs: Dict[str, int]) -> List[PartialTxOutput]:
+                        dust_threshold, asset_divs: Dict[str, int], has_return: bool) -> List[PartialTxOutput]:
         amounts = self._change_amounts(tx, len(change_addrs), fee_estimator_numchange, asset_divs)
         assert all([t[1] >= 0 for t in amounts])
-        assert len(change_addrs) >= len(amounts)
+        assert len(change_addrs) >= len(amounts) - (1 if has_return else 0)
         assert all([isinstance(amt, Tuple) for amt in amounts])
         # If change is above dust threshold after accounting for the
         # size of the change output, add it to the transaction.
@@ -316,7 +316,8 @@ class CoinChooserBase(Logger):
                                             base_tx: PartialTransaction, change_addrs,
                                             fee_estimator_w, dust_threshold,
                                             base_weight,
-                                            asset_divs: Dict[str, int]) -> Tuple[PartialTransaction, List[PartialTxOutput]]:
+                                            asset_divs: Dict[str, int],
+                                            has_return: bool) -> Tuple[PartialTransaction, List[PartialTxOutput]]:
         # make a copy of base_tx so it won't get mutated
         tx = PartialTransaction.from_io(base_tx.inputs()[:], base_tx.outputs()[:])
 
@@ -343,7 +344,7 @@ class CoinChooserBase(Logger):
             return fee_estimator_w(tx_weight + rvn_count * output_weight +
                                    fee_estimator_assets(assets))
 
-        change = self._change_outputs(tx, change_addrs, fee_estimator_numchange, dust_threshold, asset_divs)
+        change = self._change_outputs(tx, change_addrs, fee_estimator_numchange, dust_threshold, asset_divs, has_return)
         tx.add_outputs(change)
 
         return tx, change
@@ -427,7 +428,6 @@ class CoinChooserBase(Logger):
             total_weight = self._get_tx_weight(buckets, base_weight=base_weight)
 
             fee = fee_estimator_w(total_weight)
-
             total_out = spent_amount + RavenValue(fee)
             out_assets = spent_amount.assets
             ret_val = total_input.rvn_value >= total_out.rvn_value
@@ -440,6 +440,8 @@ class CoinChooserBase(Logger):
                     return {asset}
             return set()
 
+        has_return = any([o.value == 0 and o.scriptpubkey[0] == 0x6a for o in outputs])
+
         def tx_from_buckets(buckets):
             return self._construct_tx_from_selected_buckets(buckets=buckets,
                                                             base_tx=base_tx,
@@ -447,7 +449,8 @@ class CoinChooserBase(Logger):
                                                             fee_estimator_w=fee_estimator_w,
                                                             dust_threshold=dust_threshold,
                                                             base_weight=base_weight,
-                                                            asset_divs=asset_divs)
+                                                            asset_divs=asset_divs,
+                                                            has_return=has_return)
 
         # Collect the coins into buckets
         all_buckets = self.bucketize_coins(coins, fee_estimator_vb=fee_estimator_vb)

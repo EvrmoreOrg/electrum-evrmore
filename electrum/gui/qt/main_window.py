@@ -1590,7 +1590,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.amount_e.setAmount(to_show)
         # show tooltip explaining max amount
         mining_fee = tx.get_fee()
-        mining_fee_str = self.format_amount_and_units(mining_fee)
+        mining_fee_str = self.format_amount_and_units(mining_fee.rvn_value.value)
         msg = _("Mining fee: {} (can be adjusted on next screen)").format(mining_fee_str)
         if x_fee_amount:
             twofactor_fee_str = self.format_amount_and_units(x_fee_amount)

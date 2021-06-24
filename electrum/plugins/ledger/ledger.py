@@ -1,4 +1,5 @@
 import datetime
+import logging
 import threading
 import time
 from struct import pack, unpack
@@ -533,6 +534,8 @@ class Ledger_KeyStore(Hardware_KeyStore):
     @test_pin_unlocked
     @set_and_unset_signing
     def sign_message(self, sequence, message, password):
+        self.give_error("Signing messages is currently unavailable for ledger devices.")
+        return b''
         message = message.encode('utf8')
         message_hash = hashlib.sha256(message).hexdigest().upper()
         # prompt for the PIN before displaying the dialog if necessary
@@ -553,7 +556,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
         except BTChipException as e:
             if e.sw == 0x6a80:
                 self.give_error(
-                    "Unfortunately, this message cannot be signed by the Ledger wallet. Only alphanumerical messages shorter than 140 characters are supported. Please remove any extra characters (tab, carriage return) and retry.")
+                    _("Unfortunately, this message cannot be signed by the Ledger wallet. Only alphanumerical messages shorter than 140 characters are supported. Please remove any extra characters (tab, carriage return) and retry."))
             elif e.sw == 0x6985:  # cancelled by user
                 return b''
             elif e.sw == 0x6982:
@@ -647,10 +650,11 @@ class Ledger_KeyStore(Hardware_KeyStore):
                     self.give_error(_(
                         "P2SH / regular input mixed in same transaction not supported"))  # should never happen
 
-        # TODO: RVN Only
         txOutput = var_int(len(tx.outputs()))
         for o in tx.outputs():
-            txOutput += int_to_hex(o.value.rvn_value.value, 8)
+            if o.asset:
+                self.give_error(_("Sending assets with ledger is currently not supported."))
+            txOutput += int_to_hex(0 if o.asset else o.value.value, 8)
             script = o.scriptpubkey.hex()
             txOutput += var_int(len(script) // 2)
             txOutput += script
@@ -818,9 +822,11 @@ class Ledger_KeyStore(Hardware_KeyStore):
                         inputIndex = inputIndex + 1
                     firstTransaction = False
         except UserWarning:
+            logging.exception('Ledger UserWarning')
             self.give_error(_('Cancelled by user'), True)
             return
         except BTChipException as e:
+            logging.exception('Ledger BTChip')
             if e.sw in (0x6985, 0x6d00):  # cancelled by user
                 return
             elif e.sw == 0x6982:
@@ -831,6 +837,8 @@ class Ledger_KeyStore(Hardware_KeyStore):
         except BaseException as e:
             self.logger.exception('')
             self.give_error(e, True)
+        except Exception:
+            logging.exception('Ledger exception')
         finally:
             self.handler.finished()
 

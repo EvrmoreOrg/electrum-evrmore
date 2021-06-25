@@ -38,9 +38,9 @@ import queue
 import asyncio
 from typing import Optional, TYPE_CHECKING, Sequence, List, Union
 
-from PyQt5.QtGui import QPixmap, QKeySequence, QIcon, QCursor, QFont
+from PyQt5.QtGui import QPixmap, QKeySequence, QIcon, QCursor, QFont, QRegExpValidator
 from PyQt5.QtCore import Qt, QRect, QStringListModel, QSize, pyqtSignal, QPoint
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, QRegExp
 from PyQt5.QtWidgets import (QMessageBox, QComboBox, QSystemTrayIcon, QTabWidget,
                              QMenuBar, QFileDialog, QCheckBox, QLabel,
                              QVBoxLayout, QGridLayout, QLineEdit,
@@ -53,7 +53,7 @@ import electrum
 from electrum.gui import messages
 from electrum import (keystore, ecc, constants, util, ravencoin, commands,
                       paymentrequest, lnutil)
-from electrum.ravencoin import COIN, is_address
+from electrum.ravencoin import COIN, is_address, base_decode, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC
 from electrum.plugin import run_hook, BasePlugin
 from electrum.i18n import _
 from electrum.util import (format_time,
@@ -1571,12 +1571,28 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.asset_availability_text = QLabel()
         self.asset_availability_text.setAlignment(Qt.AlignCenter)
 
+        self.divisions = FreezableLineEdit()
+        self.asset_amount = FreezableLineEdit()
+        self.reissuable = QCheckBox()
 
         def on_type_click(clayout_obj):
             self.asset_availability_text.setText('')
+            self.divisions.setFrozen(False)
+            self.asset_amount.setFrozen(False)
             i = clayout_obj.selected_index()
             i2 = self.aval_owner_combo.currentIndex()
             self.aval_owner_combo.setVisible(i != 0)
+            if i == 2:
+                self.divisions.setFrozen(True)
+                self.divisions.setText('0')
+                self.asset_amount.setFrozen(True)
+                self.asset_amount.setText('1')
+                self.reissuable.setCheckState(False)
+                self.reissuable.setEnabled(False)
+            else:
+                self.reissuable.setCheckState(True)
+                self.reissuable.setEnabled(True)
+                self.reissuable.setTristate(False)
             if i == 0 or i2 == 0:
                 self.asset_name.lineEdit.setMaxLength(31)
                 self.asset_name.set_prefix('')
@@ -1594,6 +1610,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         def on_combo_change():
             self.asset_availability_text.setText('')
+            self.divisions.setFrozen(False)
+            self.asset_amount.setFrozen(False)
             i = self.create_options_layout.selected_index()
             i2 = self.aval_owner_combo.currentIndex()
             self.aval_owner_combo.setVisible(i != 0)
@@ -1610,11 +1628,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         self.aval_owner_combo.currentIndexChanged.connect(on_combo_change)
 
-        #create_options = QWidget()
-        #create_options.setLayout(self.create_options_layout.layout())
-        #c_grid.addWidget(create_options, 1, 0)
-
-        #c_grid.setColumnStretch(3, 1)
         msg = _('The asset name.') + '\n\n' \
              + _(
             'This name must be unique.')
@@ -1640,7 +1653,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                     if len(name) < 3:
                         error = None
                     else:
-                        error = "You may only use capital letters, numbers, '_', and '.'"
+                        error = "Main assets may only use capital letters, numbers, '_', and '.'"
             elif i == 1:
                 error = is_sub_asset_name_good(name)
             else:
@@ -1669,14 +1682,177 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         c_grid.addWidget(self.asset_name_error_message, 3, 2)
         c_grid.addWidget(self.asset_availability_text, 3, 3)
 
+        c_grid_b = QGridLayout()
+        c_grid_b.setColumnStretch(2, 1)
+        c_grid_b.setHorizontalSpacing(10)
+
+        def update_amount_line_edit():
+            t = self.divisions.text()
+            if not t:
+                return
+            split_amt = self.asset_amount.text().split('.')
+            divs = int(t)
+            # Update amount
+            if len(split_amt) == 2:
+                pre, post = split_amt
+                post = post[:divs]
+                if post:
+                    self.asset_amount.setText(pre + '.' + post)
+                else:
+                    self.asset_amount.setText(pre)
+            else:
+                self.asset_amount.setText(split_amt[0])
+
+            # Update regex
+            if divs == 0:
+                reg = QRegExp('^[1-9][0-9]{1,10}$')
+            else:
+                reg = QRegExp('^[1-9][0-9]{1,10}\\.([0-9]{1,' + str(divs) + '})$')
+            validator = QRegExpValidator(reg)
+            self.asset_amount.setValidator(validator)
+
+
+        msg = _('Asset Divisions') + '\n\n' \
+              + _('Asset divisions are a number from 0 to 8. They dictate how much an asset can be divided. '
+                  'The minimum asset amount is 10^-d where d is the division amount.')
+        divisions_label = HelpLabel(_('Divisions'), msg)
+        reg = QRegExp('^[012345678]{1}$')
+        validator = QRegExpValidator(reg)
+        self.divisions.setValidator(validator)
+        self.divisions.setFixedWidth(25)
+        self.divisions.setText('0')
+        self.divisions.textChanged.connect(update_amount_line_edit)
+        divisions_grid = QHBoxLayout()
+        divisions_grid.setSpacing(0)
+        divisions_grid.setContentsMargins(0, 0, 0, 0)
+        divisions_grid.addWidget(divisions_label)
+        divisions_grid.addWidget(self.divisions)
+        divisions_w = QWidget()
+        divisions_w.setLayout(divisions_grid)
+        c_grid_b.addWidget(divisions_w, 0, 0)
+
+        msg = _('Reissuability') + '\n\n' \
+              + _('This lets the asset be edited in the future.')
+        reissue_label = HelpLabel(_('Reissuable'), msg)
+        self.reissuable.setCheckState(True)
+        self.reissuable.setTristate(False)
+        reissue_grid = QHBoxLayout()
+        reissue_grid.setSpacing(0)
+        reissue_grid.setContentsMargins(0, 0, 0, 0)
+        reissue_grid.addWidget(reissue_label)
+        reissue_grid.addWidget(self.reissuable)
+        reissue_w = QWidget()
+        reissue_w.setLayout(reissue_grid)
+        c_grid_b.addWidget(reissue_w, 0, 1)
+
+        self.associated_data_info = QLabel()
+        self.associated_data_info.setAlignment(Qt.AlignCenter)
+
+        msg = _('Associated Data') + '\n\n' \
+              + _('Data to associate with this asset.')
+        data_label = HelpLabel(_('Associated Data'), msg)
+        self.associated_data = QLineEdit()
+
+        def check_associated_data():
+            text = self.associated_data.text()
+            if len(text) == 0:
+                self.associated_data_info.setText('')
+                return
+            if text[:2] == 'Qm':
+                if len(base_decode(text, base=58)) == 34:
+                    self.associated_data_info.setText('Reading as IPFS')
+                    self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                    return
+            try:
+                if len(text) == 1:
+                    raise Exception()
+                bytes.fromhex(text[:(len(text)//2)*2])
+                self.associated_data_info.setText('Reading as hex string')
+                self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                if len(text) > 34*2:
+                    self.associated_data_info.setText('Too much data in hex string!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                return
+            except:
+                self.associated_data_info.setText('Reading as ascii string')
+                self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                if len(text) > 34:
+                    self.associated_data_info.setText('Too much data in ascii string!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+
+        self.associated_data.textChanged.connect(check_associated_data)
+
+        data_grid = QHBoxLayout()
+        data_grid.setSpacing(0)
+        data_grid.setContentsMargins(0, 0, 0, 0)
+        data_grid.addWidget(data_label)
+        data_grid.addWidget(self.associated_data)
+        data_w = QWidget()
+        data_w.setLayout(data_grid)
+        c_grid_b.addWidget(data_w, 0, 2)
+        c_grid_b.addWidget(self.associated_data_info, 1, 2)
+
+        c_grid_c = QGridLayout()
+        c_grid_c.setColumnStretch(2, 1)
+        c_grid_c.setHorizontalSpacing(10)
+
+        msg = _('Asset Amount') + '\n\n' \
+              + _('The amount of an asset to create')
+        amount_label = HelpLabel(_('Amount'), msg)
+        reg = QRegExp('^[1-9][0-9]{0,10}$')
+        validator = QRegExpValidator(reg)
+        self.asset_amount.setValidator(validator)
+        amount_grid = QHBoxLayout()
+        amount_grid.setSpacing(0)
+        amount_grid.setContentsMargins(0, 0, 0, 0)
+        amount_grid.addWidget(amount_label)
+        amount_grid.addWidget(self.asset_amount)
+        amount_w = QWidget()
+        amount_w.setLayout(amount_grid)
+        c_grid_c.addWidget(amount_w, 0, 0)
+
+        self.asset_amount_warning = QLabel()
+        self.asset_amount_warning.setStyleSheet(ColorScheme.RED.as_stylesheet())
+
+        def check_amount():
+            t = self.asset_amount.text()
+            if not t:
+                self.asset_amount_warning.setText('')
+                return
+            v = float(t)
+            if v > TOTAL_COIN_SUPPLY_LIMIT_IN_BTC:
+                self.asset_amount_warning.setText(_('More than the maximum amount ({})').format(TOTAL_COIN_SUPPLY_LIMIT_IN_BTC))
+            else:
+                self.asset_amount_warning.setText('')
+
+        self.asset_amount.textChanged.connect(check_amount)
+        c_grid_c.addWidget(self.asset_amount_warning, 1, 0)
+
+        bottom_buttons = QGridLayout()
+        bottom_buttons.setColumnStretch(1, 1)
+
+        self.create_asset_b = EnterButton(_("Create Asset"), lambda: ())
+        bottom_buttons.addWidget(self.create_asset_b, 1, 0)
+        self.reset_create_b = EnterButton(_("Reset"), self.reset_workspace_create)
+        bottom_buttons.addWidget(self.reset_create_b, 1, 2)
+
         create_w = QWidget()
         widgetA = QWidget()
         widgetA.setLayout(self.create_options_layout.layout())
         widgetB = QWidget()
         widgetB.setLayout(c_grid)
-        create_l = QGridLayout()
-        create_l.addWidget(widgetA, 0, 0)
-        create_l.addWidget(widgetB, 1, 0)
+        widgetC = QWidget()
+        widgetC.setLayout(c_grid_b)
+        widgetD = QWidget()
+        widgetD.setLayout(c_grid_c)
+        widgetE = QWidget()
+        widgetE.setLayout(bottom_buttons)
+        create_l = QVBoxLayout()
+        create_l.addWidget(widgetA)
+        create_l.addWidget(widgetB)
+        create_l.addWidget(widgetC)
+        create_l.addWidget(widgetD)
+        create_l.addWidget(widgetE)
         create_w.setLayout(create_l)
 
 
@@ -1690,6 +1866,27 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         tabwidget.addTab(reissue_w, "Reissue Assets")
         layout.addWidget(tabwidget, 0, 0)
         return w
+
+    def reset_workspace_create(self):
+        self.create_options_layout.group.buttons()[0].setChecked(True)
+        self.asset_name.lineEdit.setText('')
+        self.asset_name.lineEdit.setMaxLength(31)
+        self.asset_name.set_prefix('')
+        self.divisions.setFrozen(False)
+        self.divisions.setText('0')
+        self.reissuable.setCheckState(True)
+        self.reissuable.setEnabled(True)
+        self.reissuable.setTristate(False)
+        self.aval_owner_combo.setVisible(False)
+        self.asset_name_error_message.setText('')
+        self.asset_availability_text.setText('')
+        self.associated_data_info.setText('')
+        self.asset_amount_warning.setText('')
+        self.associated_data.setText('')
+        self.asset_amount.setText('')
+        reg = QRegExp('^[1-9][0-9]{0,10}$')
+        validator = QRegExpValidator(reg)
+        self.asset_amount.setValidator(validator)
 
     def check_asset_availability(self, asset):
         self.run_coroutine_from_thread(self.network.get_meta_for_asset(asset), self.update_screen_based_on_asset_result)

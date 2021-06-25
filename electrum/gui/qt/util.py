@@ -934,14 +934,14 @@ class TaskThread(QThread):
 
 class ComplexLineEdit(QWidget):
     #https://gist.github.com/stilManiac/1851fdbd77c8c5fa3053d8081d64ece4
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, custom_prefix=None, custom_suffix=None):
         super().__init__(parent)
 
         layout = QHBoxLayout()
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        self.prefix_widget = QLabel()
+        self.prefix_widget = QLabel() if not custom_prefix else custom_prefix
         #self.prefix_widget.setFixedHeight(26)
         layout.addWidget(self.prefix_widget)
 
@@ -949,7 +949,7 @@ class ComplexLineEdit(QWidget):
         #self.lineEdit.setFixedHeight(26)
         layout.addWidget(self.lineEdit)
 
-        self.suffix_widget = QLabel()
+        self.suffix_widget = QLabel() if not custom_suffix else custom_suffix
         #self.suffix_widget.setFixedHeight(26)
         layout.addWidget(self.suffix_widget)
 

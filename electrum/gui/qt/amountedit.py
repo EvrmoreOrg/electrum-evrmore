@@ -19,6 +19,7 @@ class FreezableLineEdit(QLineEdit):
     def setFrozen(self, b):
         self.setReadOnly(b)
         self.setFrame(not b)
+        self.setStyleSheet(ColorScheme.GRAY.as_stylesheet() if b else ColorScheme.DEFAULT.as_stylesheet())
         self.frozen.emit()
 
 class AmountEdit(FreezableLineEdit):

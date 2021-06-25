@@ -90,13 +90,13 @@ def is_main_asset_name_good(name):
     Returns the error as a string or None if good
     """
     if re.search(DOUBLE_PUNCTUATION, name):
-        return "There is double punctuation in this name."
+        return "There is double punctuation in this main asset name."
     if re.search(LEADING_PUNCTUATION, name):
-        return "You cannot begin an asset with punctuation."
+        return "You cannot begin a main asset with punctuation."
     if re.search(TRAILING_PUNCTUATION, name):
-        return "You cannot end an asset with punctuation."
+        return "You cannot end a main asset with punctuation."
     if re.search(RAVEN_NAMES, name):
-        return "You cannot have Ravencoin-like names."
+        return "Main assets cannot have Ravencoin-like names."
     if re.search(MAIN_CHECK, name):
         return None
     else:
@@ -105,15 +105,15 @@ def is_main_asset_name_good(name):
 
 def is_sub_asset_name_good(name):
     if re.search(DOUBLE_PUNCTUATION, name):
-        return "There is double punctuation in this name."
+        return "There is double punctuation in this sub asset name."
     if re.search(LEADING_PUNCTUATION, name):
-        return "You cannot begin an asset with punctuation."
+        return "You cannot begin a sub asset with punctuation."
     if re.search(TRAILING_PUNCTUATION, name):
-        return "You cannot end an asset with punctuation."
+        return "You cannot end a sub asset with punctuation."
     if re.search(SUB_CHECK, name):
         return None
     else:
-        return "You may only use capital letters, numbers, '_', and '.'"
+        return "Sub assets may only use capital letters, numbers, '_', and '.'"
 
 
 def is_unique_asset_name_good(name):

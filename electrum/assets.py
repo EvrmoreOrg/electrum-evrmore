@@ -2,8 +2,8 @@
 import re
 from typing import Dict
 
-from electrum.ravencoin import opcodes, push_script, base_encode
-from electrum import transaction
+from .ravencoin import opcodes, push_script, base_encode, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN
+from . import transaction
 
 DOUBLE_PUNCTUATION = "^.*[._]{2,}.*$"
 LEADING_PUNCTUATION = "^[._].*$"
@@ -74,6 +74,7 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
             'ipfs': base_encode(ifps, base=58) if ifps else None
         }
 
+
 def create_transfer_asset_script(standard: bytes, asset: str, value: int):
     asset_header = b'rvnt'.hex()
     name = push_script(asset.encode('ascii').hex())
@@ -83,6 +84,37 @@ def create_transfer_asset_script(standard: bytes, asset: str, value: int):
         bytes([opcodes.OP_RVN_ASSET]) + \
         bytes.fromhex(push_script(asset_portion)) + \
         bytes([opcodes.OP_DROP])
+
+
+def create_owner_asset_script(standard: bytes, asset: str):
+    asset_header = b'rvno'.hex()
+    name = push_script(asset.encode('ascii').hex())
+    asset_portion = asset_header+name
+    return standard + \
+        bytes([opcodes.OP_RVN_ASSET]) + \
+        bytes.fromhex(push_script(asset_portion)) + \
+        bytes([opcodes.OP_DROP])
+
+
+def create_new_asset_script(standard: bytes, asset: str, value: int, divisions, reissuable, data):
+    assert 0 <= divisions <= 8
+    assert value <= TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN
+    assert isinstance(reissuable, bool)
+    assert isinstance(data, bytes) or data is None
+    print(data)
+    asset_header = b'rvnq'.hex()
+    name = push_script(asset.encode('ascii').hex())
+    amt = value.to_bytes(8, byteorder='little', signed=False).hex()
+    d = bytes([divisions]).hex()
+    r = '01' if reissuable else '00'
+    h = '01' if data else '00'
+    asset_portion = asset_header+name+amt+d+r+h
+    if data:
+        asset_portion += data.hex()
+    return standard + \
+           bytes([opcodes.OP_RVN_ASSET]) + \
+           bytes.fromhex(push_script(asset_portion)) + \
+           bytes([opcodes.OP_DROP])
 
 
 def is_main_asset_name_good(name):

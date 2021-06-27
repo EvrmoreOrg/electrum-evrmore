@@ -1347,7 +1347,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             fee=None,
             change_addr: str = None,
             is_sweep=False,
-            rbf=False) -> PartialTransaction:
+            rbf=False,
+            coinbase_outputs=None) -> PartialTransaction:
 
         if not coins:  # any bitcoin tx must have at least 1 input by consensus
             raise NotEnoughFunds()
@@ -1400,6 +1401,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         # If there is an unconfirmed RBF tx, merge with it
         base_tx = self.get_unconfirmed_base_tx_for_batching()
         if self.config.get('batch_rbf', False) and base_tx:
+            raise NotImplementedError()
             # make sure we don't try to spend change from the tx-to-be-replaced:
             coins = [c for c in coins if c.prevout.txid.hex() != base_tx.txid()]
             is_local = self.get_tx_height(base_tx.txid()).height == TX_HEIGHT_LOCAL
@@ -1445,7 +1447,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 change_addrs=change_addrs,
                 fee_estimator_vb=fee_estimator,
                 dust_threshold=self.dust_threshold(),
-                asset_divs=asset_divs)
+                asset_divs=asset_divs,
+                coinbase_outputs=coinbase_outputs)
         #else:
             # "spend max" branch
             # note: This *will* spend inputs with negative effective value (if there are any).

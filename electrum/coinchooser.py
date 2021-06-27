@@ -371,7 +371,8 @@ class CoinChooserBase(Logger):
     def make_tx(self, *, coins: Sequence[PartialTxInput], inputs: List[PartialTxInput],
                 outputs: List[PartialTxOutput], change_addrs: Sequence[str],
                 fee_estimator_vb: Callable, dust_threshold: int,
-                asset_divs: Dict[str, int]) -> PartialTransaction:
+                asset_divs: Dict[str, int],
+                coinbase_outputs=None) -> PartialTransaction:
         """Select unspent coins to spend to pay outputs.  If the change is
         greater than dust_threshold (after adding the change output to
         the transaction) it is kept, otherwise none is sent and it is
@@ -398,7 +399,12 @@ class CoinChooserBase(Logger):
         # would be detected from inputs. The only side effect should be that the
         # marker and flag are excluded, which is compensated in get_tx_weight()
         # FIXME calculation will be off by this (2 wu) in case of RBF batching
+
         base_weight = base_tx.estimated_weight()
+
+        if coinbase_outputs:
+            base_weight = PartialTransaction.from_io(inputs[:], outputs[:] + coinbase_outputs).estimated_weight()
+
         spent_amount = base_tx.output_value()
 
         def fee_estimator_w(weight):
@@ -463,7 +469,8 @@ class CoinChooserBase(Logger):
 
         # Choose a subset of the buckets
         scored_candidate = self.choose_buckets(all_buckets, needs_more,
-                                               self.penalty_func(base_tx, tx_from_buckets=tx_from_buckets))
+                                               self.penalty_func(base_tx, tx_from_buckets=tx_from_buckets),
+                                               coinbase_outputs=coinbase_outputs)
         tx = scored_candidate.tx
 
         self.logger.info(f"using {len(tx.inputs())} inputs")
@@ -473,7 +480,8 @@ class CoinChooserBase(Logger):
 
     def choose_buckets(self, buckets: List[Bucket],
                        needs_more: Callable,
-                       penalty_func: Callable[[List[Bucket]], ScoredCandidate]) -> ScoredCandidate:
+                       penalty_func: Callable[[List[Bucket]], ScoredCandidate],
+                       coinbase_outputs) -> ScoredCandidate:
         raise NotImplemented('To be subclassed')
 
 
@@ -555,13 +563,15 @@ class CoinChooserRandom(CoinChooserBase):
         candidates = [(already_selected_buckets + c) for c in candidates]
         return [strip_unneeded(c, needs_more) for c in candidates]
 
-    def choose_buckets(self, buckets, needs_more, penalty_func):
+    def choose_buckets(self, buckets, needs_more, penalty_func, coinbase_outputs):
         candidates = self.bucket_candidates_prefer_confirmed(buckets, needs_more)
         scored_candidates = [penalty_func(cand) for cand in candidates]
         winner = min(scored_candidates, key=lambda x: x.penalty)
         self.logger.info(f"Total number of buckets: {len(buckets)}")
         self.logger.info(f"Num candidates considered: {len(candidates)}. "
                          f"Winning penalty: {winner.penalty}")
+        if coinbase_outputs:
+            winner.tx.add_outputs(coinbase_outputs)
         return winner
 
 

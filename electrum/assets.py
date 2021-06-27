@@ -87,6 +87,7 @@ def create_transfer_asset_script(standard: bytes, asset: str, value: int):
 
 
 def create_owner_asset_script(standard: bytes, asset: str):
+    assert asset[-1] == '!'
     asset_header = b'rvno'.hex()
     name = push_script(asset.encode('ascii').hex())
     asset_portion = asset_header+name

@@ -455,6 +455,7 @@ class AssetCreateWorkspace(AbstractAssetWorkspace):
         validator = QRegExpValidator(reg)
         self.asset_amount.setValidator(validator)
         self.reissue_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+        self.last_checked = None
 
     def get_owner(self):
         i = self.aval_owner_combo.currentIndex()

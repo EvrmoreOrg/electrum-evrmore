@@ -2095,13 +2095,20 @@ class PartialTransaction(Transaction):
             self._inputs.sort(key = lambda i: (i.prevout.txid, i.prevout.out_idx))
         if outputs:
             self._outputs.sort(key = lambda o: (o.value, o.scriptpubkey))
-            burn_addr = -1
-            for i, o in enumerate(self._outputs):
+
+            burn_vout = None
+            owner_vout = None
+            asset_create_vout = None
+            for o in iter(self._outputs):
                 if o.address in constants.net.BURN_ADDRESSES:
-                    burn_addr = i
-            if burn_addr > -1:
-                burn_vout = self._outputs.pop(burn_addr)
-                self._outputs = [burn_vout] + self._outputs
+                    burn_vout = o
+                elif o.asset and o.asset[-1] == '!':
+                    owner_vout = o
+                elif o.asset:
+                    asset_create_vout = o
+            if burn_vout and owner_vout and asset_create_vout:
+                new_outs = [o for o in self._outputs if o not in (burn_vout, owner_vout, asset_create_vout)]
+                self._outputs = [burn_vout] + new_outs + [owner_vout, asset_create_vout]
 
         self.invalidate_ser_cache()
 

@@ -126,7 +126,7 @@ class SPV(NetworkJobOnDefaultServer):
 
     async def _request_and_verify_single_proof(self, tx_hash, tx_height):
         try:
-            header, pos = self.request_and_verfiy_proof(tx_hash, tx_height)
+            header, pos = await self.request_and_verfiy_proof(tx_hash, tx_height)
         except UntrustedServerReturnedError as e:
             if not isinstance(e.original_exception, aiorpcx.jsonrpc.RPCError):
                 raise

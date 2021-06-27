@@ -23,6 +23,11 @@ Contact us on `Discord`_!
 
 Interested in a pre-built binary? Find them `here`_. Otherwise, continue reading.
 
+Want to mine to hardware? See this `article`_. Trezor has similar problems. It is recommended that you set up a software wallet and mine to that, then send to your hardware from there.
+
+The master branch is not always guaranteed to be working as expected. If you would like to build from source or run raw python, please used the source from one of our `releases`_.
+
+
 Electrum itself is pure Python, and so are most of the required dependencies,
 but not everything. The following sections describe how to run from source, but here
 is a TL;DR::
@@ -62,6 +67,8 @@ If you would like hardware wallet support, see `this`_.
 .. _this: https://github.com/spesmilo/electrum-docs/blob/master/hardware-linux.rst
 .. _here: https://github.com/Electrum-RVN-SIG/electrum-ravencoin/releases
 .. _Discord: https://discord.gg/VuubYncHz4
+.. _article: https://support.ledger.com/hc/en-us/articles/115005165209-Receive-mining-proceeds
+.. _releases: https://github.com/Electrum-RVN-SIG/electrum-ravencoin/releases
 
 Running from tar.gz
 -------------------

@@ -25,7 +25,7 @@ Interested in a pre-built binary? Find them `here`_. Otherwise, continue reading
 
 Want to mine to hardware? See this `article`_. Trezor has similar problems. It is recommended that you set up a software wallet and mine to that, then send to your hardware from there.
 
-The master branch is not always guaranteed to be working as expected. If you would like to build from source or run raw python, please used the source from one of our `releases`_.
+The master branch is not always guaranteed to be working as expected. If you would like to build from source or run raw python, please use the source from one of our `releases`_.
 
 
 Electrum itself is pure Python, and so are most of the required dependencies,

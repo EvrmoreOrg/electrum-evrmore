@@ -1,5 +1,6 @@
 from abc import abstractmethod
-from typing import Dict, List
+from enum import IntEnum
+from typing import Dict, List, Optional
 
 from PyQt5.QtGui import QPixmap, QKeySequence, QIcon, QCursor, QFont, QRegExpValidator
 from PyQt5.QtCore import Qt, QRect, QStringListModel, QSize, pyqtSignal, QPoint
@@ -19,15 +20,18 @@ from electrum.gui.qt.amountedit import FreezableLineEdit
 from electrum.gui.qt.util import ComplexLineEdit, HelpLabel, EnterButton, ColorScheme, ChoicesLayout
 from electrum.i18n import _
 from electrum.ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, base_decode, address_to_script, COIN
-
 from electrum.transaction import RavenValue, PartialTxOutput
-
-
-#TODO: Clean up these classes
 from electrum.util import Satoshis, bfh
 
 
+# TODO: Clean up these classes
 class AbstractAssetWorkspace(QWidget):
+    class InterpretType(IntEnum):
+        NO_DATA = 0
+        IPFS = 1
+        HEX = 2
+        ASCII = 3
+
     def __init__(self, parent_window, exec):
         super().__init__()
 
@@ -50,6 +54,9 @@ class AbstractAssetWorkspace(QWidget):
         self.asset_amount = FreezableLineEdit()
         self.reissuable = QCheckBox()
 
+        self.send_owner_address = FreezableLineEdit()
+        self.owner_address_label = QLabel(_('New owner address:'))
+
         self.cost_label = QLabel('Cost: {} RVN'.format(constants.net.BURN_AMOUNTS.IssueAssetBurnAmount))
 
         msg = _('Reissuability') + '\n\n' \
@@ -64,6 +71,14 @@ class AbstractAssetWorkspace(QWidget):
             i2 = self.aval_owner_combo.currentIndex()
             self.aval_owner_combo.setVisible(i != 0)
 
+            if i == 2:
+                self.send_owner_address.setText('')
+                self.send_owner_address.setFrozen(True)
+                self.owner_address_label.setStyleSheet(ColorScheme.GRAY.as_stylesheet())
+            else:
+                self.send_owner_address.setText(self.change_addrs[1])
+                self.send_owner_address.setFrozen(False)
+                self.owner_address_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
             if i == 0:
                 self.cost_label.setText('Cost: {} RVN'.format(constants.net.BURN_AMOUNTS.IssueAssetBurnAmount))
             elif i == 1:
@@ -201,12 +216,20 @@ class AbstractAssetWorkspace(QWidget):
         self.associated_data_info = QLabel()
         self.associated_data_info.setAlignment(Qt.AlignCenter)
 
+        self.associated_data_interpret = self.InterpretType.NO_DATA
+
         msg = _('Associated Data') + '\n\n' \
               + _('Data to associate with this asset.')
         data_label = HelpLabel(_('Associated Data'), msg)
         self.associated_data = QLineEdit()
 
         self.associated_data.textChanged.connect(self._check_associated_data)
+
+        self.associated_data_interpret_override = QComboBox()
+        self.associated_data_interpret_override.addItems(['AUTO', 'IPFS', 'HEX', 'ASCII'])
+
+        self.associated_data_interpret_override.currentIndexChanged.connect(self._check_associated_data)
+        self.associated_data_interpret_override.setVisible(self.parent.config.get('advanced_asset_functions', False))
 
         data_grid = QHBoxLayout()
         data_grid.setSpacing(0)
@@ -217,9 +240,10 @@ class AbstractAssetWorkspace(QWidget):
         data_w.setLayout(data_grid)
         c_grid_b.addWidget(data_w, 0, 2)
         c_grid_b.addWidget(self.associated_data_info, 1, 2)
+        c_grid_b.addWidget(self.associated_data_interpret_override, 0, 3)
 
         c_grid_c = QGridLayout()
-        c_grid_c.setColumnStretch(2, 1)
+        c_grid_c.setColumnStretch(4, 1)
         c_grid_c.setHorizontalSpacing(10)
 
         msg = _('Asset Amount') + '\n\n' \
@@ -243,6 +267,33 @@ class AbstractAssetWorkspace(QWidget):
         self.asset_amount.textChanged.connect(self._check_amount)
         c_grid_c.addWidget(self.asset_amount_warning, 1, 0)
 
+        self.change_addrs = None  # type: Optional[List[str]]
+        self.refresh_change_addrs()
+
+        self.send_owner_address.setText(self.change_addrs[1])
+        self.send_asset_address = QLineEdit()
+        self.send_asset_address.setText(self.change_addrs[2])
+
+        ownr_h = QHBoxLayout()
+        ownr_h.addWidget(self.owner_address_label)
+        ownr_h.addWidget(self.send_owner_address)
+
+        self.ownr_addr_w = QWidget()
+        self.ownr_addr_w.setLayout(ownr_h)
+        self.ownr_addr_w.setVisible(self.parent.config.get('advanced_asset_functions', False))
+
+        asset_h = QHBoxLayout()
+        asset_h.addWidget(QLabel(_('New asset address:')))
+        asset_h.addWidget(self.send_asset_address)
+
+        self.asset_addr_w = QWidget()
+        self.asset_addr_w.setLayout(asset_h)
+        self.asset_addr_w.setVisible(self.parent.config.get('advanced_asset_functions', False))
+
+        addresses_h = QVBoxLayout()
+        addresses_h.addWidget(self.asset_addr_w)
+        addresses_h.addWidget(self.ownr_addr_w)
+
         bottom_buttons = QGridLayout()
         bottom_buttons.setColumnStretch(1, 2)
 
@@ -261,13 +312,16 @@ class AbstractAssetWorkspace(QWidget):
         widgetD = QWidget()
         widgetD.setLayout(c_grid_c)
         widgetE = QWidget()
-        widgetE.setLayout(bottom_buttons)
+        widgetE.setLayout(addresses_h)
+        widgetF = QWidget()
+        widgetF.setLayout(bottom_buttons)
         create_l = QVBoxLayout()
         create_l.addWidget(widgetA)
         create_l.addWidget(widgetB)
         create_l.addWidget(widgetC)
         create_l.addWidget(widgetD)
         create_l.addWidget(widgetE)
+        create_l.addWidget(widgetF)
         self.setLayout(create_l)
 
         self.aval_owner_options = []  # type: List[str]
@@ -317,20 +371,70 @@ class AbstractAssetWorkspace(QWidget):
 
     def _check_associated_data(self) -> bool:
         text = self.associated_data.text()
+        i = self.associated_data_interpret_override.currentIndex()
         if len(text) == 0:
             self.associated_data_info.setText('')
+            self.associated_data_interpret = self.InterpretType.NO_DATA
             return True
+        if i != 0:
+            if i == 1:
+                self.associated_data_interpret = self.InterpretType.IPFS
+                try:
+                    if len(base_decode(text, base=58)) > 34:
+                        self.associated_data_info.setText('Too much data in IPFS hash!')
+                        self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                        return False
+                    else:
+                        self.associated_data_info.setText('Reading as IPFS')
+                        self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                        return True
+                except:
+                    self.associated_data_info.setText('Invalid base 58 encoding!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+            if i == 2:
+                self.associated_data_interpret = self.InterpretType.HEX
+                try:
+                    bfh(text)
+                except:
+                    self.associated_data_info.setText('Not a valid hex string!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                if len(text) > 34 * 2:
+                    self.associated_data_info.setText('Too much data in hex string!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                else:
+                    self.associated_data_info.setText('Reading as hex string')
+                    self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                    return True
+
+            else:
+                self.associated_data_interpret = self.InterpretType.ASCII
+                if len(text) > 34:
+                    self.associated_data_info.setText('Too much data in ascii string!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                else:
+                    self.associated_data_info.setText('Reading as ascii string')
+                    self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                    return True
         if text[:2] == 'Qm':
-            if len(base_decode(text, base=58)) == 34:
-                self.associated_data_info.setText('Reading as IPFS')
-                self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                return True
+            try:
+                if len(base_decode(text, base=58)) == 34:
+                    self.associated_data_info.setText('Reading as IPFS')
+                    self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                    self.associated_data_interpret = self.InterpretType.IPFS
+                    return True
+            except:
+                pass
         try:
             if len(text) == 1:
                 raise Exception()
             bytes.fromhex(text)
             self.associated_data_info.setText('Reading as hex string')
             self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+            self.associated_data_interpret = self.InterpretType.HEX
             if len(text) > 34 * 2:
                 self.associated_data_info.setText('Too much data in hex string!')
                 self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
@@ -339,6 +443,7 @@ class AbstractAssetWorkspace(QWidget):
         except:
             self.associated_data_info.setText('Reading as ascii string')
             self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+            self.associated_data_interpret = self.InterpretType.ASCII
             if len(text) > 34:
                 self.associated_data_info.setText('Too much data in ascii string!')
                 self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
@@ -362,8 +467,9 @@ class AbstractAssetWorkspace(QWidget):
     def check_asset_availability(self, asset):
         def x(result):
             self.update_screen_based_on_asset_result(asset, result)
+
         self.parent.run_coroutine_from_thread(self.parent.network.get_meta_for_asset(asset),
-                                       x)
+                                              x)
 
     def update_screen_based_on_asset_result(self, asset, result):
         if result:
@@ -383,29 +489,35 @@ class AbstractAssetWorkspace(QWidget):
             asset_data = self.parent.wallet.get_assets()
             owners = [n for n in owned_assets if n[-1] == '!' and n[:-1] not in asset_data]
             self.aval_owner_options = ['Select a parent'] + \
-                                sorted([n[:-1] for n in owners])
+                                      sorted([n[:-1] for n in owners])
             self.aval_owner_combo.addItems(self.aval_owner_options)
 
-    def verify_valid(self) -> bool:
+    def refresh_change_addrs(self):
+        addrs = self.parent.wallet.get_change_addresses_for_new_transaction(extra_addresses=3)
+        if not addrs:
+            addrs = self.parent.wallet.get_change_addresses_for_new_transaction(allow_reuse=True, extra_addresses=3)
+        self.change_addrs = addrs
+
+    def verify_valid(self) -> Optional[str]:
         asset = self.asset_name.get_prefix() + self.asset_name.text()
         if asset != self.last_checked:
             self.asset_availability_text.setText('Check if available')
             self.asset_availability_text.setStyleSheet(ColorScheme.RED.as_stylesheet())
-            return False
+            return 'Check if your asset is available first'
         if not self._check_amount():
-            return False
+            return 'Invalid amount'
         if self.create_options_layout.selected_index() == 0:
             if len(asset) < 3:
                 self.asset_name_error_message.setText('Main assets must be more than 3 characters.')
-                return False
+                return 'Check name'
         elif self.aval_owner_combo.currentIndex() == 0:
             self.asset_name_error_message.setText('Please select a parent asset!')
-            return False
+            return 'No parent asset'
         if not self._check_asset_name():
-            return False
+            return 'Check name'
         if not self._check_associated_data():
-            return False
-        return True
+            return 'Invalid associated data'
+        return None
 
     def should_warn_associated_data(self):
         text = self.associated_data.text()
@@ -456,6 +568,15 @@ class AssetCreateWorkspace(AbstractAssetWorkspace):
         self.asset_amount.setValidator(validator)
         self.reissue_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
         self.last_checked = None
+        self.associated_data_interpret = self.InterpretType.NO_DATA
+        self.associated_data_interpret_override.setCurrentIndex(0)
+        self.refresh_change_addrs()
+        self.send_asset_address.setText(self.change_addrs[2])
+        self.send_owner_address.setText(self.change_addrs[1])
+        self.send_owner_address.setFrozen(False)
+        self.owner_address_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+        self.cost_label.setText('Cost: {} RVN'.format(constants.net.BURN_AMOUNTS.IssueAssetBurnAmount))
+
 
     def get_owner(self):
         i = self.aval_owner_combo.currentIndex()
@@ -478,15 +599,12 @@ class AssetCreateWorkspace(AbstractAssetWorkspace):
             NotImplementedError()
         burn = PartialTxOutput(
             scriptpubkey=bfh(address_to_script(addr)),
-            value=Satoshis(amt*COIN)
+            value=Satoshis(amt * COIN)
         )
         norm = [burn]
-        addrs = self.parent.wallet.get_change_addresses_for_new_transaction(extra_addresses=3)
-        if not addrs:
-            addrs = self.parent.wallet.get_change_addresses_for_new_transaction(allow_reuse=True, extra_addresses=3)
         o = self.get_owner()
         if o:
-            script = bfh(address_to_script(addrs[0]))
+            script = bfh(address_to_script(self.change_addrs[0]))
             norm.append(PartialTxOutput(
                 scriptpubkey=create_transfer_asset_script(script, o, 1),
                 value=Satoshis(COIN),
@@ -495,13 +613,15 @@ class AssetCreateWorkspace(AbstractAssetWorkspace):
 
         asset = self.asset_name.get_prefix() + self.asset_name.text()
         is_unique = self.create_options_layout.selected_index() == 2
-        amt = int(float(self.asset_amount.text())*COIN)
+        amt = int(float(self.asset_amount.text()) * COIN)
         d = self.associated_data.text()  # type: str
         if len(d) == 0:
             data = None
         else:
             try:
                 data = base_decode(d, base=58)
+                if len(data) != 34:
+                    raise Exception()
             except:
                 try:
                     data = bfh(d)
@@ -511,7 +631,7 @@ class AssetCreateWorkspace(AbstractAssetWorkspace):
 
         new = [
             PartialTxOutput(
-                scriptpubkey=create_new_asset_script(bfh(address_to_script(addrs[1])),
+                scriptpubkey=create_new_asset_script(bfh(address_to_script(self.send_asset_address.text())),
                                                      asset,
                                                      amt,
                                                      int(self.divisions.text()),
@@ -524,11 +644,11 @@ class AssetCreateWorkspace(AbstractAssetWorkspace):
         if not is_unique:
             new.append(
                 PartialTxOutput(
-                    scriptpubkey=create_owner_asset_script(bfh(address_to_script(addrs[2])),
-                                                              asset+'!'),
+                    scriptpubkey=create_owner_asset_script(bfh(address_to_script(self.send_owner_address.text())),
+                                                           asset + '!'),
                     value=Satoshis(COIN),
-                    asset=asset+'!'
+                    asset=asset + '!'
                 )
             )
 
-        return norm, new
+        return norm, new, self.change_addrs[3]

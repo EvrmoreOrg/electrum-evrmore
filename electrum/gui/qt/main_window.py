@@ -1566,9 +1566,11 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
     def confirm_asset_creation(self):
 
-        if not self.create_workspace.verify_valid():
+        error = self.create_workspace.verify_valid()
+
+        if error:
             self.show_warning(_('Invalid asset metadata:\n'
-                                'Please recheck your asset data.'))
+                                '{}').format(error))
             return
 
         def show_small_association_warning():
@@ -1583,9 +1585,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 cb.stateChanged.connect(on_cb)
                 goto = self.question(_('Your associated data is smalled than the '
                                               '34 byte size.\n'
-                                              'Double check that you have input the correct'
-                                              'data. If so, null bytes will be appended '
-                                              'to the end of your data to fit this size.\n'
+                                              'Double check that you have input the correct '
+                                              'data.\n'
+                                              'If you continue, null bytes will be appended '
+                                              'to the end of your data to fit this size.\n\n'
                                               'Is this okay?'),
                                             title=_('Warning: Small associated data'), checkbox=cb)
 
@@ -1628,11 +1631,12 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if not show_non_reissuable_warning():
             return
 
-        norm, new = self.create_workspace.get_output()
+        norm, new, change_addr = self.create_workspace.get_output()
         self.pay_onchain_dialog(
             self.get_coins(asset=self.create_workspace.get_owner()),
             norm,
-            coinbase_outputs=new
+            coinbase_outputs=new,
+            change_addr=change_addr
         )
 
     def get_asset_from_spend_tab(self) -> Optional[str]:
@@ -1931,7 +1935,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self, inputs: Sequence[PartialTxInput],
             outputs: List[PartialTxOutput], *,
             external_keypairs=None,
-            coinbase_outputs=None) -> None:
+            coinbase_outputs=None,
+            change_addr=None) -> None:
         # trustedcoin requires this
         if run_hook('abort_send', self):
             return
@@ -1941,7 +1946,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             outputs=outputs,
             fee=fee_est,
             is_sweep=is_sweep,
-            coinbase_outputs=coinbase_outputs)
+            coinbase_outputs=coinbase_outputs,
+            change_addr=change_addr)
 
         output_value = \
             sum([RavenValue(0, {x.asset: x.value}) if x.asset else RavenValue(x.value) for x in outputs], RavenValue())

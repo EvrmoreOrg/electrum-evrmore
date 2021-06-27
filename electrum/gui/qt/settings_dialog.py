@@ -591,6 +591,20 @@ class SettingsDialog(WindowModalDialog):
         show_spam_cb.stateChanged.connect(on_set_show_spam)
         asset_widgets.append((show_spam_cb, None))
 
+        advanced_assets_cb = QCheckBox(_("Enable advanced asset options"))
+        advanced_assets_cb.setChecked(self.config.get('advanced_asset_functions', False))
+
+        def on_set_advanced_assets_cb(v):
+            self.window.config.set_key('advanced_asset_functions', v == Qt.Checked, save=True)
+
+            self.window.create_workspace.associated_data_interpret_override.setVisible(v == Qt.Checked)
+            self.window.create_workspace.ownr_addr_w.setVisible(v == Qt.Checked)
+            self.window.create_workspace.asset_addr_w.setVisible(v == Qt.Checked)
+            #self.window.reissue_workspace.associated_data_interpret_override.setVisible(v == Qt.Checked)
+
+        advanced_assets_cb.stateChanged.connect(on_set_advanced_assets_cb)
+        asset_widgets.append((advanced_assets_cb, None))
+
         tabs_info = [
             (gui_widgets, _('General')),
             (asset_widgets, _('Assets')),

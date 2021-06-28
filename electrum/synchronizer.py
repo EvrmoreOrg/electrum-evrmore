@@ -136,7 +136,7 @@ class SynchronizerBase(NetworkJobOnDefaultServer):
     async def _add_asset(self, asset: str):
         if len(asset) > 32:
             raise ValueError(f"Assets may be at most 32 characters. {asset}")
-        if asset in self.requested_assets or asset[-1] == '!':
+        if asset in self.requested_assets:
             return
         self.requested_assets.add(asset)
         self.asset_add_queue.put_nowait(asset)
@@ -342,41 +342,41 @@ class Synchronizer(SynchronizerBase):
             height = -1
             txid_prev_o = None
             txid_o = None
-            if not ownr:
-                prev_source = result.get('source_prev', None)
-                source = result['source']
-                og = self.wallet.get_asset_meta(asset)
-                if og and og.height > source['height']:
-                    raise SynchronizerFailure(f"Server is trying to send old asset data")
-                if prev_source:
-                    prev_height = prev_source['height']
-                    prev_txid = prev_source['tx_hash']
-                    prev_idx = prev_source['tx_pos']
-                    txid_prev_o = TxOutpoint(bfh(prev_txid), prev_idx)
-                    await request_and_verify_metadata_against(prev_height, prev_txid, prev_idx,
-                                                              {'divisions': result['divisions']})
-                    d = dict()
-                    d['reissuable'] = result['reissuable']
-                    d['has_ipfs'] = result['has_ipfs']
-                    if d['has_ipfs']:
-                        d['ipfs'] = result['ipfs']
-                    height = source['height']
-                    txid = source['tx_hash']
-                    idx = source['tx_pos']
-                    txid_o = TxOutpoint(bfh(txid), idx)
-                    await request_and_verify_metadata_against(height, txid, idx, d)
-                else:
-                    height = source['height']
-                    txid = source['tx_hash']
-                    idx = source['tx_pos']
-                    txid_o = TxOutpoint(bfh(txid), idx)
-                    d = dict()
-                    d['divisions'] = result['divisions']
-                    d['reissuable'] = result['reissuable']
-                    d['has_ipfs'] = result['has_ipfs']
-                    if d['has_ipfs']:
-                        d['ipfs'] = result['ipfs']
-                    await request_and_verify_metadata_against(height, txid, idx, d)
+
+            prev_source = result.get('source_prev', None)
+            source = result['source']
+            og = self.wallet.get_asset_meta(asset)
+            if og and og.height > source['height']:
+                raise SynchronizerFailure(f"Server is trying to send old asset data")
+            if prev_source:
+                prev_height = prev_source['height']
+                prev_txid = prev_source['tx_hash']
+                prev_idx = prev_source['tx_pos']
+                txid_prev_o = TxOutpoint(bfh(prev_txid), prev_idx)
+                await request_and_verify_metadata_against(prev_height, prev_txid, prev_idx,
+                                                          {'divisions': result['divisions']})
+                d = dict()
+                d['reissuable'] = result['reissuable']
+                d['has_ipfs'] = result['has_ipfs']
+                if d['has_ipfs']:
+                    d['ipfs'] = result['ipfs']
+                height = source['height']
+                txid = source['tx_hash']
+                idx = source['tx_pos']
+                txid_o = TxOutpoint(bfh(txid), idx)
+                await request_and_verify_metadata_against(height, txid, idx, d)
+            else:
+                height = source['height']
+                txid = source['tx_hash']
+                idx = source['tx_pos']
+                txid_o = TxOutpoint(bfh(txid), idx)
+                d = dict()
+                d['divisions'] = result['divisions']
+                d['reissuable'] = result['reissuable']
+                d['has_ipfs'] = result['has_ipfs']
+                if d['has_ipfs']:
+                    d['ipfs'] = result['ipfs']
+                await request_and_verify_metadata_against(height, txid, idx, d)
 
             divs = result['divisions']
             reis = False if result['reissuable'] == 0 else True

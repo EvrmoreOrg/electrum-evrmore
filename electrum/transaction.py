@@ -203,15 +203,6 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
         return self.rvn_value >= 0
 
 
-class AssetMeta(NamedTuple):
-    name: str
-    is_owner: bool
-    is_reissuable: bool
-    divisions: int
-    has_ipfs: bool
-    ipfs_str: Optional[str]
-
-
 class TxOutput:
     scriptpubkey: bytes
     _value: Satoshis
@@ -361,6 +352,18 @@ class TxOutpoint(NamedTuple):
 
     def is_coinbase(self) -> bool:
         return self.txid == bytes(32)
+
+
+class AssetMeta(NamedTuple):
+    name: str
+    is_owner: bool
+    is_reissuable: bool
+    divisions: int
+    has_ipfs: bool
+    ipfs_str: Optional[str]
+    height: int
+    source_outpoint: TxOutpoint
+    source_prev_outpoint: Optional[TxOutpoint]
 
 
 class TxInput:
@@ -694,9 +697,6 @@ def get_assets_from_script(script: bytes) -> Dict[str, int]:
 
     # TODO: Generalize
 
-    if len(script) <= 31:
-        return {}
-
     def search_for_rvn(b: bytes, start: int) -> int:
         index = -1
         if b[start:start+3] == b'rvn':
@@ -714,7 +714,7 @@ def get_assets_from_script(script: bytes) -> Dict[str, int]:
         type = script[index]
         asset_name_len = script[index+1]
         asset_name = script[index+2:index+2+asset_name_len]
-        if type != 'o':
+        if type != b'o'[0]:
             sat_amt = int.from_bytes(script[index+2+asset_name_len:index+10+asset_name_len], byteorder='little')
         else:  # Give a value of '1' to ownership tokens
             sat_amt = 100_000_000
@@ -916,6 +916,7 @@ class Transaction:
             return 'p2wpkh-p2sh'
         raise Exception(f'unrecognized address: {repr(addr)}')
 
+    #TODO: COrrect script
     @classmethod
     def input_script(self, txin: TxInput, *, estimate_size=False) -> str:
         if txin.script_sig is not None:
@@ -957,12 +958,14 @@ class Transaction:
             raise UnknownTxinType(f'cannot construct scriptSig for txin_type: {_type}')
 
         a = txin.value_sats().assets
-        #if a:
-        #    asset, amt = list(a.items())[0]
-        #    script = assets.create_transfer_asset_script(bytes.fromhex(script), asset, amt).hex()
+        if a:
+            asset, amt = list(a.items())[0]
+            script = assets.create_transfer_asset_script(bytes.fromhex(script), asset, amt).hex()
 
         return script
 
+
+    #TODO Correct script
     @classmethod
     def get_preimage_script(cls, txin: 'PartialTxInput') -> str:
         if txin.witness_script:
@@ -993,6 +996,7 @@ class Transaction:
         if a:
             asset, amt = list(a.items())[0]
             script = assets.create_transfer_asset_script(bytes.fromhex(script), asset, amt).hex()
+
         return script
 
     @classmethod

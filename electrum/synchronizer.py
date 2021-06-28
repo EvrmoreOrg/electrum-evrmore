@@ -32,8 +32,8 @@ from aiorpcx import TaskGroup, run_in_thread, RPCError
 
 from . import util
 from .assets import pull_meta_from_create_or_reissue_script, BadAssetScript
-from .transaction import Transaction, PartialTransaction, AssetMeta, RavenValue
-from .util import bh2u, make_aiohttp_session, NetworkJobOnDefaultServer, random_shuffled_copy
+from .transaction import Transaction, PartialTransaction, AssetMeta, RavenValue, TxOutpoint
+from .util import bh2u, make_aiohttp_session, NetworkJobOnDefaultServer, random_shuffled_copy, bfh
 from .ravencoin import address_to_scripthash, is_address
 from .logging import Logger
 from .interface import GracefulDisconnect, NetworkTimeout
@@ -136,7 +136,7 @@ class SynchronizerBase(NetworkJobOnDefaultServer):
     async def _add_asset(self, asset: str):
         if len(asset) > 32:
             raise ValueError(f"Assets may be at most 32 characters. {asset}")
-        if asset in self.requested_assets:
+        if asset in self.requested_assets or asset[-1] == '!':
             return
         self.requested_assets.add(asset)
         self.asset_add_queue.put_nowait(asset)
@@ -338,35 +338,54 @@ class Synchronizer(SynchronizerBase):
                     if data[key] != value:
                         raise SynchronizerFailure(f"Metadata mismatch: {value} vs {data[key]}")
 
-            prev_source = result.get('source_prev', None)
-            source = result['source']
-            if prev_source:
-                prev_height = prev_source['height']
-                prev_txid = prev_source['tx_hash']
-                prev_idx = prev_source['tx_pos']
-                await request_and_verify_metadata_against(prev_height, prev_txid, prev_idx, {'divisions': result['divisions']})
-                d = dict()
-                d['reissuable'] = result['reissuable']
-                d['has_ipfs'] = result['has_ipfs']
-                if d['has_ipfs']:
-                    d['ipfs'] = result['ipfs']
-                height = source['height']
-                txid = source['tx_hash']
-                idx = source['tx_pos']
-                await request_and_verify_metadata_against(height, txid, idx, d)
-            else:
-                height = source['height']
-                txid = source['tx_hash']
-                idx = source['tx_pos']
-                await request_and_verify_metadata_against(height, txid, idx, result)
-
             ownr = asset[-1] == '!'
+            height = -1
+            txid_prev_o = None
+            txid_o = None
+            if not ownr:
+                prev_source = result.get('source_prev', None)
+                source = result['source']
+                og = self.wallet.get_asset_meta(asset)
+                if og and og.height > source['height']:
+                    raise SynchronizerFailure(f"Server is trying to send old asset data")
+                if prev_source:
+                    prev_height = prev_source['height']
+                    prev_txid = prev_source['tx_hash']
+                    prev_idx = prev_source['tx_pos']
+                    txid_prev_o = TxOutpoint(bfh(prev_txid), prev_idx)
+                    await request_and_verify_metadata_against(prev_height, prev_txid, prev_idx,
+                                                              {'divisions': result['divisions']})
+                    d = dict()
+                    d['reissuable'] = result['reissuable']
+                    d['has_ipfs'] = result['has_ipfs']
+                    if d['has_ipfs']:
+                        d['ipfs'] = result['ipfs']
+                    height = source['height']
+                    txid = source['tx_hash']
+                    idx = source['tx_pos']
+                    txid_o = TxOutpoint(bfh(txid), idx)
+                    await request_and_verify_metadata_against(height, txid, idx, d)
+                else:
+                    height = source['height']
+                    txid = source['tx_hash']
+                    idx = source['tx_pos']
+                    txid_o = TxOutpoint(bfh(txid), idx)
+                    d = dict()
+                    d['divisions'] = result['divisions']
+                    d['reissuable'] = result['reissuable']
+                    d['has_ipfs'] = result['has_ipfs']
+                    if d['has_ipfs']:
+                        d['ipfs'] = result['ipfs']
+                    await request_and_verify_metadata_against(height, txid, idx, d)
+
             divs = result['divisions']
             reis = False if result['reissuable'] == 0 else True
             ipfs = False if result['has_ipfs'] == 0 else True
             data = result['ipfs'] if ipfs else None
 
-            meta = AssetMeta(asset, ownr, reis, divs, ipfs, data)
+            assert height != -1
+            assert txid_o, asset
+            meta = AssetMeta(asset, ownr, reis, divs, ipfs, data, height, txid_o, txid_prev_o)
 
             self._stale_histories.pop(asset, asyncio.Future()).cancel()
             self.wallet.recieve_asset_callback(asset, meta)

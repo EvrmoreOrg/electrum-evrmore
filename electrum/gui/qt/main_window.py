@@ -1557,7 +1557,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         layout = QGridLayout()
         w = QWidget()
         w.setLayout(layout)
-        tabwidget = QTabWidget()
+        self.asset_tabs = tabwidget = QTabWidget()
         tabwidget.addTab(l, "My Assets")
         tabwidget.addTab(create_w, "Create Asset")
         tabwidget.addTab(reissue_w, "Reissue Asset")
@@ -1632,12 +1632,21 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             return
 
         norm, new, change_addr = self.create_workspace.get_output()
+
+        print('\n\n\nMAINWINDOW\n\n\n')
+        print(norm)
+        print(new)
+        print(change_addr)
+        print('\n\n\n')
+
         self.pay_onchain_dialog(
             self.get_coins(asset=self.create_workspace.get_owner()),
             norm,
             coinbase_outputs=new,
             change_addr=change_addr
         )
+
+        #self.create_workspace.reset_workspace()
 
     def get_asset_from_spend_tab(self) -> Optional[str]:
         combo_index = self.to_send_combo.currentIndex()

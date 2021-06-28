@@ -19,7 +19,7 @@ from electrum.assets import is_main_asset_name_good, is_unique_asset_name_good, 
 from electrum.gui.qt.amountedit import FreezableLineEdit
 from electrum.gui.qt.util import ComplexLineEdit, HelpLabel, EnterButton, ColorScheme, ChoicesLayout
 from electrum.i18n import _
-from electrum.ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, base_decode, address_to_script, COIN
+from electrum.ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, base_decode, address_to_script, COIN, is_address
 from electrum.transaction import RavenValue, PartialTxOutput
 from electrum.util import Satoshis, bfh
 
@@ -54,9 +54,6 @@ class AbstractAssetWorkspace(QWidget):
         self.asset_amount = FreezableLineEdit()
         self.reissuable = QCheckBox()
 
-        self.send_owner_address = FreezableLineEdit()
-        self.owner_address_label = QLabel(_('New owner address:'))
-
         self.cost_label = QLabel('Cost: {} RVN'.format(constants.net.BURN_AMOUNTS.IssueAssetBurnAmount))
 
         msg = _('Reissuability') + '\n\n' \
@@ -71,14 +68,6 @@ class AbstractAssetWorkspace(QWidget):
             i2 = self.aval_owner_combo.currentIndex()
             self.aval_owner_combo.setVisible(i != 0)
 
-            if i == 2:
-                self.send_owner_address.setText('')
-                self.send_owner_address.setFrozen(True)
-                self.owner_address_label.setStyleSheet(ColorScheme.GRAY.as_stylesheet())
-            else:
-                self.send_owner_address.setText(self.change_addrs[1])
-                self.send_owner_address.setFrozen(False)
-                self.owner_address_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
             if i == 0:
                 self.cost_label.setText('Cost: {} RVN'.format(constants.net.BURN_AMOUNTS.IssueAssetBurnAmount))
             elif i == 1:
@@ -270,29 +259,21 @@ class AbstractAssetWorkspace(QWidget):
         self.change_addrs = None  # type: Optional[List[str]]
         self.refresh_change_addrs()
 
-        self.send_owner_address.setText(self.change_addrs[1])
+        self.send_asset_address_error = QLabel()
+        self.send_asset_address_error.setStyleSheet(ColorScheme.RED.as_stylesheet())
+
         self.send_asset_address = QLineEdit()
-        self.send_asset_address.setText(self.change_addrs[2])
-
-        ownr_h = QHBoxLayout()
-        ownr_h.addWidget(self.owner_address_label)
-        ownr_h.addWidget(self.send_owner_address)
-
-        self.ownr_addr_w = QWidget()
-        self.ownr_addr_w.setLayout(ownr_h)
-        self.ownr_addr_w.setVisible(self.parent.config.get('advanced_asset_functions', False))
+        self.send_asset_address.textChanged.connect(self._check_asset_addr)
+        self.send_asset_address.setText(self.change_addrs[1])
 
         asset_h = QHBoxLayout()
         asset_h.addWidget(QLabel(_('New asset address:')))
         asset_h.addWidget(self.send_asset_address)
+        asset_h.addWidget(self.send_asset_address_error)
 
         self.asset_addr_w = QWidget()
         self.asset_addr_w.setLayout(asset_h)
         self.asset_addr_w.setVisible(self.parent.config.get('advanced_asset_functions', False))
-
-        addresses_h = QVBoxLayout()
-        addresses_h.addWidget(self.asset_addr_w)
-        addresses_h.addWidget(self.ownr_addr_w)
 
         bottom_buttons = QGridLayout()
         bottom_buttons.setColumnStretch(1, 2)
@@ -311,8 +292,6 @@ class AbstractAssetWorkspace(QWidget):
         widgetC.setLayout(c_grid_b)
         widgetD = QWidget()
         widgetD.setLayout(c_grid_c)
-        widgetE = QWidget()
-        widgetE.setLayout(addresses_h)
         widgetF = QWidget()
         widgetF.setLayout(bottom_buttons)
         create_l = QVBoxLayout()
@@ -320,7 +299,7 @@ class AbstractAssetWorkspace(QWidget):
         create_l.addWidget(widgetB)
         create_l.addWidget(widgetC)
         create_l.addWidget(widgetD)
-        create_l.addWidget(widgetE)
+        create_l.addWidget(self.asset_addr_w)
         create_l.addWidget(widgetF)
         self.setLayout(create_l)
 
@@ -331,12 +310,22 @@ class AbstractAssetWorkspace(QWidget):
     def reset_workspace(self):
         pass
 
+    def _check_asset_addr(self):
+        addr = self.send_asset_address.text()
+        if not is_address(addr):
+            self.send_asset_address_error.setText(_('Invalid Ravencoin Address'))
+            return False
+        else:
+            self.send_asset_address_error.setText('')
+            return True
+
     def _check_asset_name(self):
         self.asset_availability_text.setText('')
         name = self.asset_name.text()
         if not name:
             self.asset_name_error_message.setText('')
             return
+        pre = self.asset_name.get_prefix()
         i = self.create_options_layout.selected_index()
         if i == 0:
             error = is_main_asset_name_good(name)
@@ -349,6 +338,8 @@ class AbstractAssetWorkspace(QWidget):
             error = is_sub_asset_name_good(name)
         else:
             error = is_unique_asset_name_good(name)
+        if len(pre + name) > 31:
+            error = 'Asset name must be less than 32 characters (Including the parent).'
         if error:
             self.asset_name_error_message.setText(error)
             return False
@@ -483,11 +474,11 @@ class AbstractAssetWorkspace(QWidget):
 
     def refresh_owners(self):
         # Don't interrupt us when we're on this tab
-        if self.parent.tabs.currentIndex() != self.parent.tabs.indexOf(self.parent.assets_tab):
+        if self.parent.tabs.currentIndex() != self.parent.tabs.indexOf(self.parent.assets_tab) or \
+           self.parent.asset_tabs.currentIndex() != 1:
             self.aval_owner_combo.clear()
-            owned_assets = sum(self.parent.wallet.get_balance(), RavenValue()).assets.keys()
-            asset_data = self.parent.wallet.get_assets()
-            owners = [n for n in owned_assets if n[-1] == '!' and n[:-1] not in asset_data]
+            owned_assets = sum(self.parent.wallet.get_balance(), RavenValue()).assets
+            owners = [n for n in owned_assets.keys() if n[-1] == '!' and owned_assets.get(n, 0) != 0]
             self.aval_owner_options = ['Select a parent'] + \
                                       sorted([n[:-1] for n in owners])
             self.aval_owner_combo.addItems(self.aval_owner_options)
@@ -506,6 +497,8 @@ class AbstractAssetWorkspace(QWidget):
             return 'Check if your asset is available first'
         if not self._check_amount():
             return 'Invalid amount'
+        if not self._check_asset_addr():
+            return 'Invalid address'
         if self.create_options_layout.selected_index() == 0:
             if len(asset) < 3:
                 self.asset_name_error_message.setText('Main assets must be more than 3 characters.')
@@ -571,12 +564,9 @@ class AssetCreateWorkspace(AbstractAssetWorkspace):
         self.associated_data_interpret = self.InterpretType.NO_DATA
         self.associated_data_interpret_override.setCurrentIndex(0)
         self.refresh_change_addrs()
-        self.send_asset_address.setText(self.change_addrs[2])
-        self.send_owner_address.setText(self.change_addrs[1])
-        self.send_owner_address.setFrozen(False)
-        self.owner_address_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+        self.send_asset_address.setText(self.change_addrs[1])
+        self.send_asset_address_error.setText('')
         self.cost_label.setText('Cost: {} RVN'.format(constants.net.BURN_AMOUNTS.IssueAssetBurnAmount))
-
 
     def get_owner(self):
         i = self.aval_owner_combo.currentIndex()
@@ -644,11 +634,11 @@ class AssetCreateWorkspace(AbstractAssetWorkspace):
         if not is_unique:
             new.append(
                 PartialTxOutput(
-                    scriptpubkey=create_owner_asset_script(bfh(address_to_script(self.send_owner_address.text())),
+                    scriptpubkey=create_owner_asset_script(bfh(address_to_script(self.send_asset_address.text())),
                                                            asset + '!'),
                     value=Satoshis(COIN),
                     asset=asset + '!'
                 )
             )
 
-        return norm, new, self.change_addrs[3]
+        return norm, new, self.change_addrs[2]

@@ -346,7 +346,11 @@ class AddressSynchronizer(Logger):
                 if addr and self.is_mine(addr):
                     for asset in v.assets:
                         if asset not in self.get_assets():
-                            self.add_asset(asset)
+                            if asset[-1] != '!':
+                                self.add_asset(asset)
+                            else:
+                                self.db.add_asset_meta(asset, AssetMeta(asset, True, False, 0, False, None, tx_height,
+                                                                        TxOutpoint.from_str(ser), None))
                     self.db.add_txo_addr(tx_hash, addr, n, v, is_coinbase)
                     self._get_addr_balance_cache.pop(addr, None)  # invalidate cache
                     # give v to txi that spends me

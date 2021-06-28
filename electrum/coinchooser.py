@@ -236,6 +236,8 @@ class CoinChooserBase(Logger):
 
             assert sum(amounts) == change_amount_asset
 
+            amounts = [a for a in amounts if a > 0]
+
             ret_amt += [(asset, amount) for amount in amounts]
 
         if not output_amounts_rvn:
@@ -301,7 +303,7 @@ class CoinChooserBase(Logger):
 
     def _change_outputs(self, tx: PartialTransaction, change_addrs, fee_estimator_numchange,
                         dust_threshold, asset_divs: Dict[str, int], has_return: bool) -> List[PartialTxOutput]:
-        amounts = self._change_amounts(tx, len(change_addrs), fee_estimator_numchange, asset_divs)
+        amounts = self._change_amounts(tx, len(change_addrs) - len(asset_divs), fee_estimator_numchange, asset_divs)
         assert all([t[1] >= 0 for t in amounts])
         assert len(change_addrs) >= len(amounts) - (1 if has_return else 0)
         assert all([isinstance(amt, Tuple) for amt in amounts])

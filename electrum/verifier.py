@@ -118,10 +118,6 @@ class SPV(NetworkJobOnDefaultServer):
             else:
                 self.logger.info(repr(e))
                 raise GracefulDisconnect(e) from e
-        # we passed all the tests
-        self.merkle_roots[tx_hash] = header.get('merkle_root')
-        self.requested_merkle.discard(tx_hash)
-        self.logger.info(f"verified {tx_hash}")
         return header, pos
 
     async def _request_and_verify_single_proof(self, tx_hash, tx_height):
@@ -134,6 +130,11 @@ class SPV(NetworkJobOnDefaultServer):
             self.wallet.remove_unverified_tx(tx_hash, tx_height)
             self.requested_merkle.discard(tx_hash)
             return
+
+        # we passed all the tests
+        self.merkle_roots[tx_hash] = header.get('merkle_root')
+        self.logger.info(f"verified {tx_hash}")
+        self.requested_merkle.discard(tx_hash)
 
         header_hash = hash_header(header)
         tx_info = TxMinedInfo(height=tx_height,

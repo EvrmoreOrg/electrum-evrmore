@@ -1633,17 +1633,11 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         norm, new, change_addr = self.create_workspace.get_output()
 
-        print('\n\n\nMAINWINDOW\n\n\n')
-        print(norm)
-        print(new)
-        print(change_addr)
-        print('\n\n\n')
-
         self.pay_onchain_dialog(
             self.get_coins(asset=self.create_workspace.get_owner()),
             norm,
             coinbase_outputs=new,
-            change_addr=change_addr
+            #change_addr=change_addr
         )
 
         #self.create_workspace.reset_workspace()
@@ -1959,7 +1953,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             change_addr=change_addr)
 
         output_value = \
-            sum([RavenValue(0, {x.asset: x.value}) if x.asset else RavenValue(x.value) for x in outputs], RavenValue())
+            sum([RavenValue(0, {x.asset: x.value}) if x.asset else RavenValue(x.value) for x in outputs + coinbase_outputs], RavenValue())
 
         conf_dlg = ConfirmTxDialog(window=self, make_tx=make_tx, output_value=output_value, is_sweep=is_sweep)
         if conf_dlg.not_enough_funds:

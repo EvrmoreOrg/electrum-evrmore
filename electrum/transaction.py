@@ -1004,10 +1004,6 @@ class Transaction:
         a = txin.value_sats().assets
         if a:
             asset, amt = list(a.items())[0]
-            print('\n\n\n')
-            print(asset)
-            print(amt)
-            print('\n\n\n')
             if wallet is None:
                 _logger.warning("Using best effort pre-image script for asset {}".format(asset))
                 script = assets.create_transfer_asset_script(bytes.fromhex(script), asset, amt).hex()
@@ -1015,9 +1011,6 @@ class Transaction:
                 meta = wallet.get_asset_meta(asset)
                 assert meta
                 # We need to find out what the correct prevout script should be.
-                print(meta.source_outpoint.txid.hex())
-                print(txin.prevout.txid.hex())
-                print('\n\n\n')
                 if meta.source_outpoint.txid == txin.prevout.txid:
                     # Our script is some source type
                     if meta.source_type == 'o':
@@ -1030,7 +1023,7 @@ class Transaction:
                     else:
                         if meta.source_prev_outpoint:
                             # Reissue amt is FF
-                            script = assets.create_reissue_asset_script(bfh(script), asset, amt, b'\ff',
+                            script = assets.create_reissue_asset_script(bfh(script), asset, amt, b'\xff',
                                                                         meta.is_reissuable,
                                                                         base_decode(meta.ipfs_str,
                                                                                     base=58) if meta.ipfs_str else None).hex()
@@ -2146,20 +2139,47 @@ class PartialTransaction(Transaction):
         if outputs:
             self._outputs.sort(key = lambda o: (o.value, o.scriptpubkey))
 
+            # Assets need a certain order:
+            # Burn, {whatever}, parent, new owner, new
             burn_vout = None
-            owner_vout = None
+            parent_owner_vout = None
+            asset_owner_vout = None
             asset_create_vout = None
             for o in iter(self._outputs):
                 if o.address in constants.net.BURN_ADDRESSES:
                     burn_vout = o
-                elif o.asset and o.asset[-1] == '!':
-                    owner_vout = o
                 elif o.asset:
-                    asset_create_vout = o
-            if burn_vout and owner_vout and asset_create_vout:
-                new_outs = [o for o in self._outputs if o not in (burn_vout, owner_vout, asset_create_vout)]
-                self._outputs = [burn_vout] + new_outs + [owner_vout, asset_create_vout]
+                    asset = o.asset
+                    if asset[-1] == '!':
+                        if asset_create_vout:
+                            # We know what the asset owner looks like
+                            if asset[:-1] == asset_create_vout.asset:
+                                t = asset_owner_vout
+                                asset_owner_vout = o
+                                if not parent_owner_vout:
+                                    parent_owner_vout = t
+                            else:
+                                parent_owner_vout = o
+                        else:
+                            # Just put it somewhere
+                            if asset_owner_vout:
+                                parent_owner_vout = o
+                            else:
+                                asset_owner_vout = o
+                    else:
+                        asset_create_vout = o
+                        if asset_owner_vout and asset_owner_vout.asset[:-1] != asset:
+                            # Swap asset owner and parent owner positions
+                            t = parent_owner_vout
+                            parent_owner_vout = asset_owner_vout
+                            asset_owner_vout = t
+            if burn_vout and asset_create_vout:
+                new_outs = [o for o in self._outputs if o not in (burn_vout, parent_owner_vout, asset_owner_vout, asset_create_vout)]
 
+                self._outputs = [burn_vout] + new_outs + \
+                                ([parent_owner_vout] if parent_owner_vout else []) + \
+                                ([asset_owner_vout] if asset_owner_vout else []) + \
+                                [asset_create_vout]
         self.invalidate_ser_cache()
 
     def input_value(self) -> RavenValue:

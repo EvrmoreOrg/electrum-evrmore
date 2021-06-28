@@ -1432,13 +1432,13 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             # We want to spend all RVN, leave enough to spend the fee
             sendable = sum(map(lambda c: c.value_sats(), coins), RavenValue())
             outputs[i_max].value = Satoshis(0)
-            tx = PartialTransaction.from_io(list(coins), list(outputs))
+            tx = PartialTransaction.from_io(list(coins), list(outputs), wallet=self)
             fee = fee_estimator(tx.estimated_size())
             amount = sendable - tx.output_value() - RavenValue(fee)
             if amount < RavenValue():
                 raise NotEnoughFunds()
             outputs[i_max].value = amount.rvn_value
-            tx = PartialTransaction.from_io(list(coins), list(outputs))
+            tx = PartialTransaction.from_io(list(coins), list(outputs), wallet=self)
         else:
             tx = coin_chooser.make_tx(
                 coins=coins,
@@ -1448,7 +1448,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 fee_estimator_vb=fee_estimator,
                 dust_threshold=self.dust_threshold(),
                 asset_divs=asset_divs,
-                coinbase_outputs=coinbase_outputs)
+                coinbase_outputs=coinbase_outputs,
+                wallet=self)
         #else:
             # "spend max" branch
             # note: This *will* spend inputs with negative effective value (if there are any).

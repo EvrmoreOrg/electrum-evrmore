@@ -337,6 +337,7 @@ class Synchronizer(SynchronizerBase):
                 for key, value in meta.items():
                     if data[key] != value:
                         raise SynchronizerFailure(f"Metadata mismatch: {value} vs {data[key]}")
+                return data['type']
 
             ownr = asset[-1] == '!'
             height = -1
@@ -364,7 +365,7 @@ class Synchronizer(SynchronizerBase):
                 txid = source['tx_hash']
                 idx = source['tx_pos']
                 txid_o = TxOutpoint(bfh(txid), idx)
-                await request_and_verify_metadata_against(height, txid, idx, d)
+                s_type = await request_and_verify_metadata_against(height, txid, idx, d)
             else:
                 height = source['height']
                 txid = source['tx_hash']
@@ -376,7 +377,7 @@ class Synchronizer(SynchronizerBase):
                 d['has_ipfs'] = result['has_ipfs']
                 if d['has_ipfs']:
                     d['ipfs'] = result['ipfs']
-                await request_and_verify_metadata_against(height, txid, idx, d)
+                s_type = await request_and_verify_metadata_against(height, txid, idx, d)
 
             divs = result['divisions']
             reis = False if result['reissuable'] == 0 else True
@@ -385,7 +386,7 @@ class Synchronizer(SynchronizerBase):
 
             assert height != -1
             assert txid_o, asset
-            meta = AssetMeta(asset, ownr, reis, divs, ipfs, data, height, txid_o, txid_prev_o)
+            meta = AssetMeta(asset, ownr, reis, divs, ipfs, data, height, s_type, txid_o, txid_prev_o)
 
             self._stale_histories.pop(asset, asyncio.Future()).cancel()
             self.wallet.recieve_asset_callback(asset, meta)

@@ -1372,10 +1372,12 @@ class WalletDB(JsonDB):
             items = v.items()
             if len(items) != 0:
                 _, t = list(items)[0]
-                if len(t) != 9:
+                if len(t) != 10:
                     return dict()
-            v = dict((k, AssetMeta(name, ownr, reis, div, ipfs, data, height, TxOutpoint(s[0], s[1]), TxOutpoint(s_p[0], s_p[1]) if s_p else None))
-                     for k, (name, ownr, reis, div, ipfs, data, height, s, s_p) in items)
+            v = dict((k, AssetMeta(name, ownr, reis, div, ipfs, data, height, t,
+                                   TxOutpoint.from_str('{}:{}'.format(s[0], s[1])),
+                                   TxOutpoint.from_str('{}:{}'.format(s_p[0], s_p[1])) if s_p else None))
+                     for k, (name, ownr, reis, div, ipfs, data, height, t, s, s_p) in items)
         return v
 
     def _convert_value(self, path, key, v):

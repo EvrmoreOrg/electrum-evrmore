@@ -629,7 +629,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
                 self.give_error(_("No matching pubkey for sign_transaction"))  # should never happen
             full_path = convert_bip32_intpath_to_strpath(full_path)[2:]
 
-            redeemScript = Transaction.get_preimage_script(txin)
+            redeemScript = Transaction.get_preimage_script(txin, client_electrum.handler.get_wallet())
             txin_prev_tx = txin.utxo
             if txin_prev_tx is None and not txin.is_segwit():
                 raise UserFacingException(_('Missing previous tx for legacy input.'))

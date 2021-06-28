@@ -362,6 +362,7 @@ class AssetMeta(NamedTuple):
     has_ipfs: bool
     ipfs_str: Optional[str]
     height: int
+    source_type: str  #q, r, o
     source_outpoint: TxOutpoint
     source_prev_outpoint: Optional[TxOutpoint]
 
@@ -754,7 +755,19 @@ class Transaction:
     def __str__(self):
         return self.serialize()
 
-    def __init__(self, raw):
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k != '_wallet':
+                setattr(result, k, copy.deepcopy(v))
+            else:
+                setattr(result, k, v)
+        return result
+
+    def __init__(self, raw, wallet: 'Abstract_Wallet' = None):
+        self._wallet = wallet
         if raw is None:
             self._cached_network_ser = None
         elif isinstance(raw, str):
@@ -916,9 +929,10 @@ class Transaction:
             return 'p2wpkh-p2sh'
         raise Exception(f'unrecognized address: {repr(addr)}')
 
-    #TODO: COrrect script
     @classmethod
     def input_script(self, txin: TxInput, *, estimate_size=False) -> str:
+        # This is for the hashs; don't need to calculate asset outs here
+
         if txin.script_sig is not None:
             return txin.script_sig.hex()
         if txin.is_coinbase_input():
@@ -945,9 +959,11 @@ class Transaction:
         elif _type in ['p2wpkh', 'p2wsh']:
             script = ''
         elif _type == 'p2wpkh-p2sh':
+            raise NotImplementedError()
             redeem_script = ravencoin.p2wpkh_nested_script(pubkeys[0])
             script = construct_script([redeem_script])
         elif _type == 'p2wsh-p2sh':
+            raise NotImplementedError()
             if estimate_size:
                 witness_script = ''
             else:
@@ -957,17 +973,10 @@ class Transaction:
         else:
             raise UnknownTxinType(f'cannot construct scriptSig for txin_type: {_type}')
 
-        a = txin.value_sats().assets
-        if a:
-            asset, amt = list(a.items())[0]
-            script = assets.create_transfer_asset_script(bytes.fromhex(script), asset, amt).hex()
-
         return script
 
-
-    #TODO Correct script
     @classmethod
-    def get_preimage_script(cls, txin: 'PartialTxInput') -> str:
+    def get_preimage_script(cls, txin: 'PartialTxInput', wallet: 'Abstract_Wallet' = None) -> str:
         if txin.witness_script:
             if opcodes.OP_CODESEPARATOR in [x[0] for x in script_GetOp(txin.witness_script)]:
                 raise Exception('OP_CODESEPARATOR black magic is not supported')
@@ -995,8 +1004,44 @@ class Transaction:
         a = txin.value_sats().assets
         if a:
             asset, amt = list(a.items())[0]
-            script = assets.create_transfer_asset_script(bytes.fromhex(script), asset, amt).hex()
+            print('\n\n\n')
+            print(asset)
+            print(amt)
+            print('\n\n\n')
+            if wallet is None:
+                _logger.warning("Using best effort pre-image script for asset {}".format(asset))
+                script = assets.create_transfer_asset_script(bytes.fromhex(script), asset, amt).hex()
+            else:
+                meta = wallet.get_asset_meta(asset)
+                assert meta
+                # We need to find out what the correct prevout script should be.
+                print(meta.source_outpoint.txid.hex())
+                print(txin.prevout.txid.hex())
+                print('\n\n\n')
+                if meta.source_outpoint.txid == txin.prevout.txid:
+                    # Our script is some source type
+                    if meta.source_type == 'o':
+                        script = assets.create_owner_asset_script(bfh(script), asset).hex()
+                    elif meta.source_type == 'q':
+                        script = assets.create_new_asset_script(bfh(script), asset, amt, meta.divisions,
+                                                                meta.is_reissuable,
+                                                                base_decode(meta.ipfs_str,
+                                                                            base=58) if meta.ipfs_str else None).hex()
+                    else:
+                        if meta.source_prev_outpoint:
+                            # Reissue amt is FF
+                            script = assets.create_reissue_asset_script(bfh(script), asset, amt, b'\ff',
+                                                                        meta.is_reissuable,
+                                                                        base_decode(meta.ipfs_str,
+                                                                                    base=58) if meta.ipfs_str else None).hex()
+                        else:
+                            script = assets.create_reissue_asset_script(bfh(script), asset, amt,
+                                                                        bytes([meta.divisions]), meta.is_reissuable,
+                                                                        base_decode(meta.ipfs_str,
+                                                                                    base=58) if meta.ipfs_str else None).hex()
 
+                else:
+                    script = assets.create_transfer_asset_script(bytes.fromhex(script), asset, amt).hex()
         return script
 
     @classmethod
@@ -1995,11 +2040,12 @@ class PartialTransaction(Transaction):
         return tx
 
     @classmethod
-    def from_io(cls, inputs: Sequence[PartialTxInput], outputs: Sequence[PartialTxOutput], *,
+    def from_io(cls, inputs: Sequence[PartialTxInput], outputs: Sequence[PartialTxOutput], *, wallet = None,
                 locktime: int = None, version: int = None):
         self = cls()
         self._inputs = list(inputs)
         self._outputs = list(outputs)
+        self._wallet = wallet
         if locktime is not None:
             self.locktime = locktime
         if version is not None:
@@ -2143,7 +2189,8 @@ class PartialTransaction(Transaction):
         if sighash != SIGHASH_ALL:
             raise Exception("only SIGHASH_ALL signing is supported!")
         nHashType = int_to_hex(sighash, 4)
-        preimage_script = self.get_preimage_script(txin)
+        preimage_script = self.get_preimage_script(txin, self._wallet)
+        _logger.info(f"Preimage script for {txin.prevout.txid.hex()}\n{bfh(preimage_script)}")
         if txin.is_segwit():
             raise NotImplementedError()
             #if bip143_shared_txdigest_fields is None:

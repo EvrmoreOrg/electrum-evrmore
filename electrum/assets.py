@@ -34,7 +34,7 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
     else:
         rvn_ptr += 5
     type = bytes([script[rvn_ptr]])
-    if type not in (b'q', b'r'):
+    if type not in (b'q', b'r', b'o'):
         raise BadAssetScript('Not an asset creation script')
 
     rvn_ptr += 1
@@ -54,9 +54,10 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
             'divisions': divs,
             'reissuable': reis,
             'has_ipfs': has_i,
-            'ipfs': base_encode(ifps, base=58) if ifps else None
+            'ipfs': base_encode(ifps, base=58) if ifps else None,
+            'type': 'q'
         }
-    else:
+    elif type == b'r':
         name_len = script[rvn_ptr]
         name = script[rvn_ptr + 1:rvn_ptr + 1 + name_len]
         sats = script[rvn_ptr + 1 + name_len:rvn_ptr + 1 + name_len + 8]
@@ -71,7 +72,20 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
             'divisions': divs,
             'reissuable': reis,
             'has_ipfs': 0 if not ifps else 1,
-            'ipfs': base_encode(ifps, base=58) if ifps else None
+            'ipfs': base_encode(ifps, base=58) if ifps else None,
+            'type': 'r'
+        }
+    else:
+        name_len = script[rvn_ptr]
+        name = script[rvn_ptr + 1:rvn_ptr + 1 + name_len]
+        return {
+            'name': name.decode('ascii'),
+            'sats': 100_000_000,
+            'divisions': 0,
+            'reissuable': 0,
+            'has_ipfs': 0,
+            'ipfs': None,
+            'type': 'o'
         }
 
 
@@ -97,12 +111,30 @@ def create_owner_asset_script(standard: bytes, asset: str):
         bytes([opcodes.OP_DROP])
 
 
-def create_new_asset_script(standard: bytes, asset: str, value: int, divisions, reissuable, data):
+def create_reissue_asset_script(standard: bytes, asset: str, value: int, divisions: bytes, reissuable: bool, data: bytes):
+    assert b'\0' <= divisions <= b'\x08' or divisions == b'\xff'
+    assert value <= TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN
+    assert isinstance(reissuable, bool)
+    assert isinstance(data, bytes) or data is None
+    asset_header = b'rvnr'.hex()
+    name = push_script(asset.encode('ascii').hex())
+    amt = value.to_bytes(8, byteorder='little', signed=False).hex()
+    d = divisions.hex()
+    r = '01' if reissuable else '00'
+    asset_portion = asset_header+name+amt+d+r
+    if data:
+        asset_portion += data.hex()
+    return standard + \
+           bytes([opcodes.OP_RVN_ASSET]) + \
+           bytes.fromhex(push_script(asset_portion)) + \
+           bytes([opcodes.OP_DROP])
+
+
+def create_new_asset_script(standard: bytes, asset: str, value: int, divisions: int, reissuable: bool, data: bytes):
     assert 0 <= divisions <= 8
     assert value <= TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN
     assert isinstance(reissuable, bool)
     assert isinstance(data, bytes) or data is None
-    print(data)
     asset_header = b'rvnq'.hex()
     name = push_script(asset.encode('ascii').hex())
     amt = value.to_bytes(8, byteorder='little', signed=False).hex()

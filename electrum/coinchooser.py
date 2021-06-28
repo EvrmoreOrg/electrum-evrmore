@@ -318,10 +318,11 @@ class CoinChooserBase(Logger):
                                             base_tx: PartialTransaction, change_addrs,
                                             fee_estimator_w, dust_threshold,
                                             base_weight,
+                                            wallet,
                                             asset_divs: Dict[str, int],
                                             has_return: bool) -> Tuple[PartialTransaction, List[PartialTxOutput]]:
         # make a copy of base_tx so it won't get mutated
-        tx = PartialTransaction.from_io(base_tx.inputs()[:], base_tx.outputs()[:])
+        tx = PartialTransaction.from_io(base_tx.inputs()[:], base_tx.outputs()[:], wallet=wallet)
 
         tx.add_inputs([coin for b in buckets for coin in b.coins])
         tx_weight = self._get_tx_weight(buckets, base_weight=base_weight)
@@ -374,6 +375,7 @@ class CoinChooserBase(Logger):
                 outputs: List[PartialTxOutput], change_addrs: Sequence[str],
                 fee_estimator_vb: Callable, dust_threshold: int,
                 asset_divs: Dict[str, int],
+                wallet,
                 coinbase_outputs=None) -> PartialTransaction:
         """Select unspent coins to spend to pay outputs.  If the change is
         greater than dust_threshold (after adding the change output to
@@ -393,7 +395,7 @@ class CoinChooserBase(Logger):
         self.p = PRNG(b''.join(sorted(utxos)))
 
         # Copy the outputs so when adding change we don't modify "outputs"
-        base_tx = PartialTransaction.from_io(inputs[:], outputs[:])
+        base_tx = PartialTransaction.from_io(inputs[:], outputs[:], wallet=wallet)
         input_value = base_tx.input_value()
 
         # Weight of the transaction with no inputs and no change
@@ -405,7 +407,7 @@ class CoinChooserBase(Logger):
         base_weight = base_tx.estimated_weight()
 
         if coinbase_outputs:
-            base_weight = PartialTransaction.from_io(inputs[:], outputs[:] + coinbase_outputs).estimated_weight()
+            base_weight = PartialTransaction.from_io(inputs[:], outputs[:] + coinbase_outputs, wallet=wallet).estimated_weight()
 
         spent_amount = base_tx.output_value()
 
@@ -457,6 +459,7 @@ class CoinChooserBase(Logger):
                                                             fee_estimator_w=fee_estimator_w,
                                                             dust_threshold=dust_threshold,
                                                             base_weight=base_weight,
+                                                            wallet=wallet,
                                                             asset_divs=asset_divs,
                                                             has_return=has_return)
 

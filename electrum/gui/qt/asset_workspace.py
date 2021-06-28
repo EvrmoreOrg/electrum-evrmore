@@ -105,8 +105,6 @@ class AbstractAssetWorkspace(QWidget):
 
         def on_combo_change():
             self.asset_availability_text.setText('')
-            self.divisions.setFrozen(False)
-            self.asset_amount.setFrozen(False)
             i = self.create_options_layout.selected_index()
             i2 = self.aval_owner_combo.currentIndex()
             self.aval_owner_combo.setVisible(i != 0)
@@ -596,7 +594,7 @@ class AssetCreateWorkspace(AbstractAssetWorkspace):
         if o:
             script = bfh(address_to_script(self.change_addrs[0]))
             norm.append(PartialTxOutput(
-                scriptpubkey=create_transfer_asset_script(script, o, 1),
+                scriptpubkey=create_transfer_asset_script(script, o, COIN),
                 value=Satoshis(COIN),
                 asset=o
             ))

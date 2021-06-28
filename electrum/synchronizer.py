@@ -330,7 +330,8 @@ class Synchronizer(SynchronizerBase):
                 script = vout.scriptpubkey
                 try:
                     data = pull_meta_from_create_or_reissue_script(script)
-                except (BadAssetScript, IndexError):
+                except (BadAssetScript, IndexError) as e:
+                    print(e)
                     raise SynchronizerFailure(f"Bad asset script {script})")
                 if data['name'] != asset:
                     raise SynchronizerFailure(f"Not our asset! {asset} vs {data['name']}")

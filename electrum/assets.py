@@ -29,10 +29,10 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
             break
     if not rvn_ptr > 0:
         raise BadAssetScript('No OP_RVN_ASSET')
-    if script[rvn_ptr+1:rvn_ptr+4] == b'rvn':
-        rvn_ptr += 4
-    else:
+    if script[rvn_ptr+2:rvn_ptr+5] == b'rvn':
         rvn_ptr += 5
+    else:
+        rvn_ptr += 6
     type = bytes([script[rvn_ptr]])
     if type not in (b'q', b'r', b'o'):
         raise BadAssetScript('Not an asset creation script')

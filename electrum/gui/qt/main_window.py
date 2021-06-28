@@ -1640,7 +1640,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             #change_addr=change_addr
         )
 
-        #self.create_workspace.reset_workspace()
+        self.create_workspace.reset_workspace()
 
     def get_asset_from_spend_tab(self) -> Optional[str]:
         combo_index = self.to_send_combo.currentIndex()

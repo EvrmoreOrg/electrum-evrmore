@@ -356,6 +356,7 @@ class TxOutpoint(NamedTuple):
 
 class AssetMeta(NamedTuple):
     name: str
+    circulation: int
     is_owner: bool
     is_reissuable: bool
     divisions: int

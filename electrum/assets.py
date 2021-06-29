@@ -11,7 +11,7 @@ TRAILING_PUNCTUATION = "^.*[._]$"
 RAVEN_NAMES = "^RVN$|^RAVEN$|^RAVENCOIN$|^#RVN$|^#RAVEN$|^#RAVENCOIN$"
 
 MAIN_CHECK = "^[A-Z0-9._]{3,}$"
-SUB_CHECK ="^[A-Z0-9._]+$"
+SUB_CHECK = "^[A-Z0-9._]+$"
 UNIQUE_CHECK = "^[-A-Za-z0-9@$%&*()[\\]{}_.?:]+$"
 
 
@@ -50,7 +50,7 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
             ifps = script[rvn_ptr+1+name_len+8+1+1+1:rvn_ptr+1+name_len+8+1+1+1+34]
         return {
             'name': name.decode('ascii'),
-            'sats': int.from_bytes(sats, 'little'),
+            'sats_in_circulation': int.from_bytes(sats, 'little'),
             'divisions': divs,
             'reissuable': reis,
             'has_ipfs': has_i,
@@ -68,7 +68,7 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
             ifps = script[rvn_ptr + 1 + name_len + 8 + 1 + 1:rvn_ptr + 1 + name_len + 8 + 1 + 1 + 34]
         return {
             'name': name.decode('ascii'),
-            'sats': int.from_bytes(sats, 'little'),
+            'sats_in_circulation': int.from_bytes(sats, 'little'),
             'divisions': divs,
             'reissuable': reis,
             'has_ipfs': 0 if not ifps else 1,
@@ -80,7 +80,7 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
         name = script[rvn_ptr + 1:rvn_ptr + 1 + name_len]
         return {
             'name': name.decode('ascii'),
-            'sats': 100_000_000,
+            'sats_in_circulation': 100_000_000,
             'divisions': 0,
             'reissuable': 0,
             'has_ipfs': 0,

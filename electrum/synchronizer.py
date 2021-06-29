@@ -336,7 +336,10 @@ class Synchronizer(SynchronizerBase):
                 if data['name'] != asset:
                     raise SynchronizerFailure(f"Not our asset! {asset} vs {data['name']}")
                 for key, value in meta.items():
-                    if data[key] != value:
+                    if data['type'] == 'r' and key == 'sats_in_circulation':
+                        if data[key] > value:
+                            raise SynchronizerFailure(f"Reissued amount is greater than the total amount: {value}, {data['name']}")
+                    elif data[key] != value:
                         raise SynchronizerFailure(f"Metadata mismatch: {value} vs {data[key]}")
                 return data['type']
 
@@ -360,6 +363,7 @@ class Synchronizer(SynchronizerBase):
                 d = dict()
                 d['reissuable'] = result['reissuable']
                 d['has_ipfs'] = result['has_ipfs']
+                d['sats_in_circulation'] = result['sats_in_circulation']
                 if d['has_ipfs']:
                     d['ipfs'] = result['ipfs']
                 height = source['height']
@@ -376,6 +380,7 @@ class Synchronizer(SynchronizerBase):
                 d['divisions'] = result['divisions']
                 d['reissuable'] = result['reissuable']
                 d['has_ipfs'] = result['has_ipfs']
+                d['sats_in_circulation'] = result['sats_in_circulation']
                 if d['has_ipfs']:
                     d['ipfs'] = result['ipfs']
                 s_type = await request_and_verify_metadata_against(height, txid, idx, d)
@@ -384,10 +389,11 @@ class Synchronizer(SynchronizerBase):
             reis = False if result['reissuable'] == 0 else True
             ipfs = False if result['has_ipfs'] == 0 else True
             data = result['ipfs'] if ipfs else None
+            circulation = result['sats_in_circulation']
 
             assert height != -1
             assert txid_o, asset
-            meta = AssetMeta(asset, ownr, reis, divs, ipfs, data, height, s_type, txid_o, txid_prev_o)
+            meta = AssetMeta(asset, circulation, ownr, reis, divs, ipfs, data, height, s_type, txid_o, txid_prev_o)
 
             self._stale_histories.pop(asset, asyncio.Future()).cancel()
             self.wallet.recieve_asset_callback(asset, meta)

@@ -15,27 +15,28 @@ from PyQt5.QtWidgets import (QMessageBox, QComboBox, QSystemTrayIcon, QTabWidget
 
 from electrum import constants
 from electrum.assets import is_main_asset_name_good, is_unique_asset_name_good, is_sub_asset_name_good, \
-    create_transfer_asset_script, create_new_asset_script, create_owner_asset_script
+    create_transfer_asset_script, create_new_asset_script, create_owner_asset_script, create_reissue_asset_script
 from electrum.gui.qt.amountedit import FreezableLineEdit
 from electrum.gui.qt.util import ComplexLineEdit, HelpLabel, EnterButton, ColorScheme, ChoicesLayout
 from electrum.i18n import _
 from electrum.ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, base_decode, address_to_script, COIN, is_address
-from electrum.transaction import RavenValue, PartialTxOutput
+from electrum.transaction import RavenValue, PartialTxOutput, AssetMeta
 from electrum.util import Satoshis, bfh
 
 
-# TODO: Clean up these classes
-class AbstractAssetWorkspace(QWidget):
-    class InterpretType(IntEnum):
-        NO_DATA = 0
-        IPFS = 1
-        HEX = 2
-        ASCII = 3
+class InterpretType(IntEnum):
+    NO_DATA = 0
+    IPFS = 1
+    HEX = 2
+    ASCII = 3
+    
 
-    def __init__(self, parent_window, exec):
+# TODO: Clean up these classes
+class AssetCreateWorkspace(QWidget):
+    def __init__(self, parent, create_asset_callable):
         super().__init__()
 
-        self.parent = parent_window
+        self.parent = parent
 
         self.aval_owner_combo = QComboBox()
         self.aval_owner_combo.setCurrentIndex(0)
@@ -203,7 +204,7 @@ class AbstractAssetWorkspace(QWidget):
         self.associated_data_info = QLabel()
         self.associated_data_info.setAlignment(Qt.AlignCenter)
 
-        self.associated_data_interpret = self.InterpretType.NO_DATA
+        self.associated_data_interpret = InterpretType.NO_DATA
 
         msg = _('Associated Data') + '\n\n' \
               + _('Data to associate with this asset.')
@@ -276,7 +277,7 @@ class AbstractAssetWorkspace(QWidget):
         bottom_buttons = QGridLayout()
         bottom_buttons.setColumnStretch(1, 2)
 
-        self.exec_asset_b = exec
+        self.exec_asset_b = EnterButton(_("Create Asset"), create_asset_callable)
         bottom_buttons.addWidget(self.exec_asset_b, 1, 0)
         bottom_buttons.addWidget(self.cost_label, 1, 1)
         self.reset_create_b = EnterButton(_("Reset"), self.reset_workspace)
@@ -303,10 +304,6 @@ class AbstractAssetWorkspace(QWidget):
 
         self.aval_owner_options = []  # type: List[str]
         self.last_checked = None  # type: Optional[str]
-
-    @abstractmethod
-    def reset_workspace(self):
-        pass
 
     def _check_asset_addr(self):
         addr = self.send_asset_address.text()
@@ -363,11 +360,11 @@ class AbstractAssetWorkspace(QWidget):
         i = self.associated_data_interpret_override.currentIndex()
         if len(text) == 0:
             self.associated_data_info.setText('')
-            self.associated_data_interpret = self.InterpretType.NO_DATA
+            self.associated_data_interpret = InterpretType.NO_DATA
             return True
         if i != 0:
             if i == 1:
-                self.associated_data_interpret = self.InterpretType.IPFS
+                self.associated_data_interpret = InterpretType.IPFS
                 try:
                     if len(base_decode(text, base=58)) > 34:
                         self.associated_data_info.setText('Too much data in IPFS hash!')
@@ -382,7 +379,7 @@ class AbstractAssetWorkspace(QWidget):
                     self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
                     return False
             if i == 2:
-                self.associated_data_interpret = self.InterpretType.HEX
+                self.associated_data_interpret = InterpretType.HEX
                 try:
                     bfh(text)
                 except:
@@ -399,7 +396,7 @@ class AbstractAssetWorkspace(QWidget):
                     return True
 
             else:
-                self.associated_data_interpret = self.InterpretType.ASCII
+                self.associated_data_interpret = InterpretType.ASCII
                 if len(text) > 34:
                     self.associated_data_info.setText('Too much data in ascii string!')
                     self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
@@ -408,36 +405,57 @@ class AbstractAssetWorkspace(QWidget):
                     self.associated_data_info.setText('Reading as ascii string')
                     self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
                     return True
-        if text[:2] == 'Qm':
+        if self.parent.config.get('advanced_asset_functions', False):
+            if text[:2] == 'Qm':
+                try:
+                    if len(base_decode(text, base=58)) == 34:
+                        self.associated_data_info.setText('Reading as IPFS')
+                        self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                        self.associated_data_interpret = InterpretType.IPFS
+                        return True
+                except:
+                    pass
             try:
-                if len(base_decode(text, base=58)) == 34:
+                if len(text) == 1:
+                    raise Exception()
+                bytes.fromhex(text)
+                self.associated_data_info.setText('Reading as hex string')
+                self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                self.associated_data_interpret = InterpretType.HEX
+                if len(text) > 34 * 2:
+                    self.associated_data_info.setText('Too much data in hex string!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                return True
+            except:
+                self.associated_data_info.setText('Reading as ascii string')
+                self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                self.associated_data_interpret = InterpretType.ASCII
+                if len(text) > 34:
+                    self.associated_data_info.setText('Too much data in ascii string!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                return True
+        else:
+            self.associated_data_interpret = InterpretType.IPFS
+            try:
+                raw = base_decode(text, base=58)
+                if len(raw) > 34:
+                    self.associated_data_info.setText('Too much data in IPFS hash!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                elif len(raw) < 34:
+                    self.associated_data_info.setText('Too little data in IPFS hash!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                else:
                     self.associated_data_info.setText('Reading as IPFS')
                     self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                    self.associated_data_interpret = self.InterpretType.IPFS
                     return True
             except:
-                pass
-        try:
-            if len(text) == 1:
-                raise Exception()
-            bytes.fromhex(text)
-            self.associated_data_info.setText('Reading as hex string')
-            self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-            self.associated_data_interpret = self.InterpretType.HEX
-            if len(text) > 34 * 2:
-                self.associated_data_info.setText('Too much data in hex string!')
+                self.associated_data_info.setText('Invalid IPFS hash!')
                 self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
                 return False
-            return True
-        except:
-            self.associated_data_info.setText('Reading as ascii string')
-            self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-            self.associated_data_interpret = self.InterpretType.ASCII
-            if len(text) > 34:
-                self.associated_data_info.setText('Too much data in ascii string!')
-                self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                return False
-            return True
 
     def _check_amount(self) -> bool:
         t = self.asset_amount.text()
@@ -470,10 +488,10 @@ class AbstractAssetWorkspace(QWidget):
             self.asset_availability_text.setText('Asset Available')
             self.asset_availability_text.setStyleSheet(ColorScheme.GREEN.as_stylesheet())
 
-    def refresh_owners(self):
+    def refresh_owners(self, force=False):
         # Don't interrupt us when we're on this tab
-        if self.parent.tabs.currentIndex() != self.parent.tabs.indexOf(self.parent.assets_tab) or \
-           self.parent.asset_tabs.currentIndex() != 1:
+        if force or self.parent.tabs.currentIndex() != self.parent.tabs.indexOf(self.parent.assets_tab) or \
+                self.parent.asset_tabs.currentIndex() != 1:
             self.aval_owner_combo.clear()
             owned_assets = sum(self.parent.wallet.get_balance(), RavenValue()).assets
             owners = [n for n in owned_assets.keys() if n[-1] == '!' and owned_assets.get(n, 0) != 0]
@@ -511,16 +529,16 @@ class AbstractAssetWorkspace(QWidget):
         return None
 
     def should_warn_associated_data(self):
-        text = self.associated_data.text()
-        if len(text) == 0:
+        text = self.associated_data.text()  # type: str
+        i = self.associated_data_interpret
+        if i == InterpretType.NO_DATA:
             return False
-        try:
+        elif i == InterpretType.IPFS:
+            b = base_decode(text, base=58)
+        elif i == InterpretType.HEX:
             b = bfh(text)
-        except:
-            try:
-                b = base_decode(text, base=58)
-            except:
-                b = text
+        else:
+            b = text.encode('ascii')
         if len(b) < 34 and self.parent.config.get('warn_asset_small_associated', True):
             return True
         return False
@@ -531,11 +549,6 @@ class AbstractAssetWorkspace(QWidget):
         if not c and not is_unique and self.parent.config.get('warn_asset_non_reissuable', True):
             return True
         return False
-
-
-class AssetCreateWorkspace(AbstractAssetWorkspace):
-    def __init__(self, parent, create_asset_callable):
-        super().__init__(parent, EnterButton(_("Create Asset"), create_asset_callable))
 
     def reset_workspace(self):
         self.create_options_layout.group.buttons()[0].setChecked(True)
@@ -559,12 +572,13 @@ class AssetCreateWorkspace(AbstractAssetWorkspace):
         self.asset_amount.setValidator(validator)
         self.reissue_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
         self.last_checked = None
-        self.associated_data_interpret = self.InterpretType.NO_DATA
+        self.associated_data_interpret = InterpretType.NO_DATA
         self.associated_data_interpret_override.setCurrentIndex(0)
         self.refresh_change_addrs()
         self.send_asset_address.setText(self.change_addrs[1])
         self.send_asset_address_error.setText('')
         self.cost_label.setText('Cost: {} RVN'.format(constants.net.BURN_AMOUNTS.IssueAssetBurnAmount))
+        self.refresh_owners(True)
 
     def get_owner(self):
         i = self.aval_owner_combo.currentIndex()
@@ -603,18 +617,17 @@ class AssetCreateWorkspace(AbstractAssetWorkspace):
         is_unique = self.create_options_layout.selected_index() == 2
         amt = int(float(self.asset_amount.text()) * COIN)
         d = self.associated_data.text()  # type: str
-        if len(d) == 0:
+
+        i = self.associated_data_interpret
+        if i == InterpretType.NO_DATA:
             data = None
         else:
-            try:
+            if i == InterpretType.IPFS:
                 data = base_decode(d, base=58)
-                if len(data) != 34:
-                    raise Exception()
-            except:
-                try:
-                    data = bfh(d)
-                except:
-                    data = d.encode('ascii')
+            elif i == InterpretType.HEX:
+                data = bfh(d)
+            else:
+                data = d.encode('ascii')
             data = data.rjust(34, b'\0')
 
         new = [
@@ -639,4 +652,531 @@ class AssetCreateWorkspace(AbstractAssetWorkspace):
                 )
             )
 
+        return norm, new, self.change_addrs[2]
+
+
+class AssetReissueWorkspace(QWidget):
+    def __init__(self, parent, reissue_asset_callable):
+        super().__init__()
+
+        self.parent = parent
+
+        self.current_asset_meta = None
+
+        self.aval_owner_combo = QComboBox()
+        self.aval_owner_combo.setCurrentIndex(0)
+
+        self.divisions = FreezableLineEdit()
+        self.asset_amount = FreezableLineEdit()
+        self.reissuable = QCheckBox()
+        self.associated_data = FreezableLineEdit()
+        self.current_sats = QLabel('')
+
+        self.associated_data_info = QLabel()
+        self.associated_data_info.setAlignment(Qt.AlignCenter)
+        self.associated_data_interpret_override = QComboBox()
+        self.associated_data_interpret = InterpretType.NO_DATA
+
+        self.cost_label = QLabel('Cost: {} RVN'.format(constants.net.BURN_AMOUNTS.ReissueAssetBurnAmount))
+
+        msg = _('Reissuability') + '\n\n' \
+              + _('This lets the asset be edited in the future.')
+        self.reissue_label = HelpLabel(_('Reissuable'), msg)
+
+        def update_amount_line_edit():
+            t = self.divisions.text()
+            if not t:
+                return
+            divs = int(t)
+            # Update regex
+            if divs == 0:
+                reg = QRegExp('^[0-9]{1,11}$')
+            else:
+                reg = QRegExp('^[0-9]{1,11}\\.([0-9]{1,' + str(divs) + '})$')
+            validator = QRegExpValidator(reg)
+            self.asset_amount.setValidator(validator)
+
+        def on_combo_change():
+            i = self.aval_owner_combo.currentIndex()
+            if i == 0:
+                self.reset_workspace()
+            else:
+                asset = self.aval_owner_options[i]
+                m = self.current_asset_meta = self.parent.wallet.get_asset_meta(asset)  # type: AssetMeta
+
+                if not m:
+                    # Edge case where we have the ownership asset, but not the normal asset
+                    async def async_data_get():
+                        # We will trust what the server sends us, since this is just used for GUI and locking out
+                        # invalid options which would be caught in a node broadcast
+                        m = await self.parent.network.get_meta_for_asset(asset)
+                        if not m:
+                            return
+                        divs = m['divisions']
+                        reis = False if m['reissuable'] == 0 else True
+                        data = m.get('ipfs', None)
+                        circulation = m['sats_in_circulation']
+                        r = reis
+
+                        d = divs
+                        if d < 8:
+                            reg_base = '012345678'
+                            reg = QRegExp('^[' + reg_base[d:] + ']{1}$')
+                            validator = QRegExpValidator(reg)
+                            self.divisions.setValidator(validator)
+                            self.divisions.setFrozen(not r)
+
+                        self.divisions.setText(str(d))
+
+                        self.reissuable.setCheckState(r)
+                        if r:
+                            self.reissuable.setEnabled(r)
+                            self.reissuable.setTristate(False)
+
+                        i = data
+                        if i:
+                            self.associated_data.setFrozen(not r)
+                            self.associated_data.setText(i)
+                            self.associated_data_interpret_override.setCurrentIndex(0)
+                            self._check_associated_data()
+                        else:
+                            self.associated_data.setFrozen(not r)
+                            self.associated_data.setText('')
+                            self._check_associated_data()
+
+                        self.asset_amount.setFrozen(not r)
+                        self.asset_amount.setText('0')
+                        self.current_sats.setText(
+                            _("({} {} currently in circulation)").format(Satoshis(circulation), asset))
+
+                        if r:
+                            self.reissue_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                            self.divisions_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                            self.data_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                            self.amount_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+
+                    self.parent.run_coroutine_from_thread(async_data_get())
+                    return
+
+                r = m.is_reissuable
+
+                d = m.divisions
+                if d < 8:
+                    reg_base = '012345678'
+                    reg = QRegExp('^[' + reg_base[d:] + ']{1}$')
+                    validator = QRegExpValidator(reg)
+                    self.divisions.setValidator(validator)
+                    self.divisions.setFrozen(not r)
+
+                self.divisions.setText(str(d))
+
+                self.reissuable.setCheckState(r)
+                if r:
+                    self.reissuable.setEnabled(r)
+                    self.reissuable.setTristate(False)
+
+                i = m.ipfs_str
+                if i:
+                    self.associated_data.setFrozen(not r)
+                    self.associated_data.setText(m.ipfs_str)
+                    self.associated_data_interpret_override.setCurrentIndex(0)
+                    self._check_associated_data()
+                else:
+                    self.associated_data.setFrozen(not r)
+                    self.associated_data.setText('')
+                    self._check_associated_data()
+
+                self.asset_amount.setFrozen(not r)
+                self.asset_amount.setText('0')
+                self.current_sats.setText(_("({} {} currently in circulation)").format(Satoshis(m.circulation), m.name))
+
+                if r:
+                    self.reissue_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                    self.divisions_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                    self.data_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                    self.amount_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+
+        self.aval_owner_combo.currentIndexChanged.connect(on_combo_change)
+
+        c_grid_b = QGridLayout()
+        c_grid_b.setColumnStretch(2, 1)
+        c_grid_b.setHorizontalSpacing(10)
+
+        msg = _('Asset Divisions') + '\n\n' \
+              + _('Asset divisions are a number from 0 to 8. They dictate how much an asset can be divided. '
+                  'The minimum asset amount is 10^-d where d is the division amount.')
+        self.divisions_label = HelpLabel(_('Divisions'), msg)
+        self.divisions.setText('')
+        self.divisions.setFixedWidth(25)
+        self.divisions.setFrozen(True)
+        self.divisions.textChanged.connect(update_amount_line_edit)
+
+        divisions_grid = QHBoxLayout()
+        divisions_grid.setSpacing(0)
+        divisions_grid.setContentsMargins(0, 0, 0, 0)
+        divisions_grid.addWidget(self.divisions_label)
+        divisions_grid.addWidget(self.divisions)
+
+        divisions_w = QWidget()
+        divisions_w.setLayout(divisions_grid)
+        c_grid_b.addWidget(divisions_w, 0, 0)
+
+        self.reissuable.setCheckState(True)
+        self.reissuable.setEnabled(False)
+        reissue_grid = QHBoxLayout()
+        reissue_grid.setSpacing(0)
+        reissue_grid.setContentsMargins(0, 0, 0, 0)
+        reissue_grid.addWidget(self.reissue_label)
+        reissue_grid.addWidget(self.reissuable)
+        reissue_w = QWidget()
+        reissue_w.setLayout(reissue_grid)
+        c_grid_b.addWidget(reissue_w, 0, 1)
+
+        msg = _('Associated Data') + '\n\n' \
+              + _('Data to associate with this asset.')
+        self.data_label = HelpLabel(_('Associated Data'), msg)
+        self.associated_data.setFrozen(True)
+
+        self.associated_data.textChanged.connect(self._check_associated_data)
+
+        self.associated_data_interpret_override.addItems(['AUTO', 'IPFS', 'HEX', 'ASCII'])
+
+        self.associated_data_interpret_override.currentIndexChanged.connect(self._check_associated_data)
+        self.associated_data_interpret_override.setVisible(self.parent.config.get('advanced_asset_functions', False))
+
+        data_grid = QHBoxLayout()
+        data_grid.setSpacing(0)
+        data_grid.setContentsMargins(0, 0, 0, 0)
+        data_grid.addWidget(self.data_label)
+        data_grid.addWidget(self.associated_data)
+        data_w = QWidget()
+        data_w.setLayout(data_grid)
+        c_grid_b.addWidget(data_w, 0, 2)
+        c_grid_b.addWidget(self.associated_data_info, 1, 2)
+        c_grid_b.addWidget(self.associated_data_interpret_override, 0, 3)
+
+        c_grid_c = QGridLayout()
+        c_grid_c.setColumnStretch(4, 1)
+        c_grid_c.setHorizontalSpacing(10)
+
+        msg = _('Amount to Add') + '\n\n' \
+              + _('The amount of an asset to add to circulation')
+        self.amount_label = HelpLabel(_('Additional Amount'), msg)
+        amount_grid = QHBoxLayout()
+        amount_grid.setSpacing(0)
+        amount_grid.setContentsMargins(0, 0, 0, 0)
+        amount_grid.addWidget(self.amount_label)
+        amount_grid.addWidget(self.asset_amount)
+        amount_grid.addWidget(self.current_sats)
+        amount_w = QWidget()
+        amount_w.setLayout(amount_grid)
+        c_grid_c.addWidget(amount_w, 0, 0)
+
+        self.asset_amount_warning = QLabel()
+        self.asset_amount_warning.setStyleSheet(ColorScheme.RED.as_stylesheet())
+
+        self.asset_amount.textChanged.connect(self._check_amount)
+        c_grid_c.addWidget(self.asset_amount_warning, 1, 0)
+
+        self.change_addrs = None  # type: Optional[List[str]]
+        self.refresh_change_addrs()
+
+        self.send_asset_address_error = QLabel()
+        self.send_asset_address_error.setStyleSheet(ColorScheme.RED.as_stylesheet())
+
+        self.send_asset_address = QLineEdit()
+        self.send_asset_address.textChanged.connect(self._check_asset_addr)
+        self.send_asset_address.setText(self.change_addrs[1])
+
+        asset_h = QHBoxLayout()
+        asset_h.addWidget(QLabel(_('New asset address:')))
+        asset_h.addWidget(self.send_asset_address)
+        asset_h.addWidget(self.send_asset_address_error)
+
+        self.asset_addr_w = QWidget()
+        self.asset_addr_w.setLayout(asset_h)
+        self.asset_addr_w.setVisible(self.parent.config.get('advanced_asset_functions', False))
+
+        bottom_buttons = QGridLayout()
+        bottom_buttons.setColumnStretch(1, 2)
+
+        self.exec_asset_b = EnterButton(_("Reissue Asset"), reissue_asset_callable)
+        bottom_buttons.addWidget(self.exec_asset_b, 1, 0)
+        bottom_buttons.addWidget(self.cost_label, 1, 1)
+
+        def hard_reset():
+            self.reset_workspace(True)
+        self.reset_create_b = EnterButton(_("Reset"), hard_reset)
+        bottom_buttons.addWidget(self.reset_create_b, 1, 3)
+
+        widgetC = QWidget()
+        widgetC.setLayout(c_grid_b)
+        widgetD = QWidget()
+        widgetD.setLayout(c_grid_c)
+        widgetF = QWidget()
+        widgetF.setLayout(bottom_buttons)
+        create_l = QVBoxLayout()
+        create_l.addWidget(self.aval_owner_combo)
+        create_l.addWidget(widgetC)
+        create_l.addWidget(widgetD)
+        create_l.addWidget(self.asset_addr_w)
+        create_l.addWidget(widgetF)
+        self.setLayout(create_l)
+
+        self.aval_owner_options = []  # type: List[str]
+
+    def _check_asset_addr(self):
+        addr = self.send_asset_address.text()
+        if not is_address(addr):
+            self.send_asset_address_error.setText(_('Invalid Ravencoin Address'))
+            return False
+        else:
+            self.send_asset_address_error.setText('')
+            return True
+
+    def _check_associated_data(self) -> bool:
+        text = self.associated_data.text()
+        i = self.associated_data_interpret_override.currentIndex()
+        if len(text) == 0:
+            self.associated_data_info.setText('')
+            self.associated_data_interpret = InterpretType.NO_DATA
+            return True
+        if i != 0:
+            if i == 1:
+                self.associated_data_interpret = InterpretType.IPFS
+                try:
+                    if len(base_decode(text, base=58)) > 34:
+                        self.associated_data_info.setText('Too much data in IPFS hash!')
+                        self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                        return False
+                    else:
+                        self.associated_data_info.setText('Reading as IPFS')
+                        self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                        return True
+                except:
+                    self.associated_data_info.setText('Invalid base 58 encoding!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+            if i == 2:
+                self.associated_data_interpret = InterpretType.HEX
+                try:
+                    bfh(text)
+                except:
+                    self.associated_data_info.setText('Not a valid hex string!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                if len(text) > 34 * 2:
+                    self.associated_data_info.setText('Too much data in hex string!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                else:
+                    self.associated_data_info.setText('Reading as hex string')
+                    self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                    return True
+
+            else:
+                self.associated_data_interpret = InterpretType.ASCII
+                if len(text) > 34:
+                    self.associated_data_info.setText('Too much data in ascii string!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                else:
+                    self.associated_data_info.setText('Reading as ascii string')
+                    self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                    return True
+        if self.parent.config.get('advanced_asset_functions', False):
+            if text[:2] == 'Qm':
+                try:
+                    if len(base_decode(text, base=58)) == 34:
+                        self.associated_data_info.setText('Reading as IPFS')
+                        self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                        self.associated_data_interpret = InterpretType.IPFS
+                        return True
+                except:
+                    pass
+            try:
+                if len(text) == 1:
+                    raise Exception()
+                bytes.fromhex(text)
+                self.associated_data_info.setText('Reading as hex string')
+                self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                self.associated_data_interpret = InterpretType.HEX
+                if len(text) > 34 * 2:
+                    self.associated_data_info.setText('Too much data in hex string!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                return True
+            except:
+                self.associated_data_info.setText('Reading as ascii string')
+                self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                self.associated_data_interpret = InterpretType.ASCII
+                if len(text) > 34:
+                    self.associated_data_info.setText('Too much data in ascii string!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                return True
+        else:
+            self.associated_data_interpret = InterpretType.IPFS
+            try:
+                raw = base_decode(text, base=58)
+                if len(raw) > 34:
+                    self.associated_data_info.setText('Too much data in IPFS hash!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                elif len(raw) < 34:
+                    self.associated_data_info.setText('Too little data in IPFS hash!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
+                else:
+                    self.associated_data_info.setText('Reading as IPFS')
+                    self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+                    return True
+            except:
+                self.associated_data_info.setText('Invalid IPFS hash!')
+                self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                return False
+
+    def _check_amount(self) -> bool:
+        t = self.asset_amount.text()
+        if not t:
+            self.asset_amount_warning.setText('')
+            return False
+        v = float(t) + self.current_asset_meta.circulation / 100_000_000
+        if v > TOTAL_COIN_SUPPLY_LIMIT_IN_BTC:
+            self.asset_amount_warning.setText(
+                _('More than the maximum amount ({})').format(TOTAL_COIN_SUPPLY_LIMIT_IN_BTC))
+            return False
+        else:
+            self.asset_amount_warning.setText('')
+            return True
+
+    def refresh_owners(self, force=False):
+        # Don't interrupt us when we're on this tab
+        if force or self.parent.tabs.currentIndex() != self.parent.tabs.indexOf(self.parent.assets_tab) or \
+                self.parent.asset_tabs.currentIndex() != 2:
+            self.aval_owner_combo.clear()
+            owned_assets = sum(self.parent.wallet.get_balance(), RavenValue()).assets
+            owners = [n for n in owned_assets.keys() if n[-1] == '!' and owned_assets.get(n, 0) != 0]
+            self.aval_owner_options = ['Select a reissuable asset'] + \
+                                      sorted([n[:-1] for n in owners])
+            self.aval_owner_combo.addItems(self.aval_owner_options)
+
+    def refresh_change_addrs(self):
+        addrs = self.parent.wallet.get_change_addresses_for_new_transaction(extra_addresses=3)
+        if not addrs:
+            addrs = self.parent.wallet.get_change_addresses_for_new_transaction(allow_reuse=True, extra_addresses=3)
+        self.change_addrs = addrs
+
+    def verify_valid(self) -> Optional[str]:
+        if not self._check_amount():
+            return 'Invalid amount'
+        if not self._check_asset_addr():
+            return 'Invalid address'
+        if not self._check_associated_data():
+            return 'Invalid associated data'
+        return None
+
+    def should_warn_associated_data(self):
+        text = self.associated_data.text()  # type: str
+        i = self.associated_data_interpret
+        if i == InterpretType.NO_DATA:
+            return False
+        elif i == InterpretType.IPFS:
+            b = base_decode(text, base=58)
+        elif i == InterpretType.HEX:
+            b = bfh(text)
+        else:
+            b = text.encode('ascii')
+        if len(b) < 34 and self.parent.config.get('warn_asset_small_associated', True):
+            return True
+        return False
+
+    def should_warn_on_non_reissuable(self):
+        c = self.reissuable.isChecked()
+        if not c and self.parent.config.get('warn_asset_non_reissuable', True):
+            return True
+        return False
+
+    def reset_workspace(self, bool=False):
+
+        self.aval_owner_combo.setCurrentIndex(0)
+
+        self.current_asset_meta = None
+
+        self.divisions.setFrozen(True)
+        self.divisions.setText('')
+
+        self.reissuable.setEnabled(False)
+        self.reissuable.setCheckState(False)
+
+        self.associated_data.setFrozen(True)
+        self.associated_data.setText('')
+        self.associated_data_info.setText('')
+        self.associated_data_interpret = InterpretType.NO_DATA
+        self.associated_data_interpret_override.setCurrentIndex(0)
+
+        self.asset_amount.setFrozen(True)
+        self.asset_amount.setText('')
+        self.current_sats.setText('')
+        self.asset_amount_warning.setText('')
+
+        self.reissue_label.setStyleSheet(ColorScheme.GRAY.as_stylesheet())
+        self.divisions_label.setStyleSheet(ColorScheme.GRAY.as_stylesheet())
+        self.data_label.setStyleSheet(ColorScheme.GRAY.as_stylesheet())
+        self.amount_label.setStyleSheet(ColorScheme.GRAY.as_stylesheet())
+
+        if bool:
+            self.refresh_change_addrs()
+            self.refresh_owners(bool)
+
+    def get_owner(self):
+        i = self.aval_owner_combo.currentIndex()
+        if i == 0:
+            return None
+        return self.aval_owner_options[i] + '!'
+
+    def get_output(self):
+        burn = PartialTxOutput(
+            scriptpubkey=bfh(address_to_script(
+                constants.net.BURN_ADDRESSES.ReissueAssetBurnAddress
+            )),
+            value=Satoshis(constants.net.BURN_AMOUNTS.ReissueAssetBurnAmount * COIN)
+        )
+        o = self.get_owner()
+        script = bfh(address_to_script(self.change_addrs[0]))
+        ownr = PartialTxOutput(
+            scriptpubkey=create_transfer_asset_script(script, o, COIN),
+            value=Satoshis(COIN),
+            asset=o
+        )
+        norm = [burn, ownr]
+
+        asset = o[:-1]
+        amt = int(float(self.asset_amount.text()) * COIN)
+        d = self.associated_data.text()  # type: str
+
+        i = self.associated_data_interpret
+        if i == InterpretType.NO_DATA:
+            data = None
+        else:
+            if i == InterpretType.IPFS:
+                data = base_decode(d, base=58)
+            elif i == InterpretType.HEX:
+                data = bfh(d)
+            else:
+                data = d.encode('ascii')
+            data = data.rjust(34, b'\0')
+
+        divs = int(self.divisions.text())
+        new = [
+            PartialTxOutput(
+                scriptpubkey=create_reissue_asset_script(bfh(address_to_script(self.send_asset_address.text())),
+                                                     asset,
+                                                     amt,
+                                                     bytes([divs]) if divs != self.current_asset_meta.divisions else b'\xff',
+                                                     self.reissuable.isChecked(),
+                                                     data),
+                value=Satoshis(amt),
+                asset=asset)
+        ]
         return norm, new, self.change_addrs[2]

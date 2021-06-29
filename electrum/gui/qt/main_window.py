@@ -80,7 +80,7 @@ from electrum.simple_config import SimpleConfig
 from electrum.logging import Logger
 from electrum.lnutil import ln_dummy_address, extract_nodeid, ConnStringFormatError
 from electrum.lnaddr import lndecode, LnDecodeException, LnAddressError
-from .asset_workspace import AssetCreateWorkspace
+from .asset_workspace import AssetCreateWorkspace, AssetReissueWorkspace
 
 from .exception_window import Exception_Hook
 from .amountedit import AmountEdit, RVNAmountEdit, FreezableLineEdit, FeerateEdit, PayToAmountEdit
@@ -1072,6 +1072,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.update_completions()
         self.refresh_send_tab()
         self.create_workspace.refresh_owners()
+        self.reissue_workspace.refresh_owners()
 
     # def create_channels_tab(self):
     #     self.channels_list = ChannelsList(self)
@@ -1552,7 +1553,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.create_workspace = create_w = AssetCreateWorkspace(self,
                                                                 self.confirm_asset_creation)
 
-        self.reissue_workspace = reissue_w = QWidget()
+        self.reissue_workspace = reissue_w = AssetReissueWorkspace(self,
+                                                                   self.confirm_asset_reissue)
 
         layout = QGridLayout()
         w = QWidget()
@@ -1563,6 +1565,83 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         tabwidget.addTab(reissue_w, "Reissue Asset")
         layout.addWidget(tabwidget, 0, 0)
         return w
+
+    def confirm_asset_reissue(self):
+        error = self.reissue_workspace.verify_valid()
+
+        if error:
+            self.show_warning(_('Invalid asset metadata:\n'
+                                '{}').format(error))
+            return
+
+        def show_small_association_warning():
+            if self.reissue_workspace.should_warn_associated_data():
+                cb = QCheckBox(_("Don't show this message again."))
+                cb_checked = False
+
+                def on_cb(x):
+                    nonlocal cb_checked
+                    cb_checked = x == Qt.Checked
+
+                cb.stateChanged.connect(on_cb)
+                goto = self.question(_('Your associated data is smalled than the '
+                                       '34 byte size.\n'
+                                       'Double check that you have input the correct '
+                                       'data.\n'
+                                       'If you continue, null bytes will be appended '
+                                       'to the end of your data to fit this size.\n\n'
+                                       'Is this okay?'),
+                                     title=_('Warning: Small associated data'), checkbox=cb)
+
+                if cb_checked:
+                    self.config.set_key('warn_asset_small_associated', False)
+                if goto:
+                    return True
+                else:
+                    return False
+            else:
+                return True
+
+        def show_non_reissuable_warning():
+            if self.reissue_workspace.should_warn_on_non_reissuable():
+                cb = QCheckBox(_("Don't show this message again."))
+                cb_checked = False
+
+                def on_cb(x):
+                    nonlocal cb_checked
+                    cb_checked = x == Qt.Checked
+
+                cb.stateChanged.connect(on_cb)
+                goto = self.question(_('You will not be able to change '
+                                       'this asset in the future.\n'
+                                       'Are you sure you want to continue?'),
+                                     title=_('Warning: Non reissuable asset'), checkbox=cb)
+
+                if cb_checked:
+                    self.config.set_key('warn_asset_non_reissuable', False)
+                if goto:
+                    return True
+                else:
+                    return False
+            else:
+                return True
+
+        if not show_small_association_warning():
+            return
+
+        if not show_non_reissuable_warning():
+            return
+
+        norm, new, change_addr = self.reissue_workspace.get_output()
+
+        self.pay_onchain_dialog(
+            self.get_coins(asset=self.reissue_workspace.get_owner()),
+            norm,
+            coinbase_outputs=new,
+            # change_addr=change_addr
+        )
+
+        self.reissue_workspace.reset_workspace()
 
     def confirm_asset_creation(self):
 

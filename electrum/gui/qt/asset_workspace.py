@@ -511,8 +511,10 @@ class AssetCreateWorkspace(QWidget):
         if force or self.parent.tabs.currentIndex() != self.parent.tabs.indexOf(self.parent.assets_tab) or \
                 self.parent.asset_tabs.currentIndex() != 1:
             self.aval_owner_combo.clear()
-            owned_assets = sum(self.parent.wallet.get_balance(), RavenValue()).assets
-            owners = [n for n in owned_assets.keys() if n[-1] == '!' and owned_assets.get(n, 0) != 0]
+            confirmed, unconfirmed, = self.parent.wallet.get_balance()
+            owned_assets = sum(confirmed, RavenValue()).assets
+            in_mempool = sum(unconfirmed, RavenValue()).assets
+            owners = [n for n in owned_assets.keys() if n[-1] == '!' and owned_assets.get(n, 0) != 0 and n not in in_mempool]
             self.aval_owner_options = ['Select a parent'] + \
                                       sorted([n[:-1] for n in owners])
             self.aval_owner_combo.addItems(self.aval_owner_options)
@@ -1094,10 +1096,13 @@ class AssetReissueWorkspace(QWidget):
         if force or self.parent.tabs.currentIndex() != self.parent.tabs.indexOf(self.parent.assets_tab) or \
                 self.parent.asset_tabs.currentIndex() != 2:
             self.aval_owner_combo.clear()
-            owned_assets = sum(self.parent.wallet.get_balance(), RavenValue()).assets
+            confirmed, unconfirmed, = self.parent.wallet.get_balance()
+            owned_assets = sum(confirmed, RavenValue()).assets
+            in_mempool = sum(unconfirmed, RavenValue()).assets
+
             owners = []
             for asset in owned_assets.keys():
-                if asset[-1] == '!' and owned_assets.get(asset, 0) != 0:
+                if asset[-1] == '!' and owned_assets.get(asset, 0) != 0 and asset not in in_mempool:
                     meta = self.parent.wallet.get_asset_meta(asset[:-1])  # type: AssetMeta
                     if meta:
                         if meta.is_reissuable:

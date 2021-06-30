@@ -422,6 +422,7 @@ class AddressSynchronizer(Logger):
 
     def recieve_asset_callback(self, asset: str, meta: AssetMeta):
         self.db.add_asset_meta(asset, meta)
+        util.trigger_callback('asset_meta')
 
     def receive_tx_callback(self, tx_hash: str, tx: Transaction, tx_height: int) -> None:
         self.add_unverified_tx(tx_hash, tx_height)

@@ -129,6 +129,19 @@ class HelpLabel(QLabel):
         return QLabel.leaveEvent(self, event)
 
 
+class HelpButtonURL(QToolButton):
+    def __init__(self, url):
+        QToolButton.__init__(self)
+        self.setText('?')
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setFixedWidth(round(2.2 * char_width_in_lineedit()))
+        self.clicked.connect(self.onclick)
+        self.url = url
+
+    def onclick(self):
+        webopen(self.url)
+
+
 class HelpButton(QToolButton):
     def __init__(self, text):
         QToolButton.__init__(self)

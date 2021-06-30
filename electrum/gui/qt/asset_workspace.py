@@ -17,7 +17,7 @@ from electrum import constants
 from electrum.assets import is_main_asset_name_good, is_unique_asset_name_good, is_sub_asset_name_good, \
     create_transfer_asset_script, create_new_asset_script, create_owner_asset_script, create_reissue_asset_script
 from electrum.gui.qt.amountedit import FreezableLineEdit
-from electrum.gui.qt.util import ComplexLineEdit, HelpLabel, EnterButton, ColorScheme, ChoicesLayout
+from electrum.gui.qt.util import ComplexLineEdit, HelpLabel, EnterButton, ColorScheme, ChoicesLayout, HelpButtonURL
 from electrum.i18n import _
 from electrum.ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, base_decode, address_to_script, COIN, is_address
 from electrum.transaction import RavenValue, PartialTxOutput, AssetMeta
@@ -283,8 +283,14 @@ class AssetCreateWorkspace(QWidget):
         self.reset_create_b = EnterButton(_("Reset"), self.reset_workspace)
         bottom_buttons.addWidget(self.reset_create_b, 1, 3)
 
+        top_layout = QHBoxLayout()
+        options_w = QWidget()
+        options_w.setLayout(self.create_options_layout.layout())
+        top_layout.addWidget(options_w)
+        top_layout.addWidget(HelpButtonURL("https://kralverde.github.io/assets/"))
+
         widgetA = QWidget()
-        widgetA.setLayout(self.create_options_layout.layout())
+        widgetA.setLayout(top_layout)
         widgetB = QWidget()
         widgetB.setLayout(c_grid)
         widgetC = QWidget()
@@ -913,6 +919,11 @@ class AssetReissueWorkspace(QWidget):
         self.reset_create_b = EnterButton(_("Reset"), hard_reset)
         bottom_buttons.addWidget(self.reset_create_b, 1, 3)
 
+        top_layout = QHBoxLayout()
+        top_layout.addWidget(self.aval_owner_combo)
+        top_layout.addWidget(HelpButtonURL("https://kralverde.github.io/assets/"))
+        widgetA = QWidget()
+        widgetA.setLayout(top_layout)
         widgetC = QWidget()
         widgetC.setLayout(c_grid_b)
         widgetD = QWidget()
@@ -920,7 +931,7 @@ class AssetReissueWorkspace(QWidget):
         widgetF = QWidget()
         widgetF.setLayout(bottom_buttons)
         create_l = QVBoxLayout()
-        create_l.addWidget(self.aval_owner_combo)
+        create_l.addWidget(widgetA)
         create_l.addWidget(widgetC)
         create_l.addWidget(widgetD)
         create_l.addWidget(self.asset_addr_w)
@@ -1062,8 +1073,8 @@ class AssetReissueWorkspace(QWidget):
             owned_assets = sum(self.parent.wallet.get_balance(), RavenValue()).assets
             owners = []
             for asset in owned_assets.keys():
-                meta = self.parent.wallet.get_asset_meta(asset)  # type: AssetMeta
                 if asset[-1] == '!' and owned_assets.get(asset, 0) != 0:
+                    meta = self.parent.wallet.get_asset_meta(asset[:-1])  # type: AssetMeta
                     if meta:
                         if meta.is_reissuable:
                             owners.append(asset)

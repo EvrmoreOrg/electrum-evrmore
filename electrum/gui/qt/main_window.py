@@ -2032,7 +2032,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             change_addr=change_addr)
 
         output_value = \
-            sum([RavenValue(0, {x.asset: x.value}) if x.asset else RavenValue(x.value) for x in outputs + coinbase_outputs], RavenValue())
+            sum([RavenValue(0, {x.asset: x.value}) if x.asset else RavenValue(x.value) for x in outputs +
+                 (coinbase_outputs if coinbase_outputs else [])], RavenValue())
 
         conf_dlg = ConfirmTxDialog(window=self, make_tx=make_tx, output_value=output_value, is_sweep=is_sweep)
         if conf_dlg.not_enough_funds:

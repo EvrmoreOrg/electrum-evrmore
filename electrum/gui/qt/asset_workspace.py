@@ -510,11 +510,13 @@ class AssetCreateWorkspace(QWidget):
         # Don't interrupt us when we're on this tab
         if force or self.parent.tabs.currentIndex() != self.parent.tabs.indexOf(self.parent.assets_tab) or \
                 self.parent.asset_tabs.currentIndex() != 1:
-            self.aval_owner_combo.clear()
             confirmed, unconfirmed, = self.parent.wallet.get_balance()
             owned_assets = sum(confirmed, RavenValue()).assets
             in_mempool = sum(unconfirmed, RavenValue()).assets
             owners = [n for n in owned_assets.keys() if n[-1] == '!' and owned_assets.get(n, 0) != 0 and n not in in_mempool]
+            if set(owners) - set(self.aval_owner_options[1:]):
+                return
+            self.aval_owner_combo.clear()
             self.aval_owner_options = ['Select a parent'] + \
                                       sorted([n[:-1] for n in owners])
             self.aval_owner_combo.addItems(self.aval_owner_options)
@@ -1095,7 +1097,6 @@ class AssetReissueWorkspace(QWidget):
         # Don't interrupt us when we're on this tab
         if force or self.parent.tabs.currentIndex() != self.parent.tabs.indexOf(self.parent.assets_tab) or \
                 self.parent.asset_tabs.currentIndex() != 2:
-            self.aval_owner_combo.clear()
             confirmed, unconfirmed, = self.parent.wallet.get_balance()
             owned_assets = sum(confirmed, RavenValue()).assets
             in_mempool = sum(unconfirmed, RavenValue()).assets
@@ -1109,6 +1110,12 @@ class AssetReissueWorkspace(QWidget):
                             owners.append(asset)
                     else:
                         owners.append(asset)
+
+            if set(owners) - set(self.aval_owner_options[1:]):
+                return
+
+            self.aval_owner_combo.clear()
+
             self.aval_owner_options = ['Select a reissuable asset'] + \
                                       sorted([n[:-1] for n in owners])
             self.aval_owner_combo.addItems(self.aval_owner_options)

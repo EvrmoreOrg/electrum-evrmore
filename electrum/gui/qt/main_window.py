@@ -452,6 +452,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             wallet, tx = args
             if wallet == self.wallet:
                 self.tx_notification_queue.put(tx)
+                self.reissue_workspace.refresh_owners(True)
+                self.create_workspace.refresh_owners(True)
         elif event == 'on_quotes':
             self.on_fx_quotes()
         elif event == 'on_history':
@@ -495,9 +497,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.update_lightning_icon()
         elif event == 'cert_mismatch':
             self.show_cert_mismatch_error()
-        elif event == 'asset_meta':
-            self.reissue_workspace.refresh_owners(True)
-            self.create_workspace.refresh_owners(True)
+        #elif event == 'asset_meta':
+        #    self.reissue_workspace.refresh_owners(True)
+        #    self.create_workspace.refresh_owners(True)
         else:
             self.logger.info(f"unexpected network event: {event} {args}")
 

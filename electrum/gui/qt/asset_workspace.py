@@ -403,6 +403,12 @@ class AssetCreateWorkspace(QWidget):
 
             else:
                 self.associated_data_interpret = InterpretType.LATIN
+                try:
+                    text.encode('latin-1')
+                except:
+                    self.associated_data_info.setText('Text not compatible with latin-1!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
                 if len(text) > 34:
                     self.associated_data_info.setText('Too much data in latin-1 string!')
                     self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
@@ -437,6 +443,12 @@ class AssetCreateWorkspace(QWidget):
                 self.associated_data_info.setText('Reading as latin-1 string')
                 self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
                 self.associated_data_interpret = InterpretType.LATIN
+                try:
+                    text.encode('latin-1')
+                except:
+                    self.associated_data_info.setText('Text not compatible with latin-1!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
                 if len(text) > 34:
                     self.associated_data_info.setText('Too much data in latin-1 string!')
                     self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
@@ -991,6 +1003,12 @@ class AssetReissueWorkspace(QWidget):
 
             else:
                 self.associated_data_interpret = InterpretType.LATIN
+                try:
+                    text.encode('latin-1')
+                except:
+                    self.associated_data_info.setText('Text not compatible with latin-1!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
                 if len(text) > 34:
                     self.associated_data_info.setText('Too much data in latin-1 string!')
                     self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
@@ -1025,6 +1043,12 @@ class AssetReissueWorkspace(QWidget):
                 self.associated_data_info.setText('Reading as latin-1 string')
                 self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
                 self.associated_data_interpret = InterpretType.LATIN
+                try:
+                    text.encode('latin-1')
+                except:
+                    self.associated_data_info.setText('Text not compatible with latin-1!')
+                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                    return False
                 if len(text) > 34:
                     self.associated_data_info.setText('Too much data in latin-1 string!')
                     self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())

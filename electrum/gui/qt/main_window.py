@@ -1588,7 +1588,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                                        '34 byte size.\n'
                                        'Double check that you have input the correct '
                                        'data.\n'
-                                       'If you continue, null bytes will be appended '
+                                       'If you continue, null bytes will be prepended '
                                        'to the end of your data to fit this size.\n\n'
                                        'Is this okay?'),
                                      title=_('Warning: Small associated data'), checkbox=cb)
@@ -1666,7 +1666,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                                               '34 byte size.\n'
                                               'Double check that you have input the correct '
                                               'data.\n'
-                                              'If you continue, null bytes will be appended '
+                                              'If you continue, null bytes will be prepended '
                                               'to the end of your data to fit this size.\n\n'
                                               'Is this okay?'),
                                             title=_('Warning: Small associated data'), checkbox=cb)

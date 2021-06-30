@@ -599,7 +599,9 @@ class SettingsDialog(WindowModalDialog):
 
             self.window.create_workspace.associated_data_interpret_override.setVisible(v == Qt.Checked)
             self.window.create_workspace.asset_addr_w.setVisible(v == Qt.Checked)
-            #self.window.reissue_workspace.associated_data_interpret_override.setVisible(v == Qt.Checked)
+            self.window.reissue_workspace.associated_data_interpret_override.setVisible(v == Qt.Checked)
+            self.window.reissue_workspace.asset_addr_w.setVisible(v == Qt.Checked)
+            self.window.asset_list.update()
 
         advanced_assets_cb.stateChanged.connect(on_set_advanced_assets_cb)
         asset_widgets.append((advanced_assets_cb, None))

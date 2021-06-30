@@ -1460,6 +1460,13 @@ class OrderedDictWithIndex(OrderedDict):
         return ret
 
 
+def get_alternate_data(b: bytes) -> Tuple[str, str]:
+    h = b.hex()
+
+    b_n = [(i if (0x20 <= i <= 0x7e or 0xa1 <= i <= 0xff) else 0x2e) for i in b]
+
+    return h, bytearray(b_n).decode('latin-1')
+
 def multisig_type(wallet_type):
     '''If wallet_type is mofn multi-sig, return [m, n],
     otherwise return None.'''

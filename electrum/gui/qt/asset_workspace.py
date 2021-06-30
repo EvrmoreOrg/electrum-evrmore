@@ -716,6 +716,8 @@ class AssetReissueWorkspace(QWidget):
                         reis = False if m['reissuable'] == 0 else True
                         data = m.get('ipfs', None)
                         circulation = m['sats_in_circulation']
+                        self.current_asset_meta = AssetMeta(asset, circulation, False, reis, divs, bool(data), data, -1, '', None, None)
+
                         r = reis
 
                         d = divs
@@ -754,6 +756,8 @@ class AssetReissueWorkspace(QWidget):
                             self.divisions_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
                             self.data_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
                             self.amount_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+
+                        self.exec_asset_b.setEnabled(r)
 
                     self.parent.run_coroutine_from_thread(async_data_get())
                     return
@@ -1056,7 +1060,15 @@ class AssetReissueWorkspace(QWidget):
                 self.parent.asset_tabs.currentIndex() != 2:
             self.aval_owner_combo.clear()
             owned_assets = sum(self.parent.wallet.get_balance(), RavenValue()).assets
-            owners = [n for n in owned_assets.keys() if n[-1] == '!' and owned_assets.get(n, 0) != 0]
+            owners = []
+            for asset in owned_assets.keys():
+                meta = self.parent.wallet.get_asset_meta(asset)  # type: AssetMeta
+                if asset[-1] == '!' and owned_assets.get(asset, 0) != 0:
+                    if meta:
+                        if meta.is_reissuable:
+                            owners.append(asset)
+                    else:
+                        owners.append(asset)
             self.aval_owner_options = ['Select a reissuable asset'] + \
                                       sorted([n[:-1] for n in owners])
             self.aval_owner_combo.addItems(self.aval_owner_options)

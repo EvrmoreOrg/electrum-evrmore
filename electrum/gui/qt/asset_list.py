@@ -32,9 +32,9 @@ from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont, QMouseEvent
 from PyQt5.QtWidgets import QAbstractItemView, QComboBox, QLabel, QMenu, QCheckBox
 
 from electrum.i18n import _
-from electrum.util import ipfs_explorer_URL, profiler
+from electrum.util import ipfs_explorer_URL, profiler, get_alternate_data
 from electrum.plugin import run_hook
-from electrum.ravencoin import is_address
+from electrum.ravencoin import is_address, base_decode
 from electrum.wallet import InternalAddressCorruption
 from electrum.transaction import AssetMeta
 
@@ -170,7 +170,16 @@ class AssetList(MyTreeView):
 
             balance_text = self.parent.format_amount(balance, whitespaces=True)
 
-            ipfs_str = str(meta.ipfs_str) if meta else ''  # May be none
+            if self.config.get('advanced_asset_functions', False):
+                if meta and meta.ipfs_str:
+                    s = meta.ipfs_str
+                    h, a = get_alternate_data(base_decode(s, base=58))
+                    ipfs_str = '\nBASE58: {}\nHEX: {}\nLATIN-1: {}\n'.format(s, h, a)
+                else:
+                    ipfs_str = '\nBASE58: None\nHEX: None\nLATIN-1: None\n'
+            else:
+                ipfs_str = str(meta.ipfs_str) if meta else ''  # May be none
+
             is_reis = str(meta.is_reissuable) if meta else ''
             divs = str(meta.divisions) if meta else ''
             ownr = str(meta.is_owner) if meta else ''

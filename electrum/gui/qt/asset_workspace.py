@@ -28,7 +28,7 @@ class InterpretType(IntEnum):
     NO_DATA = 0
     IPFS = 1
     HEX = 2
-    ASCII = 3
+    LATIN = 3
     
 
 # TODO: Clean up these classes
@@ -214,7 +214,7 @@ class AssetCreateWorkspace(QWidget):
         self.associated_data.textChanged.connect(self._check_associated_data)
 
         self.associated_data_interpret_override = QComboBox()
-        self.associated_data_interpret_override.addItems(['AUTO', 'IPFS', 'HEX', 'ASCII'])
+        self.associated_data_interpret_override.addItems(['AUTO', 'IPFS', 'HEX', 'LATIN-1'])
 
         self.associated_data_interpret_override.currentIndexChanged.connect(self._check_associated_data)
         self.associated_data_interpret_override.setVisible(self.parent.config.get('advanced_asset_functions', False))
@@ -402,13 +402,13 @@ class AssetCreateWorkspace(QWidget):
                     return True
 
             else:
-                self.associated_data_interpret = InterpretType.ASCII
+                self.associated_data_interpret = InterpretType.LATIN
                 if len(text) > 34:
-                    self.associated_data_info.setText('Too much data in ascii string!')
+                    self.associated_data_info.setText('Too much data in latin-1 string!')
                     self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
                     return False
                 else:
-                    self.associated_data_info.setText('Reading as ascii string')
+                    self.associated_data_info.setText('Reading as latin-1 string')
                     self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
                     return True
         if self.parent.config.get('advanced_asset_functions', False):
@@ -434,11 +434,11 @@ class AssetCreateWorkspace(QWidget):
                     return False
                 return True
             except:
-                self.associated_data_info.setText('Reading as ascii string')
+                self.associated_data_info.setText('Reading as latin-1 string')
                 self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                self.associated_data_interpret = InterpretType.ASCII
+                self.associated_data_interpret = InterpretType.LATIN
                 if len(text) > 34:
-                    self.associated_data_info.setText('Too much data in ascii string!')
+                    self.associated_data_info.setText('Too much data in latin-1 string!')
                     self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
                     return False
                 return True
@@ -544,7 +544,7 @@ class AssetCreateWorkspace(QWidget):
         elif i == InterpretType.HEX:
             b = bfh(text)
         else:
-            b = text.encode('ascii')
+            b = text.encode('latin-1')
         if len(b) < 34 and self.parent.config.get('warn_asset_small_associated', True):
             return True
         return False
@@ -633,7 +633,7 @@ class AssetCreateWorkspace(QWidget):
             elif i == InterpretType.HEX:
                 data = bfh(d)
             else:
-                data = d.encode('ascii')
+                data = d.encode('latin-1')
             data = data.rjust(34, b'\0')
 
         new = [
@@ -849,7 +849,7 @@ class AssetReissueWorkspace(QWidget):
 
         self.associated_data.textChanged.connect(self._check_associated_data)
 
-        self.associated_data_interpret_override.addItems(['AUTO', 'IPFS', 'HEX', 'ASCII'])
+        self.associated_data_interpret_override.addItems(['AUTO', 'IPFS', 'HEX', 'LATIN-1'])
 
         self.associated_data_interpret_override.currentIndexChanged.connect(self._check_associated_data)
         self.associated_data_interpret_override.setVisible(self.parent.config.get('advanced_asset_functions', False))
@@ -990,13 +990,13 @@ class AssetReissueWorkspace(QWidget):
                     return True
 
             else:
-                self.associated_data_interpret = InterpretType.ASCII
+                self.associated_data_interpret = InterpretType.LATIN
                 if len(text) > 34:
-                    self.associated_data_info.setText('Too much data in ascii string!')
+                    self.associated_data_info.setText('Too much data in latin-1 string!')
                     self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
                     return False
                 else:
-                    self.associated_data_info.setText('Reading as ascii string')
+                    self.associated_data_info.setText('Reading as latin-1 string')
                     self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
                     return True
         if self.parent.config.get('advanced_asset_functions', False):
@@ -1022,11 +1022,11 @@ class AssetReissueWorkspace(QWidget):
                     return False
                 return True
             except:
-                self.associated_data_info.setText('Reading as ascii string')
+                self.associated_data_info.setText('Reading as latin-1 string')
                 self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                self.associated_data_interpret = InterpretType.ASCII
+                self.associated_data_interpret = InterpretType.LATIN
                 if len(text) > 34:
-                    self.associated_data_info.setText('Too much data in ascii string!')
+                    self.associated_data_info.setText('Too much data in latin-1 string!')
                     self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
                     return False
                 return True
@@ -1109,7 +1109,7 @@ class AssetReissueWorkspace(QWidget):
         elif i == InterpretType.HEX:
             b = bfh(text)
         else:
-            b = text.encode('ascii')
+            b = text.encode('latin-1')
         if len(b) < 34 and self.parent.config.get('warn_asset_small_associated', True):
             return True
         return False
@@ -1187,7 +1187,7 @@ class AssetReissueWorkspace(QWidget):
             elif i == InterpretType.HEX:
                 data = bfh(d)
             else:
-                data = d.encode('ascii')
+                data = d.encode('latin-1')
             data = data.rjust(34, b'\0')
 
         divs = int(self.divisions.text())

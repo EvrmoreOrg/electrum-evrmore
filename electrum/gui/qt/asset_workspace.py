@@ -506,20 +506,29 @@ class AssetCreateWorkspace(QWidget):
             self.asset_availability_text.setText('Asset Available')
             self.asset_availability_text.setStyleSheet(ColorScheme.GREEN.as_stylesheet())
 
-    def refresh_owners(self, force=False):
-        # Don't interrupt us when we're on this tab
-        if force or self.parent.tabs.currentIndex() != self.parent.tabs.indexOf(self.parent.assets_tab) or \
-                self.parent.asset_tabs.currentIndex() != 1:
-            confirmed, unconfirmed, _ = self.parent.wallet.get_balance()
-            owned_assets = confirmed.assets
-            in_mempool = unconfirmed.assets
-            owners = [n for n in owned_assets.keys() if n[-1] == '!' and owned_assets.get(n, 0) != 0 and n not in in_mempool]
-            if set(owners) - set(self.aval_owner_options[1:]) and self.aval_owner_options:
-                return
-            self.aval_owner_combo.clear()
-            self.aval_owner_options = ['Select a parent'] + \
-                                      sorted([n[:-1] for n in owners])
-            self.aval_owner_combo.addItems(self.aval_owner_options)
+    def refresh_owners(self):
+        confirmed, unconfirmed, _ = self.parent.wallet.get_balance()
+        owned_assets = confirmed.assets
+        in_mempool = unconfirmed.assets
+        owners = [n for n in owned_assets.keys() if
+                  n[-1] == '!' and owned_assets.get(n, 0) != 0]
+        if not (set(owners) - set([(n.replace(' (Mempool)', '') + '!') for n in self.aval_owner_options[1:]])) and self.aval_owner_options:
+            return
+        self.aval_owner_combo.clear()
+        indexes_in_mempool = set()
+        self.aval_owner_options = ['Select a parent'] + \
+                                  sorted([n[:-1] for n in owners])
+        for i in range(len(self.aval_owner_options)):
+            if i == 0:
+                continue
+            a = self.aval_owner_options[i]
+            if (a + '!') in in_mempool:
+                indexes_in_mempool.add(i)
+                self.aval_owner_options[i] = a + ' (Mempool)'
+
+        self.aval_owner_combo.addItems(self.aval_owner_options)
+        for i in indexes_in_mempool:
+            self.aval_owner_combo.model().item(i).setEnabled(False)
 
     def refresh_change_addrs(self):
         addrs = self.parent.wallet.get_change_addresses_for_new_transaction(extra_addresses=3)
@@ -600,7 +609,7 @@ class AssetCreateWorkspace(QWidget):
         self.send_asset_address.setText(self.change_addrs[1])
         self.send_asset_address_error.setText('')
         self.cost_label.setText('Cost: {} RVN'.format(constants.net.BURN_AMOUNTS.IssueAssetBurnAmount))
-        self.refresh_owners(True)
+        self.refresh_owners()
 
     def get_owner(self):
         i = self.aval_owner_combo.currentIndex()
@@ -721,7 +730,7 @@ class AssetReissueWorkspace(QWidget):
         def on_combo_change():
             i = self.aval_owner_combo.currentIndex()
             if i == 0:
-                self.reset_workspace()
+                self.reset_gui()
             else:
                 asset = self.aval_owner_options[i]
                 m = self.current_asset_meta = self.parent.wallet.get_asset_meta(asset)  # type: AssetMeta
@@ -933,7 +942,7 @@ class AssetReissueWorkspace(QWidget):
         bottom_buttons.addWidget(self.cost_label, 1, 1)
 
         def hard_reset():
-            self.reset_workspace(True)
+            self.reset_workspace()
         self.reset_create_b = EnterButton(_("Reset"), hard_reset)
         bottom_buttons.addWidget(self.reset_create_b, 1, 3)
 
@@ -1095,32 +1104,38 @@ class AssetReissueWorkspace(QWidget):
             self.asset_amount_warning.setText('')
             return True
 
-    def refresh_owners(self, force=False):
-        # Don't interrupt us when we're on this tab
-        if force or self.parent.tabs.currentIndex() != self.parent.tabs.indexOf(self.parent.assets_tab) or \
-                self.parent.asset_tabs.currentIndex() != 2:
-            confirmed, unconfirmed, _ = self.parent.wallet.get_balance()
-            owned_assets = confirmed.assets
-            in_mempool = unconfirmed.assets
+    def refresh_owners(self):
+        confirmed, unconfirmed, _ = self.parent.wallet.get_balance()
+        owned_assets = confirmed.assets
+        in_mempool = unconfirmed.assets
 
-            owners = []
-            for asset in owned_assets.keys():
-                if asset[-1] == '!' and owned_assets.get(asset, 0) != 0 and asset not in in_mempool:
-                    meta = self.parent.wallet.get_asset_meta(asset[:-1])  # type: AssetMeta
-                    if meta:
-                        if meta.is_reissuable:
-                            owners.append(asset)
-                    else:
-                        owners.append(asset)
+        owners = [n for n in owned_assets.keys() if
+                  n[-1] == '!' and owned_assets.get(n, 0) != 0]
 
-            if set(owners) - set(self.aval_owner_options[1:]) and self.aval_owner_options:
-                return
+        if not (set(owners) - set((n.replace(' (Non-reissuable)', '').replace(' (Mempool)', '')+'!') for n in self.aval_owner_options[1:])) and self.aval_owner_options:
+            return
 
-            self.aval_owner_combo.clear()
+        self.aval_owner_combo.clear()
 
-            self.aval_owner_options = ['Select a reissuable asset'] + \
-                                      sorted([n[:-1] for n in owners])
-            self.aval_owner_combo.addItems(self.aval_owner_options)
+        self.aval_owner_options = ['Select an asset'] + \
+                                  sorted([n[:-1] for n in owners])
+        disabled_indexes = set()
+        for i in range(len(self.aval_owner_options)):
+            if i == 0:
+                continue
+            asset = self.aval_owner_options[i]
+            meta = self.parent.wallet.get_asset_meta(asset)  # type: AssetMeta
+            if not meta:
+                continue
+            if not meta.is_reissuable:
+                disabled_indexes.add(i)
+                self.aval_owner_options[i] = asset + ' (Non-reissuable)'
+            if (asset + '!') in in_mempool:
+                disabled_indexes.add(i)
+                self.aval_owner_options[i] = asset + ' (Mempool)'
+        self.aval_owner_combo.addItems(self.aval_owner_options)
+        for i in disabled_indexes:
+            self.aval_owner_combo.model().item(i).setEnabled(False)
 
     def refresh_change_addrs(self):
         addrs = self.parent.wallet.get_change_addresses_for_new_transaction(extra_addresses=3)
@@ -1158,8 +1173,7 @@ class AssetReissueWorkspace(QWidget):
             return True
         return False
 
-    def reset_workspace(self, bool=False):
-
+    def reset_gui(self):
         self.aval_owner_combo.setCurrentIndex(0)
 
         self.current_asset_meta = None
@@ -1186,9 +1200,10 @@ class AssetReissueWorkspace(QWidget):
         self.data_label.setStyleSheet(ColorScheme.GRAY.as_stylesheet())
         self.amount_label.setStyleSheet(ColorScheme.GRAY.as_stylesheet())
 
-        if bool:
-            self.refresh_change_addrs()
-            self.refresh_owners(bool)
+    def reset_workspace(self):
+        self.reset_gui()
+        self.refresh_change_addrs()
+        self.refresh_owners()
 
     def get_owner(self):
         i = self.aval_owner_combo.currentIndex()

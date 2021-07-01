@@ -452,8 +452,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             wallet, tx = args
             if wallet == self.wallet:
                 self.tx_notification_queue.put(tx)
-                self.reissue_workspace.refresh_owners(True)
-                self.create_workspace.refresh_owners(True)
         elif event == 'on_quotes':
             self.on_fx_quotes()
         elif event == 'on_history':

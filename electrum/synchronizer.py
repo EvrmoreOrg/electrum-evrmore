@@ -58,21 +58,23 @@ def history_status(h):
 def asset_status(asset_data: Union[Dict, AssetMeta]):
     if asset_data:
         if isinstance(asset_data, Dict):
+            sat_amount = asset_data['sats_in_circulation']
             div_amt = asset_data['divisions']
             reissuable = False if asset_data['reissuable'] == 0 else True
             has_ipfs = False if asset_data['has_ipfs'] == 0 else True
 
-            h = ''.join([str(div_amt), str(reissuable), str(has_ipfs)])
+            h = ''.join([str(sat_amount), str(div_amt), str(reissuable), str(has_ipfs)])
             if has_ipfs:
                 h += asset_data['ipfs']
 
             status = bh2u(hashlib.sha256(h.encode('ascii')).digest())
         else:
+            sat_amount = asset_data.circulation
             div_amt = asset_data.divisions
             reissuable = asset_data.is_reissuable
             has_ipfs = asset_data.has_ipfs
 
-            h = ''.join([str(div_amt), str(reissuable), str(has_ipfs)])
+            h = ''.join([str(sat_amount), str(div_amt), str(reissuable), str(has_ipfs)])
             if has_ipfs:
                 h += asset_data.ipfs_str
 

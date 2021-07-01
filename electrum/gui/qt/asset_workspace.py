@@ -512,20 +512,22 @@ class AssetCreateWorkspace(QWidget):
         in_mempool = unconfirmed.assets
         owners = [n for n in owned_assets.keys() if
                   n[-1] == '!' and owned_assets.get(n, 0) != 0]
-        if not (set(owners) - set([(n.replace(' (Mempool)', '') + '!') for n in self.aval_owner_options[1:]])) and self.aval_owner_options:
-            return
-        self.aval_owner_combo.clear()
         indexes_in_mempool = set()
-        self.aval_owner_options = ['Select a parent'] + \
+        new_aval_owner_options = ['Select a parent'] + \
                                   sorted([n[:-1] for n in owners])
-        for i in range(len(self.aval_owner_options)):
+        for i in range(len(new_aval_owner_options)):
             if i == 0:
                 continue
-            a = self.aval_owner_options[i]
+            a = new_aval_owner_options[i]
             if (a + '!') in in_mempool:
                 indexes_in_mempool.add(i)
-                self.aval_owner_options[i] = a + ' (Mempool)'
+                new_aval_owner_options[i] = a + ' (Mempool)'
 
+        if self.aval_owner_options and not (set(self.aval_owner_options) - set(new_aval_owner_options)):
+            return
+
+        self.aval_owner_options = new_aval_owner_options
+        self.aval_owner_combo.clear()
         self.aval_owner_combo.addItems(self.aval_owner_options)
         for i in indexes_in_mempool:
             self.aval_owner_combo.model().item(i).setEnabled(False)
@@ -1112,27 +1114,29 @@ class AssetReissueWorkspace(QWidget):
         owners = [n for n in owned_assets.keys() if
                   n[-1] == '!' and owned_assets.get(n, 0) != 0]
 
-        if not (set(owners) - set((n.replace(' (Non-reissuable)', '').replace(' (Mempool)', '')+'!') for n in self.aval_owner_options[1:])) and self.aval_owner_options:
-            return
-
-        self.aval_owner_combo.clear()
-
-        self.aval_owner_options = ['Select an asset'] + \
+        new_aval_owner_options = ['Select an asset'] + \
                                   sorted([n[:-1] for n in owners])
         disabled_indexes = set()
-        for i in range(len(self.aval_owner_options)):
+        for i in range(len(new_aval_owner_options)):
             if i == 0:
                 continue
-            asset = self.aval_owner_options[i]
+            asset = new_aval_owner_options[i]
             meta = self.parent.wallet.get_asset_meta(asset)  # type: AssetMeta
             if not meta:
                 continue
             if not meta.is_reissuable:
                 disabled_indexes.add(i)
-                self.aval_owner_options[i] = asset + ' (Non-reissuable)'
+                new_aval_owner_options[i] = asset + ' (Non-reissuable)'
             if (asset + '!') in in_mempool:
                 disabled_indexes.add(i)
-                self.aval_owner_options[i] = asset + ' (Mempool)'
+                new_aval_owner_options[i] = asset + ' (Mempool)'
+
+        if self.aval_owner_options and not (set(new_aval_owner_options) - set(self.aval_owner_options)):
+            return
+
+        self.aval_owner_options = new_aval_owner_options
+        self.aval_owner_combo.clear()
+
         self.aval_owner_combo.addItems(self.aval_owner_options)
         for i in disabled_indexes:
             self.aval_owner_combo.model().item(i).setEnabled(False)

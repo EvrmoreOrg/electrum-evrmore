@@ -32,7 +32,7 @@ from typing import Dict, Optional, List, Tuple, Set, Iterable, NamedTuple, Seque
 import binascii
 
 from . import util, ravencoin
-from .util import profiler, WalletFileException, multisig_type, TxMinedInfo, bfh
+from .util import profiler, WalletFileException, multisig_type, TxMinedInfo, bfh, Satoshis
 from .invoices import PR_TYPE_ONCHAIN, Invoice
 from .keystore import bip44_derivation
 from .transaction import Transaction, TxOutpoint, tx_from_any, PartialTransaction, PartialTxOutput, AssetMeta, RavenValue
@@ -1373,7 +1373,7 @@ class WalletDB(JsonDB):
         elif key == 'tx_fees':
             v = dict((k, TxFeesValue(*x)) for k, x in v.items())
         elif key == 'prevouts_by_scripthash':
-            v = dict((k, {(prevout, value if isinstance(value, RavenValue) else RavenValue.from_json(value)) for (prevout, value) in x}) for k, x in v.items())
+            v = dict((k, {(prevout, value if isinstance(value, RavenValue) else (RavenValue(value) if isinstance(value, Satoshis) else RavenValue.from_json(value))) for (prevout, value) in x}) for k, x in v.items())
         elif key == 'txo':
             v = {txid: {addr: {pos: (v if isinstance(v, RavenValue) else RavenValue.from_json(v), cb) for pos, (v, cb) in d2.items()} for addr, d2 in d1.items()} for txid, d1 in v.items()}
         elif key == 'txi':

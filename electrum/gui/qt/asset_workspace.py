@@ -263,7 +263,7 @@ class AssetCreateWorkspace(QWidget):
 
         self.send_asset_address = QLineEdit()
         self.send_asset_address.textChanged.connect(self._check_asset_addr)
-        self.send_asset_address.setText(self.change_addrs[1])
+        #self.send_asset_address.setText(self.change_addrs[1])
 
         asset_h = QHBoxLayout()
         asset_h.addWidget(QLabel(_('New asset address:')))
@@ -927,7 +927,7 @@ class AssetReissueWorkspace(QWidget):
 
         self.send_asset_address = QLineEdit()
         self.send_asset_address.textChanged.connect(self._check_asset_addr)
-        self.send_asset_address.setText(self.change_addrs[1])
+        #self.send_asset_address.setText(self.change_addrs[1])
 
         asset_h = QHBoxLayout()
         asset_h.addWidget(QLabel(_('New asset address:')))
@@ -1212,6 +1212,7 @@ class AssetReissueWorkspace(QWidget):
         self.reset_gui()
         self.refresh_change_addrs()
         self.refresh_owners()
+        self.send_asset_address.setText(self.change_addrs[1])
 
     def get_owner(self):
         i = self.aval_owner_combo.currentIndex()

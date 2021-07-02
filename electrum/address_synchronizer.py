@@ -121,6 +121,12 @@ class AddressSynchronizer(Logger):
     def get_assets(self) -> Iterable[str]:
         return self.db.get_assets()
 
+    def get_messages(self) -> Dict:
+        return self.db.get_messages()
+
+    def add_message(self, height, message_data):
+        self.db.add_message(height, message_data)
+
     def get_address_history(self, addr: str) -> Sequence[Tuple[str, int]]:
         """Returns the history for the address, in the format that would be returned by a server.
 

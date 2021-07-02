@@ -84,6 +84,7 @@ from .asset_workspace import AssetCreateWorkspace, AssetReissueWorkspace
 
 from .exception_window import Exception_Hook
 from .amountedit import AmountEdit, RVNAmountEdit, FreezableLineEdit, FeerateEdit, PayToAmountEdit
+from .messages_list import UpdateDevMessagesThread
 from .qrcodewidget import QRCodeWidget, QRDialog
 from .qrtextedit import ShowQRTextEdit, ScanQRTextEdit
 from .transaction_dialog import show_transaction
@@ -228,20 +229,22 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.utxo_tab = self.create_utxo_tab()
         self.console_tab = self.create_console_tab()
         self.contacts_tab = self.create_contacts_tab()
+        self.messages_tab = self.create_messages_tab()
         # self.channels_tab = self.create_channels_tab()
         tabs.addTab(self.create_history_tab(), read_QIcon("tab_history.png"), _('History'))
         tabs.addTab(self.assets_tab, read_QIcon('tab_assets.png'), _('Assets'))
         tabs.addTab(self.send_tab, read_QIcon("tab_send.png"), _('Send'))
         tabs.addTab(self.receive_tab, read_QIcon("tab_receive.png"), _('Receive'))
 
-        def add_optional_tab(tabs, tab, icon, description, name):
+        def add_optional_tab(tabs, tab, icon, description, name, default=False):
             tab.tab_icon = icon
             tab.tab_description = description
             tab.tab_pos = len(tabs)
             tab.tab_name = name
-            if self.config.get('show_{}_tab'.format(name), False):
+            if self.config.get('show_{}_tab'.format(name), default):
                 tabs.addTab(tab, icon, description.replace("&", ""))
 
+        add_optional_tab(tabs, self.messages_tab, read_QIcon(""), _("Messages"), "messages", True)
         add_optional_tab(tabs, self.addresses_tab, read_QIcon("tab_addresses.png"), _("&Addresses"), "addresses")
         # add_optional_tab(tabs, self.channels_tab, read_QIcon("lightning.png"), _("Channels"), "channels")
         add_optional_tab(tabs, self.utxo_tab, read_QIcon("tab_coins.png"), _("Co&ins"), "utxo")
@@ -327,6 +330,12 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self._update_check_thread = UpdateCheckThread()
             self._update_check_thread.checked.connect(on_version_received)
             self._update_check_thread.start()
+
+        self._dev_notification_thread = None
+        if config.get('get_dev_notifications', True):
+            self._dev_notification_thread = UpdateDevMessagesThread(self)
+            self._dev_notification_thread.start()
+
 
     def setup_exception_hook(self):
         Exception_Hook.maybe_setup(config=self.config,
@@ -752,12 +761,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         wallet_menu.addSeparator()
         wallet_menu.addAction(_("Find"), self.toggle_search).setShortcut(QKeySequence("Ctrl+F"))
 
-        def add_toggle_action(view_menu, tab):
-            is_shown = self.config.get('show_{}_tab'.format(tab.tab_name), False)
+        def add_toggle_action(view_menu, tab, default=False):
+            is_shown = self.config.get('show_{}_tab'.format(tab.tab_name), default)
             item_name = (_("Hide") if is_shown else _("Show")) + " " + tab.tab_description
             tab.menu_action = view_menu.addAction(item_name, lambda: self.toggle_tab(tab))
 
         view_menu = menubar.addMenu(_("&View"))
+        add_toggle_action(view_menu, self.messages_tab, True)
         add_toggle_action(view_menu, self.addresses_tab)
         add_toggle_action(view_menu, self.utxo_tab)
         # add_toggle_action(view_menu, self.channels_tab)
@@ -1547,6 +1557,12 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         w.searchable_list = self.invoice_list
         run_hook('create_send_tab', grid)
         return w
+
+    def create_messages_tab(self):
+        from .messages_list import MessageList
+        self.message_list = l = MessageList(self)
+        tab = self.create_list_tab(l)
+        return tab
 
     def create_assets_tab(self):
 

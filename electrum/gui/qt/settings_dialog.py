@@ -606,12 +606,25 @@ class SettingsDialog(WindowModalDialog):
         advanced_assets_cb.stateChanged.connect(on_set_advanced_assets_cb)
         asset_widgets.append((advanced_assets_cb, None))
 
+        message_widgets = []
+
+        dev_notifications_cb = QCheckBox(_("Enable developer notifications"))
+        dev_notifications_cb.setChecked(self.config.get('get_dev_notifications', True))
+
+        def on_set_dev_notifications_cb(v):
+            self.window.config.set_key('get_dev_notifications', v == Qt.Checked, save=True)
+            self.window.message_list.update()
+
+        dev_notifications_cb.stateChanged.connect(on_set_dev_notifications_cb)
+        message_widgets.append((dev_notifications_cb, None))
+
         tabs_info = [
             (gui_widgets, _('General')),
             (asset_widgets, _('Assets')),
             (tx_widgets, _('Transactions')),
             # (lightning_widgets, _('Lightning')),
             (fiat_widgets, _('Fiat')),
+            (message_widgets, _('Messages')),
             (oa_widgets, _('OpenAlias')),
         ]
         for widgets, name in tabs_info:

@@ -525,8 +525,6 @@ class AssetCreateWorkspace(QWidget):
 
         diff = set(new_aval_owner_options) - set(self.aval_owner_options)
 
-        print('\nCREATE DIFF {}\n'.format(diff))
-
         if self.aval_owner_options and not diff:
             return
 
@@ -1136,8 +1134,6 @@ class AssetReissueWorkspace(QWidget):
                 new_aval_owner_options[i] = asset + ' (Mempool)'
 
         diff = set(new_aval_owner_options) - set(self.aval_owner_options)
-
-        print('\nREISSUE DIFF {}\n'.format(diff))
 
         if self.aval_owner_options and not diff:
             return

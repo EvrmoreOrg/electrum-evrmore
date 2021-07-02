@@ -938,6 +938,19 @@ class WalletDB(JsonDB):
         self.asset[asset] = meta
 
     @locked
+    def get_messages(self):
+        return copy.copy(self.messages)
+
+    @modifier
+    def add_message(self, height: int, message_data):
+        assert isinstance(height, int)
+        assert isinstance(message_data, Tuple)
+        if height in self.messages:
+            self.messages[height].append(message_data)
+        else:
+            self.messages[height] = [message_data]
+
+    @locked
     def get_txi_addresses(self, tx_hash: str) -> List[str]:
         """Returns list of is_mine addresses that appear as inputs in tx."""
         assert isinstance(tx_hash, str)
@@ -1305,6 +1318,7 @@ class WalletDB(JsonDB):
         self.data = StoredDict(self.data, self, [])
         # references in self.data
         # TODO make all these private
+        self.messages = self.get_dict('messages')                # type: Dict[int, List[Tuple[str, str, Optional[Dict[TxOutpoint, int]]]]]
         self.asset = self.get_dict('asset_meta')                 # type: Dict[str, AssetMeta]
         self.txi = self.get_dict('txi')                          # type: Dict[str, Dict[str, Dict[str, RavenValue]]]
         self.txo = self.get_dict('txo')                          # type: Dict[str, Dict[str, Dict[str, Tuple[RavenValue, bool]]]]

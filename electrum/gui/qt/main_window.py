@@ -3005,7 +3005,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
     @protected
     def do_sign(self, address, message, signature, password):
         address = address.text().strip()
-        message = message.toPlainText().strip()
+        message = message.toPlainText()#.strip()
         if not ravencoin.is_address(address):
             self.show_message(_('Invalid Ravencoin address.'))
             return

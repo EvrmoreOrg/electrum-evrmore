@@ -2258,6 +2258,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
     def lock_amount(self, b: bool) -> None:
         self.amount_e.setFrozen(b)
         self.max_button.setEnabled(not b)
+        self.to_send_combo.setEnabled(not b)
 
     def prepare_for_payment_request(self):
         self.show_send_tab()

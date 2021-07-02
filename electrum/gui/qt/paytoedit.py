@@ -102,7 +102,12 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
             raise Exception("expected two comma-separated values: (address, amount)") from None
         scriptpubkey = self.parse_output(x)
         amount = self.parse_amount(y)
-        return PartialTxOutput(scriptpubkey=scriptpubkey, value=amount)
+        asset = self.win.get_asset_from_spend_tab()
+        if asset is not None:
+            script = assets.create_transfer_asset_script(scriptpubkey, asset, amount)
+            return PartialTxOutput(scriptpubkey=script, value=amount, asset=asset)
+        else:
+            return PartialTxOutput(scriptpubkey=scriptpubkey, value=amount)
 
     def parse_output(self, x) -> bytes:
         try:
@@ -209,13 +214,9 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
                         idx=i, line_content=line.strip(), exc=e, is_multiline=True))
                     continue
             outputs.append(output)
-            if output.value == '!':
-                is_max = True
-            else:
-                total += output.value
+            total += output.value.value
         if outputs:
             self.win.set_onchain(True)
-
         self.win.max_button.setChecked(is_max)
         self.outputs = outputs
         self.payto_scriptpubkey = None

@@ -523,7 +523,11 @@ class AssetCreateWorkspace(QWidget):
                 indexes_in_mempool.add(i)
                 new_aval_owner_options[i] = a + ' (Mempool)'
 
-        if self.aval_owner_options and not (set(self.aval_owner_options) - set(new_aval_owner_options)):
+        diff = set(new_aval_owner_options) - set(self.aval_owner_options)
+
+        print('\nCREATE DIFF {}\n'.format(diff))
+
+        if self.aval_owner_options and not diff:
             return
 
         self.aval_owner_options = new_aval_owner_options
@@ -1131,7 +1135,11 @@ class AssetReissueWorkspace(QWidget):
                 disabled_indexes.add(i)
                 new_aval_owner_options[i] = asset + ' (Mempool)'
 
-        if self.aval_owner_options and not (set(new_aval_owner_options) - set(self.aval_owner_options)):
+        diff = set(new_aval_owner_options) - set(self.aval_owner_options)
+
+        print('\nREISSUE DIFF {}\n'.format(diff))
+
+        if self.aval_owner_options and not diff:
             return
 
         self.aval_owner_options = new_aval_owner_options

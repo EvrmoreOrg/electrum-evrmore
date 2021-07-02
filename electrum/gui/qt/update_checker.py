@@ -8,24 +8,77 @@ from distutils.version import StrictVersion
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QProgressBar,
-                             QHBoxLayout, QPushButton, QDialog)
+                             QHBoxLayout, QPushButton, QDialog, QGridLayout, QTextEdit, QLineEdit)
 
 from electrum import version
 from electrum import constants
 from electrum import ecc
+from electrum.gui.qt import ColorScheme
 from electrum.i18n import _
 from electrum.util import make_aiohttp_session
 from electrum.logging import Logger
 from electrum.network import Network
 
 
+VERSION_ANNOUNCEMENT_SIGNING_KEYS = (
+        "RPuQNvDVBC5Q4fXKyfYLjrunbyqiEYckP5",  # kralverde since ravencoin fork
+    )
+
+
 class UpdateCheck(QDialog, Logger):
     url = "https://raw.githubusercontent.com/Electrum-RVN-SIG/electrum-ravencoin/master/check-version.json"
     download_url = "https://github.com/Electrum-RVN-SIG/electrum-ravencoin/releases"
 
-    VERSION_ANNOUNCEMENT_SIGNING_KEYS = (
-        "RPuQNvDVBC5Q4fXKyfYLjrunbyqiEYckP5",  # kralverde since ravencoin fork
-    )
+    class VerifyUpdateHashes(QWidget):
+        def __init__(self):
+            super().__init__()
+
+            layout = QGridLayout(self)
+
+            title = QLabel(_('Verify Update Hashes for Binaries'))
+            layout.addWidget(title, 0, 1)
+
+            message_e = QTextEdit()
+            message_e.setAcceptRichText(False)
+            message_e.setPlaceholderText("===BEGIN CHECKSUMS===\nx\nx\nx\nx\nx\n===END CHECKSUMS===")
+            layout.addWidget(QLabel(_('SHA256 checksums')), 1, 0)
+            layout.addWidget(message_e, 1, 1)
+            layout.setRowStretch(2, 3)
+
+            signature_e = QTextEdit()
+            signature_e.setAcceptRichText(False)
+            layout.addWidget(QLabel(_('Signature')), 2, 0)
+            layout.addWidget(signature_e, 2, 1)
+            layout.setRowStretch(2, 1)
+
+            hbox = QHBoxLayout()
+
+            b = QPushButton(_("Verify"))
+            b.clicked.connect(lambda: self.verify(message_e, signature_e))
+            hbox.addWidget(b)
+
+            layout.addLayout(hbox, 4, 1)
+
+            self.message = QLabel()
+            layout.addWidget(self.message, 4, 0)
+
+        def verify(self, message, signature):
+            message = message.toPlainText().strip().encode('utf-8')
+            verified = False
+            for address in VERSION_ANNOUNCEMENT_SIGNING_KEYS:
+                try:
+                    # This can throw on invalid base64
+                    sig = base64.b64decode(str(signature.toPlainText()))
+                    verified = ecc.verify_message_with_address(address, sig, message, net=constants.RavencoinMainnet)
+                    break
+                except:
+                    pass
+            if verified:
+                self.message.setText(_("Signature verified"))
+                self.message.setStyleSheet(ColorScheme.GREEN.as_stylesheet())
+            else:
+                self.message.setText(_("Wrong signature"))
+                self.message.setStyleSheet(ColorScheme.RED.as_stylesheet())
 
     def __init__(self, *, latest_version=None):
         QDialog.__init__(self)
@@ -51,6 +104,9 @@ class UpdateCheck(QDialog, Logger):
         self.latest_version_label = QLabel(_("Latest version: {}".format(" ")))
         versions.addWidget(self.latest_version_label)
         self.content.addLayout(versions)
+
+        self.verify_updates = self.VerifyUpdateHashes()
+        self.content.addWidget(self.verify_updates)
 
         self.update_view(latest_version)
 
@@ -118,7 +174,7 @@ class UpdateCheckThread(QThread, Logger):
                 version_num = signed_version_dict['version']
                 sigs = signed_version_dict['signatures']
                 for address, sig in sigs.items():
-                    if address not in UpdateCheck.VERSION_ANNOUNCEMENT_SIGNING_KEYS:
+                    if address not in VERSION_ANNOUNCEMENT_SIGNING_KEYS:
                         continue
                     sig = base64.b64decode(sig)
                     msg = version_num.encode('utf-8')

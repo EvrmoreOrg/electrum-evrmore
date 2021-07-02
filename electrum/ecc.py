@@ -377,7 +377,6 @@ def verify_message_with_address(address: str, sig65: bytes, message: bytes, *, n
         pubkey_hex = public_key.get_public_key_hex(compressed)
         for txin_type in ['p2pkh','p2wpkh','p2wpkh-p2sh']:
             addr = pubkey_to_address(txin_type, pubkey_hex, net=net)
-            print((txin_type, addr, address, addr==address))
             if address == addr:
                 break
         else:

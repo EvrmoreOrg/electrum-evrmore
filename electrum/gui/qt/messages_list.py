@@ -104,7 +104,7 @@ class MessageList(MyTreeView):
 
     def __init__(self, parent):
         super().__init__(parent, self.create_menu,
-                         stretch_column=None,
+                         stretch_column=self.Columns.DATA,
                          editable_columns=[])
         self.wallet = self.parent.wallet
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)

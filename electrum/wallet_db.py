@@ -945,7 +945,7 @@ class WalletDB(JsonDB):
     def add_message(self, height: int, message_data):
         assert isinstance(height, int)
         assert isinstance(message_data, Tuple)
-        if height in self.messages and message_data not in self.messages[height]:
+        if height in self.messages and not any([not (set(t) - set(message_data)) for t in self.messages[height]]):
             self.messages[height].append(message_data)
         else:
             self.messages[height] = [message_data]

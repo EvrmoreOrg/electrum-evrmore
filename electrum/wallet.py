@@ -1008,8 +1008,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
         show_fiat = fx and fx.is_enabled() and fx.get_history_config()
         out = []
-        income = 0
-        expenditures = 0
+        income = RavenValue()
+        expenditures = RavenValue()
         capital_gains = Decimal(0)
         fiat_income = Decimal(0)
         fiat_expenditures = Decimal(0)
@@ -1034,14 +1034,14 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 item['outputs'] = list(map(lambda x: {'address': x.get_ui_address_str(), 'value': x.value},
                                            tx.outputs()))
             # fixme: use in and out values
-            value = item['bc_value'].value
-            if value < 0:
-                expenditures += -value
+            value = item['bc_value']
+            if value < RavenValue():
+                expenditures -= value
             else:
                 income += value
             # fiat computations
             if show_fiat:
-                fiat_fields = self.get_tx_item_fiat(tx_hash=tx_hash, amount_sat=value, fx=fx, tx_fee=tx_fee)
+                fiat_fields = self.get_tx_item_fiat(tx_hash=tx_hash, amount_sat=value.rvn_value.value, fx=fx, tx_fee=tx_fee)
                 fiat_value = fiat_fields['fiat_value'].value
                 item.update(fiat_fields)
                 if value < 0:
@@ -1091,7 +1091,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 out = {
                     'date': date,
                     'block_height': height,
-                    'BTC_balance': Satoshis(balance),
+                    'BTC_balance': balance,
                 }
                 if show_fiat:
                     ap = self.acquisition_price(coins, fx.timestamp_rate, fx.ccy)
@@ -1099,15 +1099,15 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                     out['acquisition_price'] = Fiat(ap, fx.ccy)
                     out['liquidation_price'] = Fiat(lp, fx.ccy)
                     out['unrealized_gains'] = Fiat(lp - ap, fx.ccy)
-                    out['fiat_balance'] = Fiat(fx.historical_value(balance, date), fx.ccy)
+                    out['fiat_balance'] = Fiat(fx.historical_value(balance.rvn_value, date), fx.ccy)
                     out['BTC_fiat_price'] = Fiat(fx.historical_value(COIN, date), fx.ccy)
                 return out
 
             summary_start = summary_point(start_timestamp, start_height, start_balance, start_coins)
             summary_end = summary_point(end_timestamp, end_height, end_balance, end_coins)
             flow = {
-                'BTC_incoming': Satoshis(income),
-                'BTC_outgoing': Satoshis(expenditures)
+                'BTC_incoming': income,
+                'BTC_outgoing': expenditures
             }
             if show_fiat:
                 flow['fiat_currency'] = fx.ccy

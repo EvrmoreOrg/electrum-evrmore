@@ -117,7 +117,7 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
         return copy.copy(self.__asset_value)
 
     def __repr__(self):
-        return 'RavenValue(RVN: {}, ASSETS: {})'.format(self.__rvn_value, self.__asset_value)
+        return 'RavenValue(RVN: {}, ASSETS: {})'.format(self.__rvn_value, {k: v.__str__() for k, v in self.__asset_value.items()})
 
     def __add__(self, other):
         if isinstance(other, RavenValue):

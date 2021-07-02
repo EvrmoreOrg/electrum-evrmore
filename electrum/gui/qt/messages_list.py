@@ -70,14 +70,14 @@ class UpdateDevMessagesThread(QThread, Logger):
                 sigs = signed_version_dict['signatures']
                 for address, sig in sigs.items():
                     if address not in VERSION_ANNOUNCEMENT_SIGNING_KEYS:
-                        raise Exception()
+                        raise Exception('Address not in annoucement keys')
                     sig = base64.b64decode(sig)
                     msg = message.encode('utf-8')
                     if ecc.verify_message_with_address(address=address, sig65=sig, message=msg,
                                                        net=constants.RavencoinMainnet):
                         break
                 else:
-                    raise Exception()
+                    raise Exception('No items')
                 return message.split('{:}')
 
     def run(self):

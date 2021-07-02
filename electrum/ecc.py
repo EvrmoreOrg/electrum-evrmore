@@ -26,6 +26,7 @@
 import base64
 import hashlib
 import functools
+import traceback
 from typing import Union, Tuple, Optional
 from ctypes import (
     byref, c_byte, c_int, c_uint, c_char_p, c_size_t, c_void_p, create_string_buffer,
@@ -376,6 +377,7 @@ def verify_message_with_address(address: str, sig65: bytes, message: bytes, *, n
         pubkey_hex = public_key.get_public_key_hex(compressed)
         for txin_type in ['p2pkh','p2wpkh','p2wpkh-p2sh']:
             addr = pubkey_to_address(txin_type, pubkey_hex, net=net)
+            print((txin_type, addr, address, addr==address))
             if address == addr:
                 break
         else:

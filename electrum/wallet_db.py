@@ -53,9 +53,9 @@ if TYPE_CHECKING:
 
 OLD_SEED_VERSION = 4        # electrum versions < 2.0
 NEW_SEED_VERSION = 11       # electrum versions >= 2.0
-# FINAL_SEED_VERSION = 40     # electrum >= 2.7 will set this to prevent
+#FINAL_SEED_VERSION = 41     # electrum >= 2.7 will set this to prevent
                             # old versions from overwriting new format
-RAVENCOIN_SEED_VERSION = 41  # Rewrites wallet to support assets
+RAVENCOIN_SEED_VERSION = 42  # Rewrites wallet to support assets
 
 
 class TxFeesValue(NamedTuple):
@@ -191,8 +191,9 @@ class WalletDB(JsonDB):
         self._convert_version_39()
         self._convert_version_40()
         self._convert_version_41()
-        self.put('seed_version', RAVENCOIN_SEED_VERSION)  # just to be sure
+        self._convert_version_42()
 
+        self.put('seed_version', RAVENCOIN_SEED_VERSION)  # just to be sure
         self._after_upgrade_tasks()
 
     def _after_upgrade_tasks(self):
@@ -843,6 +844,13 @@ class WalletDB(JsonDB):
         self.data['stored_height'] = 0
         self.data['seed_version'] = 41
 
+    def _convert_version_42(self):
+        if not self._is_upgrade_method_needed(41, 41):
+            return
+        imported_channel_backups = self.data.pop('channel_backups', {})
+        imported_channel_backups.update(self.data.get('imported_channel_backups', {}))
+        self.data['imported_channel_backups'] = imported_channel_backups
+        self.data['seed_version'] = 41
 
     def _convert_imported(self):
         if not self._is_upgrade_method_needed(0, 13):

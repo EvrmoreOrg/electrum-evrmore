@@ -33,6 +33,7 @@ import base64
 import operator
 import asyncio
 import inspect
+from collections import defaultdict
 from functools import wraps, partial
 from itertools import repeat
 from decimal import Decimal
@@ -263,7 +264,7 @@ class Commands:
     @command('n')
     async def close_wallet(self, wallet_path=None):
         """Close wallet"""
-        return self.daemon.stop_wallet(wallet_path)
+        return await self.daemon._stop_wallet(wallet_path)
 
     @command('')
     async def create(self, passphrase=None, password=None, encrypt_file=True, seed_type=None, wallet_path=None):
@@ -421,21 +422,34 @@ class Commands:
         tx.sign(keypairs)
         return tx.serialize()
 
-    @command('wp')
-    async def signtransaction(self, tx, privkey=None, password=None, wallet: Abstract_Wallet = None):
-        """Sign a transaction. The wallet keys will be used unless a private key is provided."""
-        # TODO this command should be split in two... (1) *_with_wallet, (2) *_with_privkey
+    @command('')
+    async def signtransaction_with_privkey(self, tx, privkey):
+        """Sign a transaction. The provided list of private keys will be used to sign the transaction."""
         tx = tx_from_any(tx)
-        if privkey:
-            txin_type, privkey2, compressed = ravencoin.deserialize_privkey(privkey)
-            pubkey = ecc.ECPrivkey(privkey2).get_public_key_bytes(compressed=compressed)
-            for txin in tx.inputs():
-                if txin.address and txin.address == ravencoin.pubkey_to_address(txin_type, pubkey.hex()):
+        txins_dict = defaultdict(list)
+        for txin in tx.inputs():
+            txins_dict[txin.address].append(txin)
+
+        if not isinstance(privkey, list):
+            privkey = [privkey]
+
+        for priv in privkey:
+            txin_type, priv2, compressed = ravencoin.deserialize_privkey(priv)
+            pubkey = ecc.ECPrivkey(priv2).get_public_key_bytes(compressed=compressed)
+            address = ravencoin.pubkey_to_address(txin_type, pubkey.hex())
+            if address in txins_dict.keys():
+                for txin in txins_dict[address]:
                     txin.pubkeys = [pubkey]
                     txin.script_type = txin_type
-            tx.sign({pubkey.hex(): (privkey2, compressed)})
-        else:
-            wallet.sign_transaction(tx, password)
+                tx.sign({pubkey.hex(): (priv2, compressed)})
+
+        return tx.serialize()
+
+    @command('wp')
+    async def signtransaction(self, tx, password=None, wallet: Abstract_Wallet = None):
+        """Sign a transaction. The wallet keys will be used to sign the transaction."""
+        tx = tx_from_any(tx)
+        wallet.sign_transaction(tx, password)
         return tx.serialize()
 
     @command('')
@@ -1185,29 +1199,29 @@ class Commands:
     #    Note that your funds will be locked for 24h if you do not have enough incoming capacity.
     #    """
     #    sm = wallet.lnworker.swap_manager
-    #    if lightning_amount == 'dryrun':
-    #        await sm.get_pairs()
-    #        onchain_amount_sat = satoshis(onchain_amount)
-    #        lightning_amount_sat = sm.get_recv_amount(onchain_amount_sat, is_reverse=False)
-    #        txid = None
-    #    elif onchain_amount == 'dryrun':
-    #        await sm.get_pairs()
-    #        lightning_amount_sat = satoshis(lightning_amount)
-    #        onchain_amount_sat = sm.get_send_amount(lightning_amount_sat, is_reverse=False)
-    #        txid = None
-    #    else:
-    #        lightning_amount_sat = satoshis(lightning_amount)
-    #        onchain_amount_sat = satoshis(onchain_amount)
-    #        txid = await wallet.lnworker.swap_manager.normal_swap(
-    #            lightning_amount_sat=lightning_amount_sat,
-    #            expected_onchain_amount_sat=onchain_amount_sat,
-    #            password=password,
-    #        )
-    #    return {
-    #        'txid': txid,
-    #        'lightning_amount': format_satoshis(lightning_amount_sat),
-    #        'onchain_amount': format_satoshis(onchain_amount_sat),
-    #    }
+    #         if onchain_amount == 'dryrun':
+    #             await sm.get_pairs()
+    #             lightning_amount_sat = satoshis(lightning_amount)
+    #             onchain_amount_sat = sm.get_recv_amount(lightning_amount_sat, is_reverse=True)
+    #             success = None
+    #         elif lightning_amount == 'dryrun':
+    #             await sm.get_pairs()
+    #             onchain_amount_sat = satoshis(onchain_amount)
+    #             lightning_amount_sat = sm.get_send_amount(onchain_amount_sat, is_reverse=True)
+    #             success = None
+    #         else:
+    #             lightning_amount_sat = satoshis(lightning_amount)
+    #             claim_fee = sm.get_claim_fee()
+    #             onchain_amount_sat = satoshis(onchain_amount) + claim_fee
+    #             success = await wallet.lnworker.swap_manager.reverse_swap(
+    #                 lightning_amount_sat=lightning_amount_sat,
+    #                 expected_onchain_amount_sat=onchain_amount_sat,
+    #             )
+    #         return {
+    #             'success': success,
+    #             'lightning_amount': format_satoshis(lightning_amount_sat),
+    #             'onchain_amount': format_satoshis(onchain_amount_sat),
+    #         }
 
     #@command('wn')
     #async def reverse_swap(self, lightning_amount, onchain_amount, wallet: Abstract_Wallet = None):

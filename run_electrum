@@ -120,10 +120,6 @@ def init_cmdline(config_options, wallet_path, server, *, config: 'SimpleConfig')
     cmdname = config.get('cmd')
     cmd = known_commands[cmdname]
 
-    if cmdname == 'signtransaction' and config.get('privkey'):
-        cmd.requires_wallet = False
-        cmd.requires_password = False
-
     if cmdname in ['payto', 'paytomany'] and config.get('unsigned'):
         cmd.requires_password = False
 
@@ -363,9 +359,15 @@ def main():
     set_language(config.get('language'))
 
     if config.get('testnet'):
-        constants.set_testnet()
         from electrum import blockchain
+        constants.set_testnet()
         blockchain.set_constants()
+    elif config.get('regtest'):
+        constants.set_regtest()
+    elif config.get('simnet'):
+        constants.set_simnet()
+    elif config.get('signet'):
+        constants.set_signet()
 
     cmdname = config.get('cmd')
 

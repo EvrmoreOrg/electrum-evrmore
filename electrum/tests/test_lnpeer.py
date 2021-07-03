@@ -12,6 +12,8 @@ from typing import Iterable, NamedTuple, Tuple, List, Dict
 
 from aiorpcx import TaskGroup, timeout_after, TaskTimeout
 
+import electrum
+import electrum.trampoline
 from electrum import ravencoin
 from electrum import constants
 from electrum.network import Network
@@ -152,6 +154,8 @@ class MockLNWallet(Logger, NetworkRetryManager[LNPeerAddr]):
         self.preimages = {}
         self.stopping_soon = False
 
+        self.logger.info(f"created LNWallet[{name}] with nodeID={local_keypair.pubkey.hex()}")
+
     def get_invoice_status(self, key):
         pass
 
@@ -192,6 +196,20 @@ class MockLNWallet(Logger, NetworkRetryManager[LNPeerAddr]):
             self.channel_db.stop()
             await self.channel_db.stopped_event.wait()
 
+    async def create_routes_from_invoice(self, amount_msat: int, decoded_invoice: LnAddr, *, full_path=None):
+        return [r async for r in self.create_routes_for_payment(
+            amount_msat=amount_msat,
+            final_total_msat=amount_msat,
+            invoice_pubkey=decoded_invoice.pubkey.serialize(),
+            min_cltv_expiry=decoded_invoice.get_min_final_cltv_expiry(),
+            r_tags=decoded_invoice.get_routing_info('r'),
+            invoice_features=decoded_invoice.get_features(),
+            trampoline_fee_level=0,
+            use_two_trampolines=False,
+            payment_hash=decoded_invoice.paymenthash,
+            payment_secret=decoded_invoice.payment_secret,
+            full_path=full_path)]
+
     get_payments = LNWallet.get_payments
     get_payment_info = LNWallet.get_payment_info
     save_payment_info = LNWallet.save_payment_info
@@ -206,7 +224,6 @@ class MockLNWallet(Logger, NetworkRetryManager[LNPeerAddr]):
     get_preimage = LNWallet.get_preimage
     create_route_for_payment = LNWallet.create_route_for_payment
     create_routes_for_payment = LNWallet.create_routes_for_payment
-    create_routes_from_invoice = LNWallet.create_routes_from_invoice
     _check_invoice = staticmethod(LNWallet._check_invoice)
     pay_to_route = LNWallet.pay_to_route
     pay_to_node = LNWallet.pay_to_node
@@ -259,8 +276,8 @@ class PutIntoOthersQueueTransport(MockTransport):
         self.other_mock_transport.queue.put_nowait(data)
 
 def transport_pair(k1, k2, name1, name2):
-    t1 = PutIntoOthersQueueTransport(k1, name2)
-    t2 = PutIntoOthersQueueTransport(k2, name1)
+    t1 = PutIntoOthersQueueTransport(k1, name1)
+    t2 = PutIntoOthersQueueTransport(k2, name2)
     t1.other_mock_transport = t2
     t2.other_mock_transport = t1
     return t1, t2
@@ -328,7 +345,7 @@ class TestPeer(TestCaseForTestnet):
         self._loop_thread.join(timeout=1)
         super().tearDown()
 
-    def prepare_peers(self, alice_channel, bob_channel):
+    def prepare_peers(self, alice_channel: Channel, bob_channel: Channel):
         k1, k2 = keypair(), keypair()
         alice_channel.node_id = k2.pubkey
         bob_channel.node_id = k1.pubkey
@@ -411,6 +428,8 @@ class TestPeer(TestCaseForTestnet):
 
         w_b.network.config.set_key('lightning_forward_payments', True)
         w_c.network.config.set_key('lightning_forward_payments', True)
+        w_b.network.config.set_key('lightning_forward_trampoline_payments', True)
+        w_c.network.config.set_key('lightning_forward_trampoline_payments', True)
 
         # forwarding fees, etc
         chan_ab.forwarding_fee_proportional_millionths *= 500
@@ -435,7 +454,7 @@ class TestPeer(TestCaseForTestnet):
         peer_cd.mark_open(chan_cd)
         peer_db.mark_open(chan_db)
         peer_dc.mark_open(chan_dc)
-        return SquareGraph(
+        graph = SquareGraph(
             w_a=w_a,
             w_b=w_b,
             w_c=w_c,
@@ -457,6 +476,7 @@ class TestPeer(TestCaseForTestnet):
             chan_db=chan_db,
             chan_dc=chan_dc,
         )
+        return graph
 
     @staticmethod
     async def prepare_invoice(
@@ -598,7 +618,7 @@ class TestPeer(TestCaseForTestnet):
             q2 = w2.sent_htlcs[lnaddr1.paymenthash]
             # alice sends htlc BUT NOT COMMITMENT_SIGNED
             p1.maybe_send_commitment = lambda x: None
-            route1 = w1.create_routes_from_invoice(lnaddr2.get_amount_msat(), decoded_invoice=lnaddr2)[0][0]
+            route1 = (await w1.create_routes_from_invoice(lnaddr2.get_amount_msat(), decoded_invoice=lnaddr2))[0][0]
             amount_msat = lnaddr2.get_amount_msat()
             await w1.pay_to_route(
                 route=route1,
@@ -612,7 +632,7 @@ class TestPeer(TestCaseForTestnet):
             p1.maybe_send_commitment = _maybe_send_commitment1
             # bob sends htlc BUT NOT COMMITMENT_SIGNED
             p2.maybe_send_commitment = lambda x: None
-            route2 = w2.create_routes_from_invoice(lnaddr1.get_amount_msat(), decoded_invoice=lnaddr1)[0][0]
+            route2 = (await w2.create_routes_from_invoice(lnaddr1.get_amount_msat(), decoded_invoice=lnaddr1))[0][0]
             amount_msat = lnaddr1.get_amount_msat()
             await w2.pay_to_route(
                 route=route2,
@@ -922,7 +942,14 @@ class TestPeer(TestCaseForTestnet):
     def test_multipart_payment_with_trampoline(self):
         # single attempt will fail with insufficient trampoline fee
         graph = self.prepare_chans_and_peers_in_square()
-        self._run_mpp(graph, {'alice_uses_trampoline':True, 'attempts':1}, {'alice_uses_trampoline':True, 'attempts':3})
+        electrum.trampoline._TRAMPOLINE_NODES_UNITTESTS = {
+            graph.w_b.name: LNPeerAddr(host="127.0.0.1", port=9735, pubkey=graph.w_b.node_keypair.pubkey),
+            graph.w_c.name: LNPeerAddr(host="127.0.0.1", port=9735, pubkey=graph.w_c.node_keypair.pubkey),
+        }
+        try:
+            self._run_mpp(graph, {'alice_uses_trampoline':True, 'attempts':1}, {'alice_uses_trampoline':True, 'attempts':30})
+        finally:
+            electrum.trampoline._TRAMPOLINE_NODES_UNITTESTS = {}
 
     @needs_test_with_all_chacha20_implementations
     def test_fail_pending_htlcs_on_shutdown(self):
@@ -982,14 +1009,14 @@ class TestPeer(TestCaseForTestnet):
             await asyncio.wait_for(p1.initialized, 1)
             await asyncio.wait_for(p2.initialized, 1)
             # alice sends htlc
-            route, amount_msat = w1.create_routes_from_invoice(lnaddr.get_amount_msat(), decoded_invoice=lnaddr)[0][0:2]
-            htlc = p1.pay(route=route,
-                          chan=alice_channel,
-                          amount_msat=lnaddr.get_amount_msat(),
-                          total_msat=lnaddr.get_amount_msat(),
-                          payment_hash=lnaddr.paymenthash,
-                          min_final_cltv_expiry=lnaddr.get_min_final_cltv_expiry(),
-                          payment_secret=lnaddr.payment_secret)
+            route, amount_msat = (await w1.create_routes_from_invoice(lnaddr.get_amount_msat(), decoded_invoice=lnaddr))[0][0:2]
+            p1.pay(route=route,
+                   chan=alice_channel,
+                   amount_msat=lnaddr.get_amount_msat(),
+                   total_msat=lnaddr.get_amount_msat(),
+                   payment_hash=lnaddr.paymenthash,
+                   min_final_cltv_expiry=lnaddr.get_min_final_cltv_expiry(),
+                   payment_secret=lnaddr.payment_secret)
             # alice closes
             await p1.close_channel(alice_channel.channel_id)
             gath.cancel()
@@ -1078,7 +1105,7 @@ class TestPeer(TestCaseForTestnet):
         lnaddr, pay_req = run(self.prepare_invoice(w2))
 
         lnaddr = w1._check_invoice(pay_req)
-        route, amount_msat = w1.create_routes_from_invoice(lnaddr.get_amount_msat(), decoded_invoice=lnaddr)[0][0:2]
+        route, amount_msat = run(w1.create_routes_from_invoice(lnaddr.get_amount_msat(), decoded_invoice=lnaddr))[0][0:2]
         assert amount_msat == lnaddr.get_amount_msat()
 
         run(w1.force_close_channel(alice_channel.channel_id))
@@ -1086,7 +1113,7 @@ class TestPeer(TestCaseForTestnet):
         assert q1.qsize() == 1
 
         with self.assertRaises(NoPathFound) as e:
-            w1.create_routes_from_invoice(lnaddr.get_amount_msat(), decoded_invoice=lnaddr)
+            run(w1.create_routes_from_invoice(lnaddr.get_amount_msat(), decoded_invoice=lnaddr))
 
         peer = w1.peers[route[0].node_id]
         # AssertionError is ok since we shouldn't use old routes, and the

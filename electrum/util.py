@@ -24,7 +24,7 @@ import binascii
 import os, sys, re, json
 from collections import defaultdict, OrderedDict
 from typing import (NamedTuple, Union, TYPE_CHECKING, Tuple, Optional, Callable, Any,
-                    Sequence, Dict, Generic, TypeVar, List, Iterable)
+                    Sequence, Dict, Generic, TypeVar, List, Iterable, Set)
 from datetime import datetime
 import decimal
 from decimal import Decimal
@@ -69,6 +69,14 @@ _logger = get_logger(__name__)
 
 def inv_dict(d):
     return {v: k for k, v in d.items()}
+
+
+def all_subclasses(cls) -> Set:
+    """Return all (transitive) subclasses of cls."""
+    res = set(cls.__subclasses__())
+    for sub in res.copy():
+        res |= all_subclasses(sub)
+    return res
 
 
 ca_path = certifi.where()
@@ -877,6 +885,19 @@ testnet_block_explorers = {
                            {'tx': 'tx/?txid=', 'addr': 'address/?address='}),
 }
 
+signet_block_explorers = {
+    'bc-2.jp': ('https://explorer.bc-2.jp/',
+                        {'tx': 'tx/', 'addr': 'address/'}),
+    'mempool.space': ('https://mempool.space/signet/',
+                        {'tx': 'tx/', 'addr': 'address/'}),
+    'bitcoinexplorer.org': ('https://signet.bitcoinexplorer.org/',
+                       {'tx': 'tx/', 'addr': 'address/'}),
+    'wakiyamap.dev': ('https://signet-explorer.wakiyamap.dev/',
+                       {'tx': 'tx/', 'addr': 'address/'}),
+    'system default': ('blockchain:/',
+                       {'tx': 'tx/', 'addr': 'address/'}),
+}
+
 _block_explorer_default_api_loc = {'tx': 'tx/', 'addr': 'address/'}
 
 ipfs_explorers = {
@@ -938,7 +959,11 @@ def ipfs_explorer_URL(config: 'SimpleConfig', kind: str, item: str) -> Optional[
 
 def block_explorer_info():
     from . import constants
-    return mainnet_block_explorers if not constants.net.TESTNET else testnet_block_explorers
+    if constants.net.NET_NAME == "testnet":
+        return testnet_block_explorers
+    elif constants.net.NET_NAME == "signet":
+        return signet_block_explorers
+    return mainnet_block_explorers
 
 
 def block_explorer(config: 'SimpleConfig') -> Optional[str]:

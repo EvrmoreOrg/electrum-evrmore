@@ -28,7 +28,7 @@ import json
 
 from typing import NamedTuple, Union
 
-from .util import inv_dict
+from .util import inv_dict, all_subclasses
 from . import ravencoin
 
 
@@ -75,7 +75,17 @@ class AbstractNet:
     GENESIS = None
     CHECKPOINTS = None
 
-    BLOCK_HEIGHT_FIRST_LIGHTNING_CHANNELS = 0
+    NET_NAME: str
+    TESTNET: bool
+    WIF_PREFIX: int
+    ADDRTYPE_P2PKH: int
+    ADDRTYPE_P2SH: int
+    SEGWIT_HRP: str
+    BOLT11_HRP: str
+    GENESIS: str
+    BLOCK_HEIGHT_FIRST_LIGHTNING_CHANNELS: int = 0
+    BIP44_COIN_TYPE: int
+    LN_REALM_BYTE: int
 
     @classmethod
     def max_checkpoint(cls) -> int:
@@ -87,12 +97,14 @@ class AbstractNet:
 
 
 class RavencoinMainnet(AbstractNet):
+    NET_NAME = "mainnet"
     TESTNET = False
     WIF_PREFIX = 128
     ADDRTYPE_P2PKH = 60
     ADDRTYPE_P2SH = 122
     ADDRTYPE_P2SH_ALT = 122
     SEGWIT_HRP = ""
+    BOLT11_HRP = SEGWIT_HRP
     GENESIS = "0000006b444bc2f2ffe627be9d9e7e7a0730000870ef6eb6da46c8eae389df90"
     DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     DEFAULT_SERVERS = read_json('servers.json', {})
@@ -143,12 +155,17 @@ class RavencoinMainnet(AbstractNet):
 
 
 class RavencoinTestnet(AbstractNet):
+    BIP44_COIN_TYPE = 1
+    LN_REALM_BYTE = 0
+    LN_DNS_SEEDS = [
+    ]
     TESTNET = True
     WIF_PREFIX = 239
     ADDRTYPE_P2PKH = 111
     ADDRTYPE_P2SH = 196
     ADDRTYPE_P2SH_ALT = 196
     SEGWIT_HRP = ""
+    BOLT11_HRP = SEGWIT_HRP
     GENESIS = "000000ecfc5e6324a079542221d00e10362bdc894d56500c414060eea8a3ad5a"
     DEFAULT_PORTS = {'t': '51001', 's': '51002'}
     DEFAULT_SERVERS = read_json('servers_testnet.json', {})
@@ -170,7 +187,6 @@ class RavencoinTestnet(AbstractNet):
         'p2wsh': 0x02575483,  # Vpub
     }
     XPUB_HEADERS_INV = inv_dict(XPUB_HEADERS)
-    BIP44_COIN_TYPE = 1
 
     BURN_AMOUNTS = BurnAmounts(
         IssueAssetBurnAmount=500,
@@ -197,6 +213,8 @@ class RavencoinTestnet(AbstractNet):
         GlobalBurnAddress='n1BurnXXXXXXXXXXXXXXXXXXXXXXU1qejP'
     )
 
+
+NETS_LIST = tuple(all_subclasses(AbstractNet))
 
 # don't import net directly, import the module instead (so that net is singleton)
 net = RavencoinMainnet

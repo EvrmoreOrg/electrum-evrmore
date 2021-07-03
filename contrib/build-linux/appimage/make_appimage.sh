@@ -149,7 +149,7 @@ cp "/usr/lib/x86_64-linux-gnu/libzbar.so.0" "$APPDIR/usr/lib/libzbar.so.0"
 
 info "desktop integration."
 cp "$PROJECT_ROOT/electrum-ravencoin.desktop" "$APPDIR/electrum-ravencoin.desktop"
-cp "$PROJECT_ROOT/electrum/gui/icons/electrum.png" "$APPDIR/electrum.png"
+cp "$PROJECT_ROOT/electrum/gui/icons/electrum-ravencoin.png" "$APPDIR/electrum-ravencoin.png"
 
 
 # add launcher

@@ -233,7 +233,11 @@ class AssetList(MyTreeView):
         menu = QMenu()
         self.add_copy_menu(menu, org_idx)
 
-        menu.addAction(_('Send {}').format(asset), lambda: ())
+        def send_asset(asset):
+            self.parent.show_send_tab()
+            self.parent.to_send_combo.setCurrentIndex(self.parent.send_options.index(asset))
+
+        menu.addAction(_('Send {}').format(asset), lambda: send_asset(asset))
         if ipfs[:2] == 'Qm':
             url = ipfs_explorer_URL(self.parent.config, 'ipfs', ipfs)
             menu.addAction(_('View IPFS'), lambda: self.webopen_safe(url))

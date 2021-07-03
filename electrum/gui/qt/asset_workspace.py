@@ -1,3 +1,4 @@
+import time
 from abc import abstractmethod
 from enum import IntEnum
 from typing import Dict, List, Optional
@@ -263,7 +264,16 @@ class AssetCreateWorkspace(QWidget):
 
         self.send_asset_address = QLineEdit()
         self.send_asset_address.textChanged.connect(self._check_asset_addr)
-        #self.send_asset_address.setText(self.change_addrs[1])
+
+        if len(self.change_addrs) > 1:
+            self.send_asset_address.setText(self.change_addrs[1])
+        else:
+            async def delayed_address_update():
+                time.sleep(5)
+                self.refresh_change_addrs()
+                self.send_asset_address.setText(self.change_addrs[1])
+
+            self.parent.run_coroutine_from_thread(delayed_address_update())
 
         asset_h = QHBoxLayout()
         asset_h.addWidget(QLabel(_('New asset address:')))
@@ -928,6 +938,16 @@ class AssetReissueWorkspace(QWidget):
         self.send_asset_address = QLineEdit()
         self.send_asset_address.textChanged.connect(self._check_asset_addr)
         #self.send_asset_address.setText(self.change_addrs[1])
+
+        if len(self.change_addrs) > 1:
+            self.send_asset_address.setText(self.change_addrs[1])
+        else:
+            async def delayed_address_update():
+                time.sleep(5)
+                self.refresh_change_addrs()
+                self.send_asset_address.setText(self.change_addrs[1])
+
+            self.parent.run_coroutine_from_thread(delayed_address_update())
 
         asset_h = QHBoxLayout()
         asset_h.addWidget(QLabel(_('New asset address:')))

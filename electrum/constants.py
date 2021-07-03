@@ -155,6 +155,7 @@ class RavencoinMainnet(AbstractNet):
 
 
 class RavencoinTestnet(AbstractNet):
+    NET_NAME = "testnet"
     BIP44_COIN_TYPE = 1
     LN_REALM_BYTE = 0
     LN_DNS_SEEDS = [

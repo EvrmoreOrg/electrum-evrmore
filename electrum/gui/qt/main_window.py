@@ -1429,13 +1429,19 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.receive_address_e.setToolTip("")
 
     def refresh_send_tab(self):
-        # Don't interrupt us when we're on this tab
-        if self.tabs.currentIndex() != self.tabs.indexOf(self.send_tab):
-            self.to_send_combo.clear()
-            balance = sum(self.wallet.get_balance(), RavenValue())
-            self.send_options = [util.decimal_point_to_base_unit_name(self.get_decimal_point())] + \
-                                sorted([asset for asset, bal in balance.assets.items() if bal != 0])
-            self.to_send_combo.addItems(self.send_options)
+        # Don't interrupt if we don't need to
+        balance = sum(self.wallet.get_balance(), RavenValue())
+        new_send_options = [util.decimal_point_to_base_unit_name(self.get_decimal_point())] + \
+                            sorted([asset for asset, bal in balance.assets.items() if bal != 0])
+
+        diff = set(new_send_options) - set(self.send_options)
+        if self.send_options and not diff:
+            return
+
+        self.to_send_combo.clear()
+        self.send_options = new_send_options
+        self.to_send_combo.addItems(self.send_options)
+
 
     def create_send_tab(self):
         # A 4-column grid layout.  All the stretch is in the last column.
@@ -1448,7 +1454,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         # Let user choose to send RVN or Asset
         self.to_send_combo = QComboBox()
-
+        self.refresh_send_tab()
         # self.amount_e = RVNAmountEdit(self.get_decimal_point)
         self.amount_e = PayToAmountEdit(self.get_decimal_point,
                                         lambda: self.send_options[self.to_send_combo.currentIndex()][:4])

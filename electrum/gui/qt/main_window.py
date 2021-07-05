@@ -1513,14 +1513,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             i = self.to_send_combo.currentIndex()
             self.fiat_send_e.setVisible(i == 0)
             if i == 0:
-                reg = QRegExp('^[1-9][0-9]{1,10}\\.([0-9]{1,8})$')
+                reg = QRegExp('^[0-9]{0,11}\\.([0-9]{1,8})$')
             else:
                 meta = self.wallet.get_asset_meta(self.send_options[i])
                 divs = meta.divisions
                 if divs == 0:
-                    reg = QRegExp('^[1-9][0-9]{1,10}$')
+                    reg = QRegExp('^[1-9][0-9]{0,10}$')
                 else:
-                    reg = QRegExp('^[1-9][0-9]{1,10}\\.([0-9]{1,' + str(divs) + '})$')
+                    reg = QRegExp('^[0-9]{0,11}\\.([0-9]{1,' + str(divs) + '})$')
             validator = QRegExpValidator(reg)
             self.amount_e.setValidator(validator)
 

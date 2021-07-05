@@ -247,6 +247,9 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
                 amount = Satoshis(self.amount_edit.get_amount())
             if asset:
                 script = assets.create_transfer_asset_script(script, asset, amount)
+            if amount == 0:
+                self.errors.append(PayToLineError('The amount cannot be 0.', None))
+                return []
             self.outputs = [PartialTxOutput(scriptpubkey=script, value=amount, asset=asset, is_max=is_max)]
 
         return self.outputs[:]

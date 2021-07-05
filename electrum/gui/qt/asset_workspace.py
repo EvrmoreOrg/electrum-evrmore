@@ -168,7 +168,7 @@ class AssetCreateWorkspace(QWidget):
             if divs == 0:
                 reg = QRegExp('^[1-9][0-9]{1,10}$')
             else:
-                reg = QRegExp('^[1-9][0-9]{1,10}\\.([0-9]{1,' + str(divs) + '})$')
+                reg = QRegExp('^[0-9]{1,11}\\.([0-9]{1,' + str(divs) + '})$')
             validator = QRegExpValidator(reg)
             self.asset_amount.setValidator(validator)
 
@@ -494,6 +494,11 @@ class AssetCreateWorkspace(QWidget):
         if v > TOTAL_COIN_SUPPLY_LIMIT_IN_BTC:
             self.asset_amount_warning.setText(
                 _('More than the maximum amount ({})').format(TOTAL_COIN_SUPPLY_LIMIT_IN_BTC))
+            return False
+        elif v == 0:
+            self.asset_amount_warning.setText(
+                _('The amount cannot be 0.')
+            )
             return False
         else:
             self.asset_amount_warning.setText('')
@@ -1123,6 +1128,11 @@ class AssetReissueWorkspace(QWidget):
         if v > TOTAL_COIN_SUPPLY_LIMIT_IN_BTC:
             self.asset_amount_warning.setText(
                 _('More than the maximum amount ({})').format(TOTAL_COIN_SUPPLY_LIMIT_IN_BTC))
+            return False
+        elif v == 0:
+            self.asset_amount_warning.setText(
+                _('The amount cannot be 0.')
+            )
             return False
         else:
             self.asset_amount_warning.setText('')

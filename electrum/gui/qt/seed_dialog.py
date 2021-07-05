@@ -72,7 +72,7 @@ class SeedLayout(QVBoxLayout):
             (value, title) for value, title in (
                 ('electrum', _('Electrum')),
                 ('bip39', _('BIP39 seed')),
-                ('slip39', _('SLIP39 seed')),
+                #('slip39', _('SLIP39 seed')),
             )
             if value in self.options or value == 'electrum'
         ]

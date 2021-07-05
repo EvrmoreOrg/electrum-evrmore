@@ -1508,8 +1508,23 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         grid.addWidget(self.fiat_send_e, 4, 3)
         self.amount_e.frozen.connect(
             lambda: self.fiat_send_e.setFrozen(self.amount_e.isReadOnly()))
-        self.to_send_combo.currentIndexChanged.connect(
-            lambda: self.fiat_send_e.setVisible(self.to_send_combo.currentIndex() == 0))
+
+        def on_to_send():
+            i = self.to_send_combo.currentIndex()
+            self.fiat_send_e.setVisible(i == 0)
+            if i == 0:
+                reg = QRegExp('^[1-9][0-9]{1,10}\\.([0-9]{1,8})$')
+            else:
+                meta = self.wallet.get_asset_meta(self.send_options[i])
+                divs = meta.divisions
+                if divs == 0:
+                    reg = QRegExp('^[1-9][0-9]{1,10}$')
+                else:
+                    reg = QRegExp('^[1-9][0-9]{1,10}\\.([0-9]{1,' + str(divs) + '})$')
+            validator = QRegExpValidator(reg)
+            self.amount_e.setValidator(validator)
+
+        self.to_send_combo.currentIndexChanged.connect(on_to_send)
 
         self.max_button = EnterButton(_("Max"), self.spend_max)
         self.max_button.setFixedWidth(100)

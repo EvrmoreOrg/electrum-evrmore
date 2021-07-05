@@ -2,21 +2,26 @@
   "rvn4lyfe.com": {
     "pruning": "-",
     "s": "50002",
-    "version": "1.8"
+    "version": "1.9"
   },
   "electrum1.rvn.rocks": {
     "pruning": "-",
     "s": "50002",
-    "version": "1.8"
+    "version": "1.9"
   },
   "electrum2.rvn.rocks": {
     "pruning": "-",
     "s": "50002",
-    "version": "1.8"
+    "version": "1.9"
   },
   "electrum3.rvn.rocks": {
     "pruning": "-",
     "s": "50002",
-    "version": "1.8"
+    "version": "1.9"
+  },
+  "128.199.15.190": {
+    "pruning": "-",
+    "s": "50002",
+    "version": "1.9"
   }
 }

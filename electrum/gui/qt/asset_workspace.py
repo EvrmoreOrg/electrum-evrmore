@@ -297,7 +297,7 @@ class AssetCreateWorkspace(QWidget):
         options_w = QWidget()
         options_w.setLayout(self.create_options_layout.layout())
         top_layout.addWidget(options_w)
-        top_layout.addWidget(HelpButtonURL("https://kralverde.github.io/assets/"))
+        top_layout.addWidget(HelpButtonURL("https://ravencoin.org/assets/"))
 
         widgetA = QWidget()
         widgetA.setLayout(top_layout)
@@ -977,7 +977,7 @@ class AssetReissueWorkspace(QWidget):
 
         top_layout = QHBoxLayout()
         top_layout.addWidget(self.aval_owner_combo)
-        top_layout.addWidget(HelpButtonURL("https://kralverde.github.io/assets/"))
+        top_layout.addWidget(HelpButtonURL("https://ravencoin.org/assets/"))
         widgetA = QWidget()
         widgetA.setLayout(top_layout)
         widgetC = QWidget()

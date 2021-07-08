@@ -52,16 +52,18 @@ class InvoiceList(MyTreeView):
     class Columns(IntEnum):
         DATE = 0
         DESCRIPTION = 1
-        AMOUNT = 2
-        STATUS = 3
+        ASSET = 2
+        AMOUNT = 3
+        STATUS = 4
 
     headers = {
         Columns.DATE: _('Date'),
         Columns.DESCRIPTION: _('Description'),
+        Columns.ASSET: _('Asset'),
         Columns.AMOUNT: _('Amount'),
         Columns.STATUS: _('Status'),
     }
-    filter_columns = [Columns.DATE, Columns.DESCRIPTION, Columns.AMOUNT]
+    filter_columns = [Columns.DATE, Columns.DESCRIPTION, Columns.ASSET, Columns.AMOUNT]
 
     def __init__(self, parent):
         super().__init__(parent, self.create_menu,
@@ -109,12 +111,16 @@ class InvoiceList(MyTreeView):
             status_str = item.get_status_str(status)
             message = item.message
             amount = item.get_amount_sat()
-            if amount != '!':
-                amount = amount.rvn_value.value
+            a = amount.assets
+            if a:
+                asset_str, amount = list(a.items())[0]
+            else:
+                asset_str = ""
+                amount = amount.rvn_value
             timestamp = item.time or 0
             date_str = format_time(timestamp) if timestamp else _('Unknown')
             amount_str = self.parent.format_amount(amount, whitespaces=True)
-            labels = [date_str, message, amount_str, status_str]
+            labels = [date_str, message, asset_str, amount_str, status_str]
             items = [QStandardItem(e) for e in labels]
             self.set_editability(items)
             items[self.Columns.DATE].setIcon(read_QIcon(icon_name))

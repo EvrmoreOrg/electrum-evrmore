@@ -2019,7 +2019,11 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.pay_lightning_invoice(invoice.invoice, amount_msat=invoice.get_amount_msat())
         elif invoice.type == PR_TYPE_ONCHAIN:
             assert isinstance(invoice, OnchainInvoice)
-            a = self.get_asset_from_spend_tab()
+            l = list(invoice.get_amount_sat().assets.keys())
+            if l:
+                a = l[0]
+            else:
+                a = None
             self.pay_onchain_dialog(self.get_coins(asset=a), invoice.outputs)
         else:
             raise Exception('unknown invoice type')

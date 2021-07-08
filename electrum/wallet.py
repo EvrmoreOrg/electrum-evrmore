@@ -864,7 +864,6 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 for txout in invoice.outputs:
                     self._invoices_from_scriptpubkey_map[txout.scriptpubkey].add(invoice_key)
 
-    # TODO: Currently only for RVN
     def _is_onchain_invoice_paid(self, invoice: Invoice, conf: int) -> Tuple[bool, Sequence[str]]:
         """Returns whether on-chain invoice is satisfied, and list of relevant TXIDs."""
         assert invoice.type == PR_TYPE_ONCHAIN
@@ -895,7 +894,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 # note: "at least one TXO" check is needed for zero amount invoice (e.g. OP_RETURN)
                 if len(prevouts_and_values) == 0:
                     return False, []
-                if total_received.rvn_value < invoice_amt.rvn_value:
+                if total_received < invoice_amt:
                     return False, []
         return True, relevant_txs
 

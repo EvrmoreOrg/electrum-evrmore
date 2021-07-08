@@ -114,7 +114,7 @@ class Invoice(StoredObject):
 @attr.s
 class OnchainInvoice(Invoice):
     message = attr.ib(type=str, kw_only=True)
-    amount_sat = attr.ib(kw_only=True)  # type: Union[RavenValue, str]  # in satoshis. can be '!'
+    amount_sat = attr.ib(kw_only=True)  # type: RavenValue
     exp = attr.ib(type=int, kw_only=True, validator=attr.validators.instance_of(int))
     time = attr.ib(type=int, kw_only=True, validator=attr.validators.instance_of(int))
     id = attr.ib(type=str, kw_only=True)
@@ -127,9 +127,7 @@ class OnchainInvoice(Invoice):
         """returns the first address, to be displayed in GUI"""
         return self.outputs[0].address
 
-    def get_amount_sat(self) -> Union[RavenValue, str]:
-        if self.amount_sat == '!':
-            return '!'
+    def get_amount_sat(self) -> RavenValue:
         return self.amount_sat or RavenValue()
 
     @amount_sat.validator

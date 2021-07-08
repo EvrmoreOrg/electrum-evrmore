@@ -41,6 +41,7 @@ import binascii
 import copy
 
 from . import ecc, ravencoin, constants, segwit_addr, bip32, assets
+from .assets import guess_asset_script_for_vin
 from .bip32 import BIP32Node
 from .util import profiler, to_bytes, bh2u, bfh, chunks, is_hex_str, Satoshis
 from .ravencoin import (TYPE_ADDRESS, TYPE_SCRIPT, hash_160,
@@ -167,9 +168,11 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
 
     def __lt__(self, other):
         if isinstance(other, RavenValue):
+            o_a = other.assets
+            if len(self.__asset_value) == 0 and len(o_a) != 0:
+                return True
             if self.__rvn_value >= other.__rvn_value:
                 return False
-            o_a = other.assets
             for asset, amt in self.__asset_value.items():
                 if asset not in o_a:
                     return False
@@ -1005,37 +1008,7 @@ class Transaction:
         a = txin.value_sats().assets
         if a:
             asset, amt = list(a.items())[0]
-            if wallet is None:
-                _logger.warning("Using best effort pre-image script for asset {}".format(asset))
-                script = assets.create_transfer_asset_script(bytes.fromhex(script), asset, amt).hex()
-            else:
-                meta = wallet.get_asset_meta(asset)
-                assert meta
-                # We need to find out what the correct prevout script should be.
-                if meta.source_outpoint.txid == txin.prevout.txid:
-                    # Our script is some source type
-                    if meta.source_type == 'o':
-                        script = assets.create_owner_asset_script(bfh(script), asset).hex()
-                    elif meta.source_type == 'q':
-                        script = assets.create_new_asset_script(bfh(script), asset, amt, meta.divisions,
-                                                                meta.is_reissuable,
-                                                                base_decode(meta.ipfs_str,
-                                                                            base=58) if meta.ipfs_str else None).hex()
-                    else:
-                        if meta.source_prev_outpoint:
-                            # Reissue amt is FF
-                            script = assets.create_reissue_asset_script(bfh(script), asset, amt, b'\xff',
-                                                                        meta.is_reissuable,
-                                                                        base_decode(meta.ipfs_str,
-                                                                                    base=58) if meta.ipfs_str else None).hex()
-                        else:
-                            script = assets.create_reissue_asset_script(bfh(script), asset, amt,
-                                                                        bytes([meta.divisions]), meta.is_reissuable,
-                                                                        base_decode(meta.ipfs_str,
-                                                                                    base=58) if meta.ipfs_str else None).hex()
-
-                else:
-                    script = assets.create_transfer_asset_script(bytes.fromhex(script), asset, amt).hex()
+            script = guess_asset_script_for_vin(bfh(script), asset, amt, txin, wallet)
         return script
 
     @classmethod

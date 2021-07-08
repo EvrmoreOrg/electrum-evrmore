@@ -2,7 +2,8 @@
 import re
 from typing import Dict
 
-from .ravencoin import opcodes, push_script, base_encode, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN
+from .logging import get_logger
+from .ravencoin import opcodes, push_script, base_encode, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN, base_decode
 from . import transaction
 
 DOUBLE_PUNCTUATION = "^.*[._]{2,}.*$"
@@ -13,6 +14,8 @@ RAVEN_NAMES = "^RVN$|^RAVEN$|^RAVENCOIN$|^#RVN$|^#RAVEN$|^#RAVENCOIN$"
 MAIN_CHECK = "^[A-Z0-9._]{3,}$"
 SUB_CHECK = "^[A-Z0-9._]+$"
 UNIQUE_CHECK = "^[-A-Za-z0-9@$%&*()[\\]{}_.?:]+$"
+
+_logger = get_logger(__name__)
 
 
 class BadAssetScript(Exception): pass
@@ -149,6 +152,45 @@ def create_new_asset_script(standard: bytes, asset: str, value: int, divisions: 
            bytes.fromhex(push_script(asset_portion)) + \
            bytes([opcodes.OP_DROP])
 
+
+def guess_asset_script_for_vin(script: bytes, asset: str, amt: int, txin, wallet) -> str:
+    if wallet is None:
+        _logger.warning("Using best effort pre-image script for asset: no wallet: {}".format(asset))
+        script = create_transfer_asset_script(script, asset, amt).hex()
+        return script
+    else:
+        meta = wallet.get_asset_meta(asset)
+        if not meta:
+            _logger.warning("Using best effort pre-image script for asset: no meta: {}".format(asset))
+            script = create_transfer_asset_script(script, asset, amt).hex()
+            return script
+        # We need to find out what the correct prevout script should be.
+        if meta.source_outpoint.txid == txin.prevout.txid:
+            # Our script is some source type
+            if meta.source_type == 'o':
+                script = create_owner_asset_script(script, asset).hex()
+            elif meta.source_type == 'q':
+                script = create_new_asset_script(script, asset, amt, meta.divisions,
+                                                 meta.is_reissuable,
+                                                 base_decode(meta.ipfs_str,
+                                                             base=58) if meta.ipfs_str else None).hex()
+            else:
+                if meta.source_prev_outpoint:
+                    # Reissue amt is FF
+                    script = create_reissue_asset_script(script, asset, amt, b'\xff',
+                                                         meta.is_reissuable,
+                                                         base_decode(meta.ipfs_str,
+                                                                     base=58) if meta.ipfs_str else None).hex()
+                else:
+                    script = create_reissue_asset_script(script, asset, amt,
+                                                         bytes([meta.divisions]), meta.is_reissuable,
+                                                         base_decode(meta.ipfs_str,
+                                                                     base=58) if meta.ipfs_str else None).hex()
+
+        else:
+            script = create_transfer_asset_script(script, asset, amt).hex()
+
+    return script
 
 def is_main_asset_name_good(name):
     """

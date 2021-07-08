@@ -20,9 +20,13 @@ from electrum.assets import is_main_asset_name_good, is_unique_asset_name_good, 
 from electrum.gui.qt.amountedit import FreezableLineEdit
 from electrum.gui.qt.util import ComplexLineEdit, HelpLabel, EnterButton, ColorScheme, ChoicesLayout, HelpButtonURL
 from electrum.i18n import _
+from electrum.logging import get_logger
 from electrum.ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, base_decode, address_to_script, COIN, is_address
 from electrum.transaction import RavenValue, PartialTxOutput, AssetMeta
 from electrum.util import Satoshis, bfh
+
+
+_logger = get_logger(__name__)
 
 
 class InterpretType(IntEnum):
@@ -738,19 +742,6 @@ class AssetReissueWorkspace(QWidget):
               + _('This lets the asset be edited in the future.')
         self.reissue_label = HelpLabel(_('Reissuable'), msg)
 
-        def update_amount_line_edit():
-            t = self.divisions.text()
-            if not t:
-                return
-            divs = int(t)
-            # Update regex
-            if divs == 0:
-                reg = QRegExp('^[0-9]{1,11}$')
-            else:
-                reg = QRegExp('^[0-9]{1,11}\\.([0-9]{1,' + str(divs) + '})$')
-            validator = QRegExpValidator(reg)
-            self.asset_amount.setValidator(validator)
-
         def on_combo_change():
             i = self.aval_owner_combo.currentIndex()
             if i == 0:
@@ -766,11 +757,17 @@ class AssetReissueWorkspace(QWidget):
                         # invalid options which would be caught in a node broadcast
                         m = await self.parent.network.get_meta_for_asset(asset)
                         if not m:
-                            return
-                        divs = m['divisions']
-                        reis = False if m['reissuable'] == 0 else True
-                        data = m.get('ipfs', None)
-                        circulation = m['sats_in_circulation']
+                            # Dummy data
+                            _logger.warning("Couldn't query asset meta!")
+                            divs = 0
+                            reis = True
+                            data = None
+                            circulation = 0
+                        else:
+                            divs = m['divisions']
+                            reis = False if m['reissuable'] == 0 else True
+                            data = m.get('ipfs', None)
+                            circulation = m['sats_in_circulation']
                         self.current_asset_meta = AssetMeta(asset, circulation, False, reis, divs, bool(data), data, -1, '', None, None)
 
                         r = reis
@@ -805,6 +802,13 @@ class AssetReissueWorkspace(QWidget):
                         self.asset_amount.setText('0')
                         self.current_sats.setText(
                             _("({} {} currently in circulation)").format(Satoshis(circulation), asset))
+
+                        if d == 0:
+                            reg = QRegExp('^[0-9]{1,11}$')
+                        else:
+                            reg = QRegExp('^[0-9]{1,11}\\.([0-9]{1,' + str(d) + '})$')
+                        validator = QRegExpValidator(reg)
+                        self.asset_amount.setValidator(validator)
 
                         if r:
                             self.reissue_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
@@ -851,6 +855,13 @@ class AssetReissueWorkspace(QWidget):
                 self.asset_amount.setText('0')
                 self.current_sats.setText(_("({} {} currently in circulation)").format(Satoshis(m.circulation), m.name))
 
+                if d == 0:
+                    reg = QRegExp('^[0-9]{1,11}$')
+                else:
+                    reg = QRegExp('^[0-9]{1,11}\\.([0-9]{1,' + str(d) + '})$')
+                validator = QRegExpValidator(reg)
+                self.asset_amount.setValidator(validator)
+
                 if r:
                     self.reissue_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
                     self.divisions_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
@@ -870,7 +881,6 @@ class AssetReissueWorkspace(QWidget):
         self.divisions.setText('')
         self.divisions.setFixedWidth(25)
         self.divisions.setFrozen(True)
-        self.divisions.textChanged.connect(update_amount_line_edit)
 
         divisions_grid = QHBoxLayout()
         divisions_grid.setSpacing(0)

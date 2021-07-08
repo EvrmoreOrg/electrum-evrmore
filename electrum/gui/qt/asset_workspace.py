@@ -95,7 +95,7 @@ class AssetCreateWorkspace(QWidget):
                 self.asset_name.set_prefix('')
                 return
             text = self.aval_owner_options[i2]
-            self.asset_name.lineEdit.setMaxLength(31 - len(text))
+            self.asset_name.lineEdit.setMaxLength(31 - len(text) - 1)
             if i == 1:
                 self.asset_name.set_prefix(text + '/')
             else:

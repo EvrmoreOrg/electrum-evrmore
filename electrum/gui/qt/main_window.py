@@ -1522,11 +1522,16 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 reg = QRegExp('^[0-9]{0,11}\\.([0-9]{1,8})$')
             else:
                 meta = self.wallet.get_asset_meta(self.send_options[i])
-                divs = meta.divisions
-                if divs == 0:
-                    reg = QRegExp('^[1-9][0-9]{0,10}$')
+                if meta:
+                    divs = meta.divisions
+                    if divs == 0:
+                        reg = QRegExp('^[1-9][0-9]{0,10}$')
+                    else:
+                        reg = QRegExp('^[0-9]{0,11}\\.([0-9]{1,' + str(divs) + '})$')
                 else:
-                    reg = QRegExp('^[0-9]{0,11}\\.([0-9]{1,' + str(divs) + '})$')
+                    # For some reason we don't have asset data yet;
+                    # give the user the most freedom
+                    reg = QRegExp('^[0-9]{0,11}\\.([0-9]{1,8})$')
             validator = QRegExpValidator(reg)
             self.amount_e.setValidator(validator)
 

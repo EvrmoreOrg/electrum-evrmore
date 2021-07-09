@@ -2506,9 +2506,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.contact_list.update()
         self.update_completions()
 
-    # TODO: RVN Only
     def show_onchain_invoice(self, invoice: OnchainInvoice):
-        amount_str = self.format_amount(invoice.amount_sat.rvn_value.value) + ' ' + self.base_unit()
+        #amount_str = self.format_amount(invoice.amount_sat.rvn_value.value) + ' ' + self.base_unit()
+        amount_str = invoice.amount_sat.__repr__()
         d = WindowModalDialog(self, _("Onchain Invoice"))
         vbox = QVBoxLayout(d)
         grid = QGridLayout()
@@ -2519,7 +2519,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             grid.addWidget(QLabel(invoice.get_address()), 2, 1)
         else:
             outputs_str = '\n'.join(
-                map(lambda x: str(x.address) + ' : ' + self.format_amount(x.value.rvn_value) + self.base_unit(), invoice.outputs))
+                map(lambda x: str(x.address) + ' : ' + self.format_amount(x.value) + (self.base_unit() if not x.asset else (' ' + x.asset)), invoice.outputs))
             grid.addWidget(QLabel(_("Outputs") + ':'), 2, 0)
             grid.addWidget(QLabel(outputs_str), 2, 1)
         grid.addWidget(QLabel(_("Description") + ':'), 3, 0)

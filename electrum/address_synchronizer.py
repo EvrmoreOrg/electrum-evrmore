@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple, NamedTuple, Sequen
 from aiorpcx import TaskGroup
 
 from . import ravencoin, util
+from .assets import pull_meta_from_create_or_reissue_script
 from .ravencoin import COINBASE_MATURITY
 from .util import profiler, bfh, TxMinedInfo, UnrelatedTransactionException, with_lock
 from .transaction import Transaction, TxOutput, TxInput, PartialTxInput, TxOutpoint, PartialTransaction, AssetMeta, RavenValue
@@ -347,9 +348,17 @@ class AddressSynchronizer(Logger):
                 self.db.add_prevout_by_scripthash(scripthash, prevout=TxOutpoint.from_str(ser), value=v)
                 addr = txo.address
                 if addr and self.is_mine(addr):
-                    for asset in v.assets:
+
+                    if txo.asset:
                         if asset not in self.get_assets():
                             self.add_asset(asset)
+                        try:
+                            d = pull_meta_from_create_or_reissue_script(txo.scriptpubkey)
+                            if d['type'] == 'r':
+                                self.db.add_asset_reissue_point(asset, tx.txid(), txo.scriptpubkey.hex())
+                        except:
+                            pass
+
                     self.db.add_txo_addr(tx_hash, addr, n, v, is_coinbase)
                     self._get_addr_balance_cache.pop(addr, None)  # invalidate cache
                     # give v to txi that spends me
@@ -422,6 +431,9 @@ class AddressSynchronizer(Logger):
                 children.add(other_hash)
                 children |= self.get_depending_transactions(other_hash)
             return children
+
+    def get_asset_reissue_outpoints(self, asset: str) -> List[Tuple[str, str]]:
+        return self.db.get_asset_reissue_points(asset)
 
     def recieve_asset_callback(self, asset: str, meta: AssetMeta):
         self.db.add_asset_meta(asset, meta)

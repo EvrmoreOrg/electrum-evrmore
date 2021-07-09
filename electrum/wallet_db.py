@@ -946,6 +946,21 @@ class WalletDB(JsonDB):
         self.asset[asset] = meta
 
     @locked
+    def get_asset_reissue_points(self, asset: str) -> List[Tuple[str, str]]:
+        assert isinstance(asset, str)
+        return self.asset_reissue_outpoints.get(asset, [])
+
+    @modifier
+    def add_asset_reissue_point(self, asset: str, txid: str, script: str) -> None:
+        assert isinstance(asset, str)
+        assert isinstance(txid, str)
+        assert isinstance(script, str)
+        if asset not in self.asset_reissue_outpoints:
+            self.asset_reissue_outpoints[asset] = [(txid, script)]
+        else:
+            self.asset_reissue_outpoints[asset].append((txid, script))
+
+    @locked
     def get_messages(self):
         return copy.copy(self.messages)
 
@@ -1328,6 +1343,7 @@ class WalletDB(JsonDB):
         # TODO make all these private
         self.messages = self.get_dict('messages')                # type: Dict[int, List[Tuple[str, str, Optional[Dict[TxOutpoint, int]]]]]
         self.asset = self.get_dict('asset_meta')                 # type: Dict[str, AssetMeta]
+        self.asset_reissue_outpoints = self.get_dict('asset_reissue_points')  # type: Dict[str, List[Tuple[str, str]]]
         self.txi = self.get_dict('txi')                          # type: Dict[str, Dict[str, Dict[str, RavenValue]]]
         self.txo = self.get_dict('txo')                          # type: Dict[str, Dict[str, Dict[str, Tuple[RavenValue, bool]]]]
         self.transactions = self.get_dict('transactions')        # type: Dict[str, Transaction]

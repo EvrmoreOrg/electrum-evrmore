@@ -5,6 +5,7 @@ from typing import Dict
 from .logging import get_logger
 from .ravencoin import opcodes, push_script, base_encode, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN, base_decode
 from . import transaction
+from .util import bfh
 
 DOUBLE_PUNCTUATION = "^.*[._]{2,}.*$"
 LEADING_PUNCTUATION = "^[._].*$"
@@ -160,6 +161,7 @@ def guess_asset_script_for_vin(script: bytes, asset: str, amt: int, txin, wallet
         return script
     else:
         meta = wallet.get_asset_meta(asset)
+        reissue_outpoints = wallet.get_asset_reissue_outpoints(asset)
         if not meta:
             _logger.warning("Using best effort pre-image script for asset: no meta: {}".format(asset))
             script = create_transfer_asset_script(script, asset, amt).hex()
@@ -186,7 +188,14 @@ def guess_asset_script_for_vin(script: bytes, asset: str, amt: int, txin, wallet
                                                          bytes([meta.divisions]), meta.is_reissuable,
                                                          base_decode(meta.ipfs_str,
                                                                      base=58) if meta.ipfs_str else None).hex()
-
+        elif txin.prevout.txid.hex() in [x for x, _ in reissue_outpoints]:
+            script_t = None
+            for id, s in reissue_outpoints:
+                if id == txin.prevout.txid.hex():
+                    script_t = s
+                    break
+            script = script_t
+            assert script
         else:
             script = create_transfer_asset_script(script, asset, amt).hex()
 

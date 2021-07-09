@@ -1262,8 +1262,9 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             if not all([self.is_mine(self.get_txin_address(txin)) for txin in tx.inputs()]):
                 continue
             # do not mutate LN funding txs, as that would change their txid
-            if self.is_lightning_funding_tx(txid):
-                continue
+            #Unneeded for now
+            #if self.is_lightning_funding_tx(txid):
+            #    continue
             # tx must have opted-in for RBF (even if local, for consistency)
             if tx.is_final():
                 continue

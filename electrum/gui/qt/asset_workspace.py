@@ -1166,12 +1166,13 @@ class AssetReissueWorkspace(QWidget):
             meta = self.parent.wallet.get_asset_meta(asset)  # type: AssetMeta
             if not meta:
                 continue
-            if not meta.is_reissuable:
-                disabled_indexes.add(i)
-                new_aval_owner_options[i] = asset + ' (Non-reissuable)'
-            if (asset + '!') in in_mempool:
-                disabled_indexes.add(i)
-                new_aval_owner_options[i] = asset + ' (Mempool)'
+            else:
+                if not meta.is_reissuable:
+                    disabled_indexes.add(i)
+                    new_aval_owner_options[i] = asset + ' (Non-reissuable)'
+                if (asset + '!') in in_mempool:
+                    disabled_indexes.add(i)
+                    new_aval_owner_options[i] = asset + ' (Mempool)'
 
         diff = set(new_aval_owner_options) - set(self.aval_owner_options)
 

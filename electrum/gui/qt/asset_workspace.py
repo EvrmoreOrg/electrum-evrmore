@@ -51,7 +51,7 @@ class AssetCreateWorkspace(QWidget):
         c_grid.setSpacing(4)
 
         self.asset_name = ComplexLineEdit()
-        self.asset_name.lineEdit.setMaxLength(31)
+        self.asset_name.lineEdit.setMaxLength(30)
         self.asset_name.setPrefixStyle(ColorScheme.GRAY.as_stylesheet())
         self.asset_availability_text = QLabel()
         self.asset_availability_text.setAlignment(Qt.AlignCenter)
@@ -95,11 +95,11 @@ class AssetCreateWorkspace(QWidget):
                 self.reissuable.setTristate(False)
                 self.reissue_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
             if i == 0 or i2 == 0:
-                self.asset_name.lineEdit.setMaxLength(31)
+                self.asset_name.lineEdit.setMaxLength(30)
                 self.asset_name.set_prefix('')
                 return
             text = self.aval_owner_options[i2]
-            self.asset_name.lineEdit.setMaxLength(31 - len(text) - 1)
+            self.asset_name.lineEdit.setMaxLength(30 - len(text) - 1)
             if i == 1:
                 self.asset_name.set_prefix(text + '/')
             else:
@@ -116,10 +116,10 @@ class AssetCreateWorkspace(QWidget):
             self.aval_owner_combo.setVisible(i != 0)
             if i == 0 or i2 == 0:
                 self.asset_name.set_prefix('')
-                self.asset_name.lineEdit.setMaxLength(31)
+                self.asset_name.lineEdit.setMaxLength(30)
                 return
             text = self.aval_owner_options[i2]
-            self.asset_name.lineEdit.setMaxLength(31 - len(text))
+            self.asset_name.lineEdit.setMaxLength(30 - len(text) - 1)
             if i == 1:
                 self.asset_name.set_prefix(text + '/')
             else:
@@ -353,8 +353,8 @@ class AssetCreateWorkspace(QWidget):
             error = is_sub_asset_name_good(name)
         else:
             error = is_unique_asset_name_good(name)
-        if len(pre + name) > 31:
-            error = 'Asset name must be less than 32 characters (Including the parent).'
+        if len(pre + name) > 30:
+            error = 'Asset name must be less than 31 characters (Including the parent).'
         if error:
             self.asset_name_error_message.setText(error)
             return False
@@ -612,7 +612,7 @@ class AssetCreateWorkspace(QWidget):
     def reset_workspace(self):
         self.create_options_layout.group.buttons()[0].setChecked(True)
         self.asset_name.lineEdit.setText('')
-        self.asset_name.lineEdit.setMaxLength(31)
+        self.asset_name.lineEdit.setMaxLength(30)
         self.asset_name.set_prefix('')
         self.divisions.setFrozen(False)
         self.divisions.setText('0')
@@ -1143,11 +1143,6 @@ class AssetReissueWorkspace(QWidget):
         if v > TOTAL_COIN_SUPPLY_LIMIT_IN_BTC:
             self.asset_amount_warning.setText(
                 _('More than the maximum amount ({})').format(TOTAL_COIN_SUPPLY_LIMIT_IN_BTC))
-            return False
-        elif v == 0:
-            self.asset_amount_warning.setText(
-                _('The amount cannot be 0.')
-            )
             return False
         else:
             self.asset_amount_warning.setText('')

@@ -33,8 +33,8 @@ but not everything. The following sections describe how to run from source, but 
 is a TL;DR::
 
     sudo apt-get install libsecp256k1-0
-    python3 -m pip install --user .[gui,crypto]
-
+    sudo apt-get install cmake
+    ./electrum-env
 
 Not pure-python dependencies
 ----------------------------

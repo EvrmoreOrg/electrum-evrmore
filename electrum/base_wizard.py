@@ -93,7 +93,6 @@ class BaseWizard(Logger):
         self.plugin = None  # type: Optional[BasePlugin]
         self.keystores = []  # type: List[KeyStore]
         self.is_kivy = config.get('gui') == 'kivy'
-        self.seed_type = None
 
     def set_icon(self, icon):
         pass
@@ -146,7 +145,7 @@ class BaseWizard(Logger):
         wallet_kinds = [
             ('standard',  _("Standard wallet")),
             #('2fa', _("Wallet with two-factor authentication")),
-            ('multisig',  _("Multi-signature wallet (advanced)")),
+            #('multisig',  _("Multi-signature wallet (advanced)")),
             ('imported',  _("Import Ravencoin addresses or private keys")),
         ]
         choices = [pair for pair in wallet_kinds if pair[0] in wallet_types]
@@ -556,7 +555,12 @@ class BaseWizard(Logger):
         self.derivation_and_script_type_dialog(f, get_account_xpub=get_account_xpub)
 
     def create_keystore(self, seed, passphrase):
-        k = keystore.from_seed(seed, passphrase, self.wallet_type == 'multisig')
+        if self.seed_type == 'bip39':
+            root_seed = bip39_to_seed(seed, '')
+            derivation = normalize_bip32_derivation(bip44_derivation(0))
+            k = keystore.from_bip43_rootseed(root_seed, derivation, xtype='standard', seed=seed)
+        else:
+            k = keystore.from_seed(seed, passphrase, self.wallet_type == 'multisig')
         if k.can_have_deterministic_lightning_xprv():
             self.data['lightning_xprv'] = k.get_lightning_xprv(None)
         self.on_keystore(k)
@@ -700,12 +704,11 @@ class BaseWizard(Logger):
         self.show_xpub_dialog(xpub=xpub, run_next=lambda x: self.run('choose_keystore'))
 
     def choose_seed_type(self):
-        seed_type = 'bip39' if self.config.get('nosegwit') else 'segwit'
+        seed_type = 'standard' if self.config.get('nosegwit') else 'segwit'
         self.create_seed(seed_type)
 
     def create_seed(self, seed_type):
         from . import mnemonic
-        self.seed_type = seed_type
         # seed = mnemonic.Mnemonic('en').make_seed(seed_type=self.seed_type)
         seed = mnemonic.Mnemonic('en').make_bip39_seed()
         self.opt_bip39 = True #False

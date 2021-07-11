@@ -611,7 +611,6 @@ class BIP32_KeyStore(Xpub, Deterministic_KeyStore):
         node = rootnode.subkey_at_private_derivation(derivation)
         self.add_xprv(node.to_xprv())
         self.add_key_origin_from_root_node(derivation_prefix=derivation, root_node=rootnode)
-        print(seed)
         if seed:
             Deterministic_KeyStore.add_seed(self, seed)
 

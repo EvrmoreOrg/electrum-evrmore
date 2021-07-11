@@ -23,7 +23,7 @@ from electrum.base_wizard import BaseWizard, HWD_SETUP_DECRYPT_WALLET, GoBack, R
 from electrum.network import Network
 from electrum.i18n import _
 
-from .seed_dialog import SeedLayout, KeysLayout, SeedLayoutDisplay
+from .seed_dialog import SeedLayout, KeysLayout, SeedLayoutDisplay, SeedConfirmDisplay
 from .network_dialog import NetworkChoiceLayout
 from .util import (MessageBoxMixin, Buttons, icon_path, ChoicesLayout, WWLabel,
                    InfoButton, char_width_in_lineedit, PasswordLineEdit)
@@ -156,7 +156,7 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
         self.app = app
         self.config = config
         self.gui_thread = gui_object.gui_thread
-        self.setMinimumSize(600, 425)
+        self.setMinimumSize(600, 460)
         self.accept_signal.connect(self.accept)
         self.title = QLabel()
         self.main_widget = QWidget()
@@ -456,13 +456,14 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
         self.exec_layout(slayout, title, next_enabled=False)
         return slayout.get_text()
 
-    def seed_input(self, title, message, is_seed, options):
-        slayout = SeedLayout(
+    def seed_input(self, title, message, is_seed, options, full=True):
+        slayout = SeedConfirmDisplay(
             title=message,
             is_seed=is_seed,
             options=options,
             parent=self,
             config=self.config,
+            full_check=full
         )
         self.exec_layout(slayout, title, next_enabled=False)
         return slayout.get_seed(), slayout.seed_type, slayout.is_ext
@@ -508,7 +509,7 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
             _('If you lose your seed, your money will be permanently lost.'),
             _('To make sure that you have properly saved your seed, please retype it here.')
         ])
-        seed, seed_type, is_ext = self.seed_input(title, message, test, None)
+        seed, seed_type, is_ext = self.seed_input(title, message, test, None, False)
         return seed
 
     @wizard_dialog
@@ -530,6 +531,7 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
             self.opt_bip39 = True  # False
             self.opt_ext = False  # True
         self.seed = slayout.get_seed()
+        self.seed_type = slayout.seed_type
         return slayout.is_ext and slayout.seed_type == 'electrum'
 
     def pw_layout(self, msg, kind, force_disable_encrypt_cb):
@@ -719,6 +721,7 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
         return line.text()
 
     @wizard_dialog
+    #TODO: Implement
     def show_xpub_dialog(self, xpub, run_next):
         msg = ' '.join([
             _("Here is your master public key."),

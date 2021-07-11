@@ -1085,8 +1085,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         # self.channels_list.update_rows.emit(wallet)
         self.update_completions()
         self.refresh_send_tab()
-        self.create_workspace.refresh_owners()
-        self.reissue_workspace.refresh_owners()
+        if self.wallet.wallet_type not in ('imported, xpub, btchip, ledger, trezor'):
+            self.create_workspace.refresh_owners()
+            self.reissue_workspace.refresh_owners()
 
     # def create_channels_tab(self):
     #     self.channels_list = ChannelsList(self)
@@ -1596,11 +1597,16 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         from .asset_list import AssetList
         self.asset_list = l = AssetList(self)
 
-        self.create_workspace = create_w = AssetCreateWorkspace(self,
+        if self.wallet.wallet_type not in ('imported, xpub, ledger, trezor, btchip'):
+
+            self.create_workspace = create_w = AssetCreateWorkspace(self,
                                                                 self.confirm_asset_creation)
 
-        self.reissue_workspace = reissue_w = AssetReissueWorkspace(self,
+            self.reissue_workspace = reissue_w = AssetReissueWorkspace(self,
                                                                    self.confirm_asset_reissue)
+        else:
+            self.create_workspace = create_w = QLabel()
+            self.reissue_workspace = reissue_w = QLabel()
 
         layout = QGridLayout()
         w = QWidget()

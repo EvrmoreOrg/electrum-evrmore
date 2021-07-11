@@ -606,11 +606,14 @@ class BIP32_KeyStore(Xpub, Deterministic_KeyStore):
         self.xprv = xprv
         self.add_xpub(bip32.xpub_from_xprv(xprv))
 
-    def add_xprv_from_seed(self, bip32_seed, xtype, derivation):
+    def add_xprv_from_seed(self, bip32_seed, xtype, derivation, *, seed=None):
         rootnode = BIP32Node.from_rootseed(bip32_seed, xtype=xtype)
         node = rootnode.subkey_at_private_derivation(derivation)
         self.add_xprv(node.to_xprv())
         self.add_key_origin_from_root_node(derivation_prefix=derivation, root_node=rootnode)
+        print(seed)
+        if seed:
+            Deterministic_KeyStore.add_seed(self, seed)
 
     def get_private_key(self, sequence: Sequence[int], password):
         xprv = self.get_master_private_key(password)
@@ -911,11 +914,11 @@ def bip39_is_checksum_valid(
     return checksum == calculated_checksum, True
 
 
-def from_bip43_rootseed(root_seed, derivation, xtype=None):
+def from_bip43_rootseed(root_seed, derivation, xtype=None, *, seed=None):
     k = BIP32_KeyStore({})
     if xtype is None:
         xtype = xtype_from_derivation(derivation)
-    k.add_xprv_from_seed(root_seed, xtype, derivation)
+    k.add_xprv_from_seed(root_seed, xtype, derivation, seed=seed)
     return k
 
 

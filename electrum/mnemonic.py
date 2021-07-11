@@ -99,6 +99,7 @@ class Wordlist(tuple):
         super().__init__()
         index_from_word = {w: i for i, w in enumerate(words)}
         self._index_from_word = MappingProxyType(index_from_word)  # no mutation
+        self.space = ' '
 
     def index(self, word, start=None, stop=None) -> int:
         try:
@@ -138,8 +139,12 @@ filenames = {
     'en':'english.txt',
     'es':'spanish.txt',
     'ja':'japanese.txt',
-    'pt':'portuguese.txt',
-    'zh':'chinese_simplified.txt'
+    #'pt':'portuguese.txt',
+    'zh_s':'chinese_simplified.txt',
+    'zh_t':'chinese_traditional.txt',
+    'fr':'french.txt',
+    'it':'italian.txt',
+    'ko':'korean.txt'
 }
 
 
@@ -151,9 +156,11 @@ class Mnemonic(Logger):
         Logger.__init__(self)
         lang = lang or 'en'
         self.logger.info(f'language {lang}')
-        filename = filenames.get(lang[0:2], 'english.txt')
+        filename = filenames.get(lang[0:4], 'english.txt')
         self.wordlist = Wordlist.from_file(filename)
-        self.logger.info(f"wordlist has {len(self.wordlist)} words")
+        if lang == 'ja' or lang == 'ko':
+            self.wordlist.space = u"\u3000"
+        self.logger.info(f"wordlist {filename} has {len(self.wordlist)} words")
 
     @classmethod
     def mnemonic_to_seed(self, mnemonic, passphrase) -> bytes:
@@ -186,6 +193,38 @@ class Mnemonic(Logger):
             k = self.wordlist.index(w)
             i = i*n + k
         return i
+
+    def make_bip39_seed(self, *, num_bits=None) -> str:
+        from .keystore import bip39_is_checksum_valid
+        is_good = False
+        words = ''
+        while not is_good:
+            words = self._make_bip39_seed(num_bits=num_bits)
+            if bip39_is_checksum_valid(words, wordlist=self.wordlist) == (True, True):
+                break
+        return words.replace(' ', self.wordlist.space)
+
+    def _make_bip39_seed(self, *, num_bits=None) -> str:
+        # https://github.com/ebellocchia/bip_utils/blob/master/bip_utils/bip39/bip39_mnemonic.py
+        if num_bits is None:
+            num_bits = 128
+        if num_bits not in (128, 160, 192, 224, 256):
+            raise Exception('Invalid bit length')
+        entropy = os.urandom(num_bits // 8)
+        entropy_hash = hashlib.sha512(entropy).digest()
+        entropy_bin = bin(int.from_bytes(entropy, 'big'))[2:].zfill(len(entropy) * 8)
+        entropy_hash_bin = bin(int.from_bytes(entropy_hash, 'big'))[2:].zfill(len(entropy_hash) * 8)
+        checksum_bin = entropy_hash_bin[:len(entropy)//4]
+
+        mnemonic_entropy_bin = entropy_bin + checksum_bin
+
+        mnemonic_words = []
+        for i in range(len(mnemonic_entropy_bin) // 11):
+            position = int(mnemonic_entropy_bin[i * 11: (i + 1) * 11], 2)
+            mnemonic_words.append(self.wordlist[position])
+
+        words = " ".join(mnemonic_words)
+        return words
 
     def make_seed(self, *, seed_type=None, num_bits=None) -> str:
         from .keystore import bip39_is_checksum_valid

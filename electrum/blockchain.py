@@ -274,6 +274,21 @@ class Blockchain(Logger):
     Manages blockchain headers and their verification
     """
 
+    class DGW_Cache(Dict):
+
+        def __init__(self, parent_chain: 'Blockchain'):
+            super().__init__()
+            self.parent_chain = parent_chain
+
+        def __setitem__(self, key, value):
+            super().__setitem__(key, value)
+            sorted_heights = sorted(self.keys())
+            for k in sorted_heights:
+                if k < sorted_heights[-1] - DGW_PASTBLOCKS - 50:
+                    del self[k]
+                else:
+                    break
+
     def __init__(self, config: SimpleConfig, forkpoint: int, parent: Optional['Blockchain'],
                  forkpoint_hash: str, prev_hash: Optional[str]):
         assert isinstance(forkpoint_hash, str) and len(forkpoint_hash) == 64, forkpoint_hash
@@ -289,6 +304,9 @@ class Blockchain(Logger):
         self._prev_hash = prev_hash  # blockhash immediately before forkpoint
         self.lock = threading.RLock()
         self.update_size()
+
+        # Ravencoin
+        self.dgw_cache = self.DGW_Cache(self)  # block height -> header  # stores DGW_PASTBLOCKS + 100 (for resyncs) blocks
 
     @property
     def checkpoints(self):
@@ -694,8 +712,14 @@ class Blockchain(Logger):
             except:
                 pass
             if last is None:
+                try:
+                    last = self.dgw_cache.get(height)
+                except:
+                    pass
+            if last is None:
                 last = self.read_header(height)
                 assert last is not None
+            self.dgw_cache[height] = last
             return last
 
         # params
@@ -830,7 +854,6 @@ class Blockchain(Logger):
             self.verify_header(header, prev_hash, target)
         except BaseException as e:
             return False
-
         return True
 
     def connect_chunk(self, start_height: int, hexdata: str) -> bool:

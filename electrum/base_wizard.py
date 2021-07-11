@@ -523,7 +523,7 @@ class BaseWizard(Logger):
         if self.seed_type == 'bip39':
             def f(passphrase):
                 root_seed = bip39_to_seed(seed, passphrase)
-                self.on_restore_bip43(root_seed)
+                self.on_restore_bip43(root_seed, seed=seed)
             self.passphrase_dialog(run_next=f, is_restoring=True) if is_ext else f('')
         elif self.seed_type == 'slip39':
             def f(passphrase):
@@ -541,10 +541,10 @@ class BaseWizard(Logger):
         else:
             raise Exception('Unknown seed type', self.seed_type)
 
-    def on_restore_bip43(self, root_seed):
+    def on_restore_bip43(self, root_seed, *, seed=None):
         def f(derivation, script_type):
             derivation = normalize_bip32_derivation(derivation)
-            self.run('on_bip43', root_seed, derivation, script_type)
+            self.run('on_bip43', root_seed, derivation, script_type, seed)
         if self.wallet_type == 'standard':
             def get_account_xpub(account_path):
                 root_node = BIP32Node.from_rootseed(root_seed, xtype="standard")
@@ -561,8 +561,8 @@ class BaseWizard(Logger):
             self.data['lightning_xprv'] = k.get_lightning_xprv(None)
         self.on_keystore(k)
 
-    def on_bip43(self, root_seed, derivation, script_type):
-        k = keystore.from_bip43_rootseed(root_seed, derivation, xtype=script_type)
+    def on_bip43(self, root_seed, derivation, script_type, seed=None):
+        k = keystore.from_bip43_rootseed(root_seed, derivation, xtype=script_type, seed=seed)
         self.on_keystore(k)
 
     def get_script_type_of_wallet(self) -> Optional[str]:
@@ -700,20 +700,22 @@ class BaseWizard(Logger):
         self.show_xpub_dialog(xpub=xpub, run_next=lambda x: self.run('choose_keystore'))
 
     def choose_seed_type(self):
-        seed_type = 'standard' if self.config.get('nosegwit') else 'segwit'
+        seed_type = 'bip39' if self.config.get('nosegwit') else 'segwit'
         self.create_seed(seed_type)
 
     def create_seed(self, seed_type):
         from . import mnemonic
         self.seed_type = seed_type
-        seed = mnemonic.Mnemonic('en').make_seed(seed_type=self.seed_type)
-        self.opt_bip39 = False
-        self.opt_ext = True
+        # seed = mnemonic.Mnemonic('en').make_seed(seed_type=self.seed_type)
+        seed = mnemonic.Mnemonic('en').make_bip39_seed()
+        self.opt_bip39 = True #False
+        self.opt_ext = False #True
         self.opt_slip39 = False
-        f = lambda x: self.request_passphrase(seed, x)
-        self.show_seed_dialog(run_next=f, seed_text=seed)
+        f = lambda x: self.request_passphrase(x)
+        self.show_seed_dialog(run_next=f, seed_text=seed, electrum_seed_type=seed_type)
 
-    def request_passphrase(self, seed, opt_passphrase):
+    def request_passphrase(self, opt_passphrase):
+        seed = self.seed
         if opt_passphrase:
             f = lambda x: self.confirm_seed(seed, x)
             self.passphrase_dialog(run_next=f)

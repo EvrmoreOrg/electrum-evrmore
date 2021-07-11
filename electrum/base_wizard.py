@@ -259,6 +259,7 @@ class BaseWizard(Logger):
                 _("To create a watching-only wallet, please enter your master public key (xpub/ypub/zpub)."),
                 _("To create a spending wallet, please enter a master private key (xprv/yprv/zprv).")
             ])
+            self.seed_type = 'standard'
             self.add_xpub_dialog(title=title, message=message, run_next=self.on_restore_from_key, is_valid=v)
         else:
             i = len(self.keystores) + 1

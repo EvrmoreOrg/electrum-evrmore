@@ -172,7 +172,7 @@ class SeedConfirmDisplay(QVBoxLayout):
         if not dialog.exec_():
             return None
         self.is_ext = cb_ext.isChecked() if 'ext' in self.options else False
-        self.seed_type = 'electrum'
+        #self.seed_type = 'electrum'
 
     def initialize_completer(self):
         if self.seed_type != 'slip39':

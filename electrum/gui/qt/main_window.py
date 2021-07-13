@@ -1089,7 +1089,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         # self.channels_list.update_rows.emit(wallet)
         self.update_completions()
         self.refresh_send_tab()
-        if self.wallet.wallet_type not in ('imported, xpub, btchip, ledger, trezor'):
+        if self.wallet.wallet_type not in ('imported, xpub'):
             self.create_workspace.refresh_owners()
             self.reissue_workspace.refresh_owners()
 
@@ -1599,7 +1599,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         from .asset_list import AssetList
         self.asset_list = l = AssetList(self)
 
-        if self.wallet.wallet_type not in ('imported, xpub, ledger, trezor, btchip'):
+        if self.wallet.wallet_type not in ('imported, xpub'):
             self.create_workspace = create_w = AssetCreateWorkspace(self,
                                                                 self.confirm_asset_creation)
 

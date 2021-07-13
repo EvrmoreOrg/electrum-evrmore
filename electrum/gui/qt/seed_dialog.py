@@ -38,7 +38,7 @@ from electrum import slip39
 
 from .util import (Buttons, OkButton, WWLabel, ButtonsTextEdit, icon_path,
                    EnterButton, CloseButton, WindowModalDialog, ColorScheme,
-                   ChoicesLayout)
+                   ChoicesLayout, HelpButton)
 from .qrtextedit import ShowQRTextEdit, ScanQRTextEdit
 from .completion_text_edit import CompletionTextEdit
 
@@ -322,7 +322,7 @@ class SeedLayoutDisplay(QVBoxLayout):
 
         self.languages = list(mnemonic.filenames.items())
         self.lang_cb = QComboBox()
-        self.lang_cb.addItems([x[1][:-4] for x in self.languages])
+        self.lang_cb.addItems([' '.join([s.capitalize() for s in x[1][:-4].split('_')]) for x in self.languages])
         self.lang_cb.setCurrentIndex(0)
 
         def on_change():
@@ -378,11 +378,18 @@ class SeedLayoutDisplay(QVBoxLayout):
 
         if not only_display:
             vbox.addLayout(self.clayout.layout())
-
-        if options and not only_display:
-            vbox.addWidget(self.opt_button)
-        if not only_display:
-            vbox.addWidget(self.lang_cb)
+            h_b = QHBoxLayout()
+            if options:
+                h_b.addWidget(self.opt_button)
+            h_b.addWidget(self.lang_cb)
+            help = HelpButton(_('The standard electrum seed phrase is not ' +
+                                'BIP39 compliant and will not work with other wallets. ' +
+                                'It does however, have some advantages over BIP39 as explained ' +
+                                'here:') +
+                                '\n\nhttps://electrum.readthedocs.io/en/latest/seedphrase.html\n\n' +
+                                _('If you wish to use your seed phrase with other wallets, choose BIP39.'))
+            h_b.addWidget(help)
+            vbox.addLayout(h_b)
 
         hbox.addLayout(vbox)
 

@@ -309,7 +309,7 @@ class Deterministic_KeyStore(Software_KeyStore):
         return bool(self.seed)
 
     def get_seed_type(self) -> Optional[str]:
-        return self._seed_type
+        return self._seed_type + ' electrum' if self._seed_type else 'BIP39'
 
     def is_watching_only(self):
         return not self.has_seed()
@@ -626,7 +626,7 @@ class BIP32_KeyStore(Xpub, Deterministic_KeyStore):
         return cK, k
 
     def can_have_deterministic_lightning_xprv(self):
-        if (self.get_seed_type() == 'segwit'
+        if (self._seed_type == 'segwit'
                 and self.get_bip32_node_for_xpub().xtype == 'p2wpkh'):
             return True
         return False

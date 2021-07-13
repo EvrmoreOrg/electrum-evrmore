@@ -130,7 +130,7 @@ class SeedConfirmDisplay(QVBoxLayout):
             self.seed_type = seed_type_values[choices_layout.selected_index()]
             self.is_seed = (lambda x: bool(x)) if self.seed_type != 'bip39' else self.saved_is_seed
             self.seed_status.setText('')
-            self.on_edit()
+            self.on_edit(from_click=True)
             self.initialize_completer()
             self.seed_warning.setText(None)
 
@@ -212,21 +212,22 @@ class SeedConfirmDisplay(QVBoxLayout):
         else:
             return self.slip39_seed
 
-    def on_edit(self):
+    def on_edit(self, *, from_click=False):
         s = ' '.join(self.get_seed_words())
         b = self.is_seed(s)
+
+        from electrum.keystore import bip39_is_checksum_valid
+        from electrum.mnemonic import Wordlist, filenames
+
+        lang = ''
+        for type, file in filenames.items():
+            word_list = Wordlist.from_file(file)
+            is_checksum, is_wordlist = bip39_is_checksum_valid(s, wordlist=word_list)
+            if is_wordlist:
+                lang = type
+                break
+
         if self.seed_type == 'bip39':
-            from electrum.keystore import bip39_is_checksum_valid
-            from electrum.mnemonic import Wordlist, filenames
-
-            lang = ''
-            for type, file in filenames.items():
-                word_list = Wordlist.from_file(file)
-                is_checksum, is_wordlist = bip39_is_checksum_valid(s, wordlist=word_list)
-                if is_wordlist:
-                    lang = type
-                    break
-
             status = ('checksum: ' + ('ok' if is_checksum else 'failed')) if is_wordlist else 'unknown wordlist'
             label = 'BIP39 - ' + lang + ' (%s)'%status
             if lang and lang != self.lang:
@@ -247,6 +248,12 @@ class SeedConfirmDisplay(QVBoxLayout):
         else:
             t = seed_type(s)
             label = _('Seed Type') + ': ' + t if t else ''
+
+            if is_checksum and is_wordlist and not from_click:
+                # This is a valid bip39 and this method was called from typing
+                # Emulate selecting the bip39 option
+                self.clayout.group.buttons()[1].click()
+                return
 
         self.seed_type_label.setText(label)
         self.parent.next_button.setEnabled(b)

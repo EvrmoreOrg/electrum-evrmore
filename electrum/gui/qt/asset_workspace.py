@@ -298,9 +298,7 @@ class AssetCreateWorkspace(QWidget):
         bottom_buttons.addWidget(self.reset_create_b, 1, 3)
 
         top_layout = QHBoxLayout()
-        options_w = QWidget()
-        options_w.setLayout(self.create_options_layout.layout())
-        top_layout.addWidget(options_w)
+        top_layout.addLayout(self.create_options_layout.layout())
         top_layout.addWidget(HelpButtonURL("https://ravencoin.org/assets/"))
 
         widgetA = QWidget()
@@ -313,6 +311,7 @@ class AssetCreateWorkspace(QWidget):
         widgetD.setLayout(c_grid_c)
         widgetF = QWidget()
         widgetF.setLayout(bottom_buttons)
+
         create_l = QVBoxLayout()
         create_l.addWidget(widgetA)
         create_l.addWidget(widgetB)

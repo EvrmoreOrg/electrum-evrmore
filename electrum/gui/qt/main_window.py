@@ -1146,7 +1146,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         grid.setSpacing(8)
         grid.setColumnStretch(3, 1)
 
-        self.receive_message_e = SizedFreezableLineEdit(width=700)
+        self.receive_message_e = FreezableLineEdit()
         grid.addWidget(QLabel(_('Description')), 0, 0)
         grid.addWidget(self.receive_message_e, 0, 1, 1, 4)
         self.receive_message_e.textChanged.connect(self.update_receive_qr)
@@ -1175,7 +1175,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             i = 0
         self.expires_combo.addItems(evl_values)
         self.expires_combo.setCurrentIndex(i)
-        self.expires_combo.setFixedWidth(self.receive_amount_e.width())
+        #self.expires_combo.setFixedWidth(self.receive_amount_e.width())
 
         def on_expiry(i):
             self.config.set_key('request_expiry', evl_keys[i])
@@ -1452,7 +1452,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         # The exchange rate plugin adds a fiat widget in column 2
         self.send_grid = grid = QGridLayout()
         grid.setSpacing(8)
-        grid.setColumnStretch(3, 1)
+        grid.setColumnStretch(1, 1)
 
         from .paytoedit import PayToEdit
 

@@ -5,10 +5,6 @@ NSIS_FILENAME=nsis-3.05-setup.exe
 NSIS_URL=https://downloads.sourceforge.net/project/nsis/NSIS%203/3.05/$NSIS_FILENAME
 NSIS_SHA256=1a3cc9401667547b9b9327a177b13485f7c59c2303d4b6183e7bc9e6c8d6bfdb
 
-LIBUSB_REPO="https://github.com/libusb/libusb.git"
-LIBUSB_COMMIT="c6a35c56016ea2ab2f19115d2ea1e85e0edae155"
-# ^ tag v1.0.24
-
 PYINSTALLER_REPO="https://github.com/SomberNight/pyinstaller.git"
 PYINSTALLER_COMMIT="80ee4d613ecf75a1226b960a560ee01459e65ddb"
 # ^ tag 4.2, plus a custom commit that fixes cross-compilation with MinGW
@@ -89,10 +85,10 @@ info "Compiling libusb..."
 ) || fail "libusb build failed"
 cp "$CACHEDIR/libusb/libusb/.libs/libusb-1.0.dll" $WINEPREFIX/drive_c/tmp/  || fail "Could not copy libusb to its destination"
 
-
 # copy already built DLLs
 cp "$DLL_TARGET_DIR/libsecp256k1-0.dll" $WINEPREFIX/drive_c/tmp/ || fail "Could not copy libsecp to its destination"
 cp "$DLL_TARGET_DIR/libzbar-0.dll" $WINEPREFIX/drive_c/tmp/ || fail "Could not copy libzbar to its destination"
+cp "$DLL_TARGET_DIR/libusb-1.0.dll" $WINEPREFIX/drive_c/tmp/ || fail "Could not copy libusb to its destination"
 
 
 info "Building PyInstaller."

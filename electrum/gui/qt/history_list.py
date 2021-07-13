@@ -1037,7 +1037,8 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
                 menu.addAction(_("Increase fee"), lambda: self.parent.bump_fee_dialog(tx))
             else:
                 if tx_details.can_cpfp:
-                    menu.addAction(_("Child pays for parent"), lambda: self.parent.cpfp_dialog(tx))
+                    pass
+                    #menu.addAction(_("Child pays for parent"), lambda: self.parent.cpfp_dialog(tx))
             if tx_details.can_dscancel:
                 menu.addAction(_("Cancel (double-spend)"), lambda: self.parent.dscancel_dialog(tx))
         invoices = self.wallet.get_relevant_invoices_for_tx(tx)

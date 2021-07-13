@@ -29,6 +29,8 @@ cmd = 'xgettext -s --from-code UTF-8 --language Python --no-wrap -f app.fil --ou
 print('Generate template')
 os.system(cmd)
 
+sys.exit()
+
 os.chdir('electrum')
 
 crowdin_identifier = 'electrum'

@@ -196,35 +196,35 @@ class Mnemonic(Logger):
 
     def make_bip39_seed(self, *, num_bits=None) -> str:
         from .keystore import bip39_is_checksum_valid
-        is_good = False
+
+        def _make_bip39_seed(num_bits):
+            # https://github.com/ebellocchia/bip_utils/blob/master/bip_utils/bip39/bip39_mnemonic.py
+            if num_bits is None:
+                num_bits = 128
+            if num_bits not in (128, 160, 192, 224, 256):
+                raise Exception('Invalid bit length')
+            entropy = os.urandom(num_bits // 8)
+            entropy_hash = hashlib.sha512(entropy).digest()
+            entropy_bin = bin(int.from_bytes(entropy, 'big'))[2:].zfill(len(entropy) * 8)
+            entropy_hash_bin = bin(int.from_bytes(entropy_hash, 'big'))[2:].zfill(len(entropy_hash) * 8)
+            checksum_bin = entropy_hash_bin[:len(entropy) // 4]
+
+            mnemonic_entropy_bin = entropy_bin + checksum_bin
+
+            mnemonic_words = []
+            for i in range(len(mnemonic_entropy_bin) // 11):
+                position = int(mnemonic_entropy_bin[i * 11: (i + 1) * 11], 2)
+                mnemonic_words.append(self.wordlist[position])
+
+            words = " ".join(mnemonic_words)
+            return words
+
         words = ''
-        while not is_good:
-            words = self._make_bip39_seed(num_bits=num_bits)
+        while True:
+            words = _make_bip39_seed(num_bits)
             if bip39_is_checksum_valid(words, wordlist=self.wordlist) == (True, True):
                 break
         return words.replace(' ', self.wordlist.space)
-
-    def _make_bip39_seed(self, *, num_bits=None) -> str:
-        # https://github.com/ebellocchia/bip_utils/blob/master/bip_utils/bip39/bip39_mnemonic.py
-        if num_bits is None:
-            num_bits = 128
-        if num_bits not in (128, 160, 192, 224, 256):
-            raise Exception('Invalid bit length')
-        entropy = os.urandom(num_bits // 8)
-        entropy_hash = hashlib.sha512(entropy).digest()
-        entropy_bin = bin(int.from_bytes(entropy, 'big'))[2:].zfill(len(entropy) * 8)
-        entropy_hash_bin = bin(int.from_bytes(entropy_hash, 'big'))[2:].zfill(len(entropy_hash) * 8)
-        checksum_bin = entropy_hash_bin[:len(entropy)//4]
-
-        mnemonic_entropy_bin = entropy_bin + checksum_bin
-
-        mnemonic_words = []
-        for i in range(len(mnemonic_entropy_bin) // 11):
-            position = int(mnemonic_entropy_bin[i * 11: (i + 1) * 11], 2)
-            mnemonic_words.append(self.wordlist[position])
-
-        words = " ".join(mnemonic_words)
-        return words
 
     def make_seed(self, *, seed_type=None, num_bits=None) -> str:
         from .keystore import bip39_is_checksum_valid

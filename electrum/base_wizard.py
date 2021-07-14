@@ -93,6 +93,7 @@ class BaseWizard(Logger):
         self.plugin = None  # type: Optional[BasePlugin]
         self.keystores = []  # type: List[KeyStore]
         self.is_kivy = config.get('gui') == 'kivy'
+        self.seed_type = None
 
     def set_icon(self, icon):
         pass

@@ -37,8 +37,7 @@ binaries += [('C:/tmp/libzbar-0.dll', '.')]
 datas = [
     (home+'electrum/*.json', 'electrum'),
     (home+'electrum/lnwire/*.csv', 'electrum/lnwire'),
-    (home+'electrum/wordlist/english.txt', 'electrum/wordlist'),
-    (home+'electrum/wordlist/slip39.txt', 'electrum/wordlist'),
+    (home+'electrum/wordlist/*.txt', 'electrum/wordlist'),
     (home+'electrum/locale', 'electrum/locale'),
     (home+'electrum/plugins', 'electrum/plugins'),
     (home+'electrum/gui/icons', 'electrum/gui/icons'),

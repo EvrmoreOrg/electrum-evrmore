@@ -448,6 +448,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.network_signal.emit(event, args)
 
     def on_network_qt(self, event, args=None):
+        # Defer expensive updates when syncing the headers;
+        # We don't want every single block to trigger these when syncing
+        server_height = self.network.get_server_height()
+        local_height = self.network.get_local_height()
+        if local_height < server_height - 100:
+            return
+
         # Handle a network message in the GUI thread
         # note: all windows get events from all wallets!
         if event == 'wallet_updated':
@@ -574,6 +581,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.logger.info("using default geometry")
             if not self.isMaximized():
                 self.setGeometry(100, 100, 950, 550)
+        self.setMinimumSize(950, 550)
 
     def watching_only_changed(self):
         name = "Electrum Ravencoin Testnet" if constants.net.TESTNET else "Electrum Ravencoin"
@@ -928,7 +936,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 self.tray.showMessage("Electrum", message, QSystemTrayIcon.Information, 20000)
 
     def timer_actions(self):
-        self.request_list.refresh_status()
         # Note this runs in the GUI thread
         if self.need_update.is_set():
             self.need_update.clear()
@@ -936,6 +943,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         elif not self.wallet.up_to_date:
             # this updates "synchronizing" progress
             self.update_status()
+        self.request_list.refresh_status()
+
+        # Quit early if syncing headers
+        server_height = self.network.get_server_height()
+        local_height = self.network.get_local_height()
+        if local_height < server_height - 100:
+            return
+
         # resolve aliases
         # FIXME this is a blocking network call that has a timeout of 5 sec
         self.payto_e.resolve()
@@ -1014,12 +1029,12 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             return
 
         status_text = ''
+        server_height = self.network.get_server_height()
         if self.network is None:
             text = _("Offline")
             icon = read_QIcon("status_disconnected.png")
 
         elif self.network.is_connected():
-            server_height = self.network.get_server_height()
             server_lag = self.network.get_local_height() - server_height
             fork_str = "_fork" if len(self.network.get_blockchains()) > 1 else ""
             # Server height can be 0 after switching to a new server
@@ -1028,7 +1043,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             if not self.wallet.up_to_date or server_height == 0:
                 num_sent, num_answered = self.wallet.get_history_sync_state_details()
                 text = ("{} ({}/{})"
-                        .format(_("Synchronizing..."), num_answered, num_sent))
+                        .format(_("Syncing transactions..."), num_answered, num_sent))
                 icon = read_QIcon("status_waiting.png")
             elif server_lag > 1:
                 text = _("Server is lagging ({} blocks)").format(server_lag)
@@ -1052,9 +1067,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                     icon = read_QIcon("status_connected%s.png" % fork_str)
                 else:
                     icon = read_QIcon("status_connected_proxy%s.png" % fork_str)
-                local_height = self.network.get_local_height()
-                if local_height < server_height - 100:
-                    status_text = "Syncing headers {}/{}".format(local_height, server_height)
+            local_height = self.network.get_local_height()
+            if local_height < server_height - 100:
+                status_text = "Syncing headers... {}/{}".format(local_height, server_height)
         else:
             if self.network.proxy:
                 text = "{} ({})".format(_("Not connected"), _("proxy enabled"))

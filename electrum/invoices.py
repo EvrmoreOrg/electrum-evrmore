@@ -68,7 +68,10 @@ def _decode_outputs(outputs) -> List[PartialTxOutput]:
     ret = []
     for output in outputs:
         if not isinstance(output, PartialTxOutput):
-            output = PartialTxOutput.from_legacy_tuple(*output)
+            try:
+                output = PartialTxOutput.from_legacy_tuple(*output)
+            except:
+                continue
         ret.append(output)
     return ret
 

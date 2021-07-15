@@ -1384,6 +1384,7 @@ class WalletDB(JsonDB):
             v = dict((k, Invoice.from_json(x)) for k, x in v.items())
         if key == 'payment_requests':
             v = dict((k, Invoice.from_json(x)) for k, x in v.items())
+            v = dict((k, x) for k, x in v if x.outputs)
         elif key == 'adds':
             v = dict((k, UpdateAddHtlc.from_tuple(*x)) for k, x in v.items())
         elif key == 'fee_updates':

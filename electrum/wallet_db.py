@@ -33,7 +33,7 @@ import binascii
 
 from . import util, ravencoin
 from .util import profiler, WalletFileException, multisig_type, TxMinedInfo, bfh, Satoshis
-from .invoices import PR_TYPE_ONCHAIN, Invoice
+from .invoices import PR_TYPE_ONCHAIN, Invoice, OnchainInvoice
 from .keystore import bip44_derivation
 from .transaction import Transaction, TxOutpoint, tx_from_any, PartialTransaction, PartialTxOutput, AssetMeta, RavenValue
 from .logging import Logger
@@ -1382,9 +1382,10 @@ class WalletDB(JsonDB):
             v = dict((k, tx_from_any(x, deserialize=False)) for k, x in v.items())
         if key == 'invoices':
             v = dict((k, Invoice.from_json(x)) for k, x in v.items())
+            v = dict((k, x) for k, x in v.items() if (isinstance(x, OnchainInvoice) and x.outputs) or not isinstance(x, OnchainInvoice))
         if key == 'payment_requests':
             v = dict((k, Invoice.from_json(x)) for k, x in v.items())
-            v = dict((k, x) for k, x in v.items() if x.outputs)
+            v = dict((k, x) for k, x in v.items() if (isinstance(x, OnchainInvoice) and x.outputs) or not isinstance(x, OnchainInvoice))
         elif key == 'adds':
             v = dict((k, UpdateAddHtlc.from_tuple(*x)) for k, x in v.items())
         elif key == 'fee_updates':

@@ -34,10 +34,13 @@ Electrum itself is pure Python, and so are most of the required dependencies,
 but not everything. The following sections describe how to run from source, but here
 is a TL;DR::
 
+    sudo apt-get install python3
+    sudo apt-get install python3-pip
     sudo apt-get install python3-cryptography
     sudo apt-get install python3-pyqt5
     sudo apt-get install libsecp256k1-0
     sudo apt-get install cmake
+    sudo pip3 install virtualenv
     ./electrum-env
 
 Not pure-python dependencies

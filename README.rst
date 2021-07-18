@@ -21,9 +21,11 @@ Getting started
 
 Contact us on `Discord`_!
 
+Want to mine to hardware? See this `article`_. Trezor has similar problems. It is recommended that you set up a software wallet and mine to that, then send to your hardware from there.
+
 Interested in a pre-built binary? Find them `here`_. Otherwise, continue reading.
 
-Want to mine to hardware? See this `article`_. Trezor has similar problems. It is recommended that you set up a software wallet and mine to that, then send to your hardware from there.
+Electrum Ravencoin is currently only supported for Qt-based software.
 
 The master branch is not always guaranteed to be working as expected. If you would like to build from source or run raw python, please use the source from one of our `releases`_.
 
@@ -158,12 +160,9 @@ Any help testing the software, reporting or fixing bugs, reviewing pull requests
 and recent changes, writing tests, or helping with outstanding issues is very welcome.
 Implementing new features, or improving/refactoring the codebase, is of course
 also welcome, but to avoid wasted effort, especially for larger changes,
-we encourage discussing these on the issue tracker or IRC first.
+we encourage discussing these on the discord first.
 
-Besides `GitHub`_, most communication about Electrum development happens on IRC, in the
-:code:`#electrum` channel on Libera Chat. The easiest way to participate on IRC is
-with the web client, `web.libera.chat`_.
+Besides `GitHub`_, most communication about Electrum development happens on discord, in the
+:code:`#electrum-rvn-sig` channel on discord.
 
-
-.. _web.libera.chat: https://web.libera.chat/#electrum
-.. _GitHub: https://github.com/spesmilo/electrum
+.. _GitHub: https://github.com/Electrum-RVN-SIG/electrum-ravencoin

@@ -29,6 +29,7 @@ Electrum Ravencoin is currently only supported for Qt-based software.
 
 The master branch is not always guaranteed to be working as expected. If you would like to build from source or run raw python, please use the source from one of our `releases`_.
 
+Learn how to run your own `ElectrumX Server`_.
 
 Electrum itself is pure Python, and so are most of the required dependencies,
 but not everything. The following sections describe how to run from source, but here
@@ -76,6 +77,7 @@ If you would like hardware wallet support, see `this`_.
 .. _Discord: https://discord.gg/VuubYncHz4
 .. _article: https://support.ledger.com/hc/en-us/articles/115005165209-Receive-mining-proceeds
 .. _releases: https://github.com/Electrum-RVN-SIG/electrum-ravencoin/releases
+.. _`ElectrumX Server`: https://github.com/Electrum-RVN-SIG/electrumx-ravencoin
 
 Running from tar.gz
 -------------------

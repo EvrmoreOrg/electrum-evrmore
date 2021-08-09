@@ -556,6 +556,8 @@ class AssetCreateWorkspace(QWidget):
         addrs = self.parent.wallet.get_change_addresses_for_new_transaction(extra_addresses=3)
         if not addrs:
             addrs = self.parent.wallet.get_change_addresses_for_new_transaction(allow_reusing_used_change_addrs=True, extra_addresses=3)
+        if not addrs:
+            addrs = self.parent.wallet.get_change_addresses()[:4]
         if len(addrs) < 4:
             assert len(addrs) > 0
             addr = addrs[0]

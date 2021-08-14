@@ -1614,7 +1614,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         from .asset_list import AssetList
         self.asset_list = l = AssetList(self)
 
-        if self.wallet.wallet_type not in ('imported, xpub'):
+        if self.wallet.wallet_type not in ('xpub',):
             self.create_workspace = create_w = AssetCreateWorkspace(self,
                                                                 self.confirm_asset_creation)
 

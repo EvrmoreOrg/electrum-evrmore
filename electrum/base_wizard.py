@@ -523,6 +523,8 @@ class BaseWizard(Logger):
         self.seed_type = seed_type if seed_type != 'electrum' else mnemonic.seed_type(seed)
         if self.seed_type == 'bip39':
             def f(passphrase):
+                print(seed)
+                print(passphrase)
                 root_seed = bip39_to_seed(seed, passphrase)
                 self.on_restore_bip43(root_seed, seed=seed)
             self.passphrase_dialog(run_next=f, is_restoring=True) if is_ext else f('')
@@ -558,7 +560,7 @@ class BaseWizard(Logger):
 
     def create_keystore(self, seed, passphrase):
         if self.seed_type == 'bip39':
-            root_seed = bip39_to_seed(seed, '')
+            root_seed = bip39_to_seed(seed, passphrase if passphrase else '')
             derivation = normalize_bip32_derivation(bip44_derivation(0))
             k = keystore.from_bip43_rootseed(root_seed, derivation, xtype='standard', seed=seed)
         else:

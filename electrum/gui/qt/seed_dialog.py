@@ -134,12 +134,12 @@ class SeedConfirmDisplay(QVBoxLayout):
             self.initialize_completer()
             self.seed_warning.setText(None)
 
-            if self.seed_type == 'bip39':
-                if self.opt_button:
-                    self.opt_button.setVisible(False)
-            else:
-                if self.opt_button:
-                    self.opt_button.setVisible(True)
+            #if self.seed_type == 'bip39':
+            #    if self.opt_button:
+            #        self.opt_button.setVisible(False)
+            #else:
+            #    if self.opt_button:
+            #        self.opt_button.setVisible(True)
 
         if options and full_check:
             hbox.addWidget(self.opt_button)
@@ -294,7 +294,7 @@ class SeedLayoutDisplay(QVBoxLayout):
         self.seed_e.setText(seed)
         self.seed_e.setMaximumHeight(75)
 
-        self.cached_seed_phrases = {'bip39_en': seed}
+        self.cached_seed_phrases = {'bip39_en_': seed}
 
         hbox = QHBoxLayout()
         if icon:
@@ -315,7 +315,7 @@ class SeedLayoutDisplay(QVBoxLayout):
         self.opt_button = None
         if options:
             self.opt_button = EnterButton(_('Options'), self.seed_options)
-            self.opt_button.setVisible(False)
+            #self.opt_button.setVisible(False)
 
         seed_types = [
             (value, title) for value, title in (
@@ -328,16 +328,22 @@ class SeedLayoutDisplay(QVBoxLayout):
         from electrum import mnemonic
 
         self.languages = list(mnemonic.filenames.items())
+        self.bits = (128, 160, 192, 224, 256)
         self.lang_cb = QComboBox()
         self.lang_cb.addItems([' '.join([s.capitalize() for s in x[1][:-4].split('_')]) for x in self.languages])
         self.lang_cb.setCurrentIndex(0)
 
+        self.bits_label = QLabel('Entropy:')
+        self.bits_cb = QComboBox()
+        self.bits_cb.addItems([str(b) for b in self.bits])
+        self.bits_cb.setCurrentIndex(0)
+
         def on_change():
             i = self.lang_cb.currentIndex()
             l = self.languages[i][0]
-            k = 'bip39_' + l
+            k = 'bip39_' + l + str(self.bit)
             if k not in self.cached_seed_phrases:
-                seed = mnemonic.Mnemonic(l).make_bip39_seed()
+                seed = mnemonic.Mnemonic(l).make_bip39_seed(num_bits=self.bit)
                 self.cached_seed_phrases[k] = seed
             else:
                 seed = self.cached_seed_phrases[k]
@@ -347,16 +353,33 @@ class SeedLayoutDisplay(QVBoxLayout):
 
         self.lang_cb.currentIndexChanged.connect(on_change)
 
+        def on_change_bits():
+            i = self.bits_cb.currentIndex()
+            b = self.bits[i]
+            k = 'bip39_' + self.lang + str(b)
+            if k not in self.cached_seed_phrases:
+                seed = mnemonic.Mnemonic(self.lang).make_bip39_seed(num_bits=b)
+                self.cached_seed_phrases[k] = seed
+            else:
+                seed = self.cached_seed_phrases[k]
+            self.seed_warning.setText(SEED_WARNING_1(seed))
+            self.seed_e.setText(seed)
+            self.bit = b
+
+        self.bits_cb.currentIndexChanged.connect(on_change_bits)
+
         def f(choices_layout):
             self.seed_type = seed_type_values[choices_layout.selected_index()]
             self.seed_status.setText('')
             if self.seed_type == 'bip39':
-                if self.opt_button:
-                    self.opt_button.setVisible(False)
+                #if self.opt_button:
+                #    self.opt_button.setVisible(False)
                 self.lang_cb.setVisible(True)
-                k = 'bip39_'+self.lang
+                self.bits_cb.setVisible(True)
+                self.bits_label.setVisible(True)
+                k = 'bip39_'+self.lang+str(self.bit)
                 if k not in self.cached_seed_phrases:
-                    seed = mnemonic.Mnemonic(self.lang).make_bip39_seed()
+                    seed = mnemonic.Mnemonic(self.lang).make_bip39_seed(num_bits=self.bit)
                     self.cached_seed_phrases[k] = seed
                 else:
                     seed = self.cached_seed_phrases[k]
@@ -364,9 +387,11 @@ class SeedLayoutDisplay(QVBoxLayout):
                 self.seed_e.setText(seed)
                 self.seed_type = 'bip39'
             else:
-                if self.opt_button:
-                    self.opt_button.setVisible(True)
+                #if self.opt_button:
+                #    self.opt_button.setVisible(True)
                 self.lang_cb.setVisible(False)
+                self.bits_cb.setVisible(False)
+                self.bits_label.setVisible(False)
                 k = 'electrum'
                 if k not in self.cached_seed_phrases:
                     seed = mnemonic.Mnemonic('en').make_seed(seed_type=self.electrum_seed_type)
@@ -396,7 +421,14 @@ class SeedLayoutDisplay(QVBoxLayout):
                                 '\n\nhttps://electrum.readthedocs.io/en/latest/seedphrase.html\n\n' +
                                 _('If you wish to use your seed phrase with other wallets, choose BIP39.'))
             h_b.addWidget(help)
+
+            h_b2 = QHBoxLayout()
+            h_b2.addWidget(self.bits_label)
+            h_b2.addWidget(self.bits_cb)
+            h_b2.setStretch(1, 1)
+
             vbox.addLayout(h_b)
+            vbox.addLayout(h_b2)
 
         hbox.addLayout(vbox)
 
@@ -426,13 +458,14 @@ class SeedLayoutDisplay(QVBoxLayout):
         self.addWidget(WWLabel(SEED_WARNING_2(seed)))
 
         self.lang = 'en'
+        self.bit = 128
 
     def seed_options(self):
         dialog = QDialog()
         vbox = QVBoxLayout(dialog)
 
         if 'ext' in self.options:
-            cb_ext = QCheckBox(_('Extend this seed with custom words'))
+            cb_ext = QCheckBox(_('Extend this seed with custom words (the "passphrase")'))
             cb_ext.setChecked(self.is_ext)
             vbox.addWidget(cb_ext)
 
@@ -564,8 +597,8 @@ class SeedLayout(QVBoxLayout):
         self.seed_status = WWLabel('')
         self.addWidget(self.seed_status)
         self.seed_warning = WWLabel('')
-        if msg:
-            self.seed_warning.setText(seed_warning_msg(seed))
+        #if msg:
+        #    self.seed_warning.setText(seed_warning_msg(seed))
         self.addWidget(self.seed_warning)
 
         self.lang = 'en'

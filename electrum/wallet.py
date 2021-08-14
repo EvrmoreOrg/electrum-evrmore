@@ -2930,7 +2930,7 @@ class Imported_Wallet(Simple_Wallet):
             txin_type = self.get_txin_type(addr)
             if txin_type == 'address':
                 return
-            if addr != bitcoin.pubkey_to_address(txin_type, pubkey):
+            if addr != ravencoin.pubkey_to_address(txin_type, pubkey):
                 raise InternalAddressCorruption()
 
     def _add_input_sig_info(self, txin, address, *, only_der_suffix):

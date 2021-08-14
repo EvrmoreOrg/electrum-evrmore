@@ -156,7 +156,7 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
         self.app = app
         self.config = config
         self.gui_thread = gui_object.gui_thread
-        self.setMinimumSize(600, 460)
+        self.setMinimumSize(600, 490)
         self.accept_signal.connect(self.accept)
         self.title = QLabel()
         self.main_widget = QWidget()
@@ -529,10 +529,10 @@ class InstallWizard(QDialog, MessageBoxMixin, BaseWizard):
             self.opt_ext = True  # True
         else:
             self.opt_bip39 = True  # False
-            self.opt_ext = False  # True
+            self.opt_ext = True  # True
         self.seed = slayout.get_seed()
         self.seed_type = slayout.seed_type
-        return slayout.is_ext and slayout.seed_type == 'electrum'
+        return slayout.is_ext #and slayout.seed_type == 'electrum'
 
     def pw_layout(self, msg, kind, force_disable_encrypt_cb):
         pw_layout = PasswordLayout(

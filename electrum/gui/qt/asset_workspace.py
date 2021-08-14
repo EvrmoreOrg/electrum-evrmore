@@ -553,11 +553,15 @@ class AssetCreateWorkspace(QWidget):
             self.aval_owner_combo.model().item(i).setEnabled(False)
 
     def refresh_change_addrs(self):
+        # We just want addresses to send the newly created assets to
+        # Is there a way to improve this?
         addrs = self.parent.wallet.get_change_addresses_for_new_transaction(extra_addresses=3)
         if not addrs:
             addrs = self.parent.wallet.get_change_addresses_for_new_transaction(allow_reusing_used_change_addrs=True, extra_addresses=3)
         if not addrs:
-            addrs = self.parent.wallet.get_change_addresses()[:4]
+            addrs = self.parent.wallet.get_change_addresses(slice_stop=4)
+        if not addrs:
+            addrs = self.parent.wallet.get_receiving_addresses(slice_stop=4)
         if len(addrs) < 4:
             assert len(addrs) > 0
             addr = addrs[0]
@@ -1188,9 +1192,15 @@ class AssetReissueWorkspace(QWidget):
             self.aval_owner_combo.model().item(i).setEnabled(False)
 
     def refresh_change_addrs(self):
+        # We just want addresses to send the newly created assets to
+        # Is there a way to improve this?
         addrs = self.parent.wallet.get_change_addresses_for_new_transaction(extra_addresses=3)
         if not addrs:
             addrs = self.parent.wallet.get_change_addresses_for_new_transaction(allow_reusing_used_change_addrs=True, extra_addresses=3)
+        if not addrs:
+            addrs = self.parent.wallet.get_change_addresses(slice_stop=4)
+        if not addrs:
+            addrs = self.parent.wallet.get_receiving_addresses(slice_stop=4)
         if len(addrs) < 4:
             assert len(addrs) > 0
             addr = addrs[0]

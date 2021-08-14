@@ -523,8 +523,6 @@ class BaseWizard(Logger):
         self.seed_type = seed_type if seed_type != 'electrum' else mnemonic.seed_type(seed)
         if self.seed_type == 'bip39':
             def f(passphrase):
-                print(seed)
-                print(passphrase)
                 root_seed = bip39_to_seed(seed, passphrase)
                 self.on_restore_bip43(root_seed, seed=seed)
             self.passphrase_dialog(run_next=f, is_restoring=True) if is_ext else f('')

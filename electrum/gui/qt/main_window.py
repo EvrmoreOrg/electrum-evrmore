@@ -96,7 +96,7 @@ from .util import (read_QIcon, ColorScheme, text_dialog, icon_path, WaitingDialo
                    import_meta_gui, export_meta_gui,
                    filename_field, address_field, char_width_in_lineedit, webopen,
                    TRANSACTION_FILE_EXTENSION_FILTER_ANY, MONOSPACE_FONT,
-                   getOpenFileName, getSaveFileName, BlockingWaitingDialog)
+                   getOpenFileName, getSaveFileName, BlockingWaitingDialog, HeaderTrackerLayout)
 from .util import ButtonsTextEdit, ButtonsLineEdit, ComplexLineEdit
 from .installwizard import WIF_HELP_TEXT
 from .history_list import HistoryList, HistoryModel
@@ -232,7 +232,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.contacts_tab = self.create_contacts_tab()
         self.messages_tab = self.create_messages_tab()
         # self.channels_tab = self.create_channels_tab()
-        tabs.addTab(self.create_history_tab(), read_QIcon("tab_history.png"), _('History'))
+        self.history_tab = self.create_history_tab()
+        history_tab_widget = QWidget()
+        self.history_tab_layout = QVBoxLayout()
+        self.header_tracker = HeaderTrackerLayout(self.network)
+        self.header_tracker.begin()
+        self.history_tab_layout.addLayout(self.header_tracker)
+        history_tab_widget.setLayout(self.history_tab_layout)
+        tabs.addTab(history_tab_widget, read_QIcon("tab_history.png"), _('History'))
         tabs.addTab(self.assets_tab, read_QIcon('tab_assets.png'), _('Assets'))
         tabs.addTab(self.send_tab, read_QIcon("tab_send.png"), _('Send'))
         tabs.addTab(self.receive_tab, read_QIcon("tab_receive.png"), _('Receive'))
@@ -1055,8 +1062,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 else:
                     icon = read_QIcon("status_connected_proxy%s.png" % fork_str)
             local_height = self.network.get_local_height()
-            if local_height < server_height - 100:
-                status_text = "Syncing headers... {}/{}".format(local_height, server_height)
+            if local_height > server_height - 100 and self.header_tracker:
+                self.history_tab_layout.removeItem(self.history_tab_layout.itemAt(0))
+                self.header_tracker.finished()
+                self.header_tracker.deleteLater()
+                self.header_tracker = None  # Garbage collect
+
+                self.history_tab_layout.addWidget(self.history_tab)
         else:
             if self.network.proxy:
                 text = "{} ({})".format(_("Not connected"), _("proxy enabled"))

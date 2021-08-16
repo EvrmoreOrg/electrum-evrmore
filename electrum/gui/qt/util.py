@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import os.path
 import time
 import sys
@@ -17,7 +18,7 @@ from PyQt5.QtGui import (QFont, QColor, QCursor, QPixmap, QStandardItem, QImage,
 from PyQt5.QtCore import (Qt, QPersistentModelIndex, QModelIndex, pyqtSignal,
                           QCoreApplication, QItemSelectionModel, QThread,
                           QSortFilterProxyModel, QSize, QLocale, QAbstractItemModel,
-                          QEvent, QRect, QPoint, QObject)
+                          QEvent, QRect, QPoint, QObject, QTimer)
 from PyQt5.QtWidgets import (QPushButton, QLabel, QMessageBox, QHBoxLayout,
                              QAbstractItemView, QVBoxLayout, QLineEdit,
                              QStyle, QDialog, QGroupBox, QButtonGroup, QRadioButton,
@@ -65,6 +66,62 @@ TRANSACTION_FILE_EXTENSION_FILTER_ONLY_COMPLETE_TX = "Complete Transaction (*.tx
 TRANSACTION_FILE_EXTENSION_FILTER_SEPARATE = (f"{TRANSACTION_FILE_EXTENSION_FILTER_ONLY_PARTIAL_TX};;"
                                               f"{TRANSACTION_FILE_EXTENSION_FILTER_ONLY_COMPLETE_TX};;"
                                               f"All files (*)")
+
+
+class HeaderTrackerLayout(QVBoxLayout):
+    def __init__(self, network):
+        super().__init__()
+
+        self.network = network
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.calculate_stats)
+        self.start = time.time()
+        self.headers_start = self.network.get_local_height()
+        self.last_eta = '...'
+
+        gen_info = QLabel(_('You are currently synchronizing and verifying Ravencoin block headers.\n'
+                            'Please leave electrum open until this process is complete.\n'
+                            'You will only need to download these headers once.\n\n'
+                            'This electrum client uses these headers to verify information sent by electrum servers.\n'
+                            'Transaction information you might have will not be visible while this synchronization is occuring.\n\n'
+                            'The GUI will be laggy while this synchronization is in progress. A fix is in the works...'))
+        self.addWidget(gen_info)
+
+        self.header_stats = QLabel('')
+        self.update_stats(0, 0, '...')
+
+        self.addWidget(self.header_stats)
+
+        self.setStretch(1, 1)
+
+    def calculate_stats(self):
+        local_height = self.network.get_local_height()
+        server_height = self.network.get_server_height()
+
+        sec_delta = time.time() - self.start
+        headers_left = server_height - local_height
+        header_delta = local_height - self.headers_start
+
+        eta = self.last_eta
+
+        if headers_left != 0 and sec_delta != 0:
+            secs = sec_delta / header_delta * headers_left
+            eta = str(datetime.timedelta(seconds=round(secs)))
+
+        self.update_stats(local_height, server_height, eta)
+        self.last_eta = eta
+
+    def update_stats(self, local, server, time):
+        self.header_stats.setText(_('Header Status:\n'
+                                    '{}/{}\n\n'
+                                    'Estimated time until completion:\n'
+                                    '{}').format(local, server, time))
+
+    def begin(self):
+        self.timer.start(2000)
+
+    def finished(self):
+        self.timer.stop()
 
 
 class EnterButton(QPushButton):

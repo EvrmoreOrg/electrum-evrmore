@@ -45,24 +45,21 @@ from .completion_text_edit import CompletionTextEdit
 if TYPE_CHECKING:
     from electrum.simple_config import SimpleConfig
 
-def SEED_WARNING_1(seed):\
+
+def seed_warning_msg(seed):
     return ''.join([
         "<p>",
         _("Please save these {0} words on paper (order is important). "),
         _("This seed will allow you to recover your wallet in case "
           "of computer failure."),
         "</p>",
-    ]).format(len(seed.split()))
-
-def SEED_WARNING_2(seed):
-    return ''.join([
         "<b>" + _("WARNING") + ":</b>",
         "<ul>",
         "<li>" + _("Never disclose your seed.") + "</li>",
         "<li>" + _("Never type it on a website.") + "</li>",
         "<li>" + _("Do not store it electronically.") + "</li>",
         "</ul>"
-    ])
+    ]).format(len(seed.split()))
 
 
 class SeedConfirmDisplay(QVBoxLayout):
@@ -164,7 +161,7 @@ class SeedConfirmDisplay(QVBoxLayout):
         vbox = QVBoxLayout(dialog)
 
         if 'ext' in self.options:
-            cb_ext = QCheckBox(_('Extend this seed with custom words'))
+            cb_ext = QCheckBox(_('Extend this seed with custom words (the "passphrase")'))
             cb_ext.setChecked(self.is_ext)
             vbox.addWidget(cb_ext)
 
@@ -294,7 +291,7 @@ class SeedLayoutDisplay(QVBoxLayout):
         self.seed_e.setText(seed)
         self.seed_e.setMaximumHeight(75)
 
-        self.cached_seed_phrases = {'bip39_en_': seed}
+        self.cached_seed_phrases = {'bip39_en_128': seed}
 
         hbox = QHBoxLayout()
         if icon:
@@ -315,6 +312,8 @@ class SeedLayoutDisplay(QVBoxLayout):
         self.opt_button = None
         if options:
             self.opt_button = EnterButton(_('Options'), self.seed_options)
+            hbox.addWidget(self.opt_button)
+            self.addLayout(hbox)
             #self.opt_button.setVisible(False)
 
         seed_types = [
@@ -347,7 +346,7 @@ class SeedLayoutDisplay(QVBoxLayout):
                 self.cached_seed_phrases[k] = seed
             else:
                 seed = self.cached_seed_phrases[k]
-            self.seed_warning.setText(SEED_WARNING_1(seed))
+            self.seed_warning.setText(seed_warning_msg(seed))
             self.seed_e.setText(seed)
             self.lang = l
 
@@ -362,7 +361,7 @@ class SeedLayoutDisplay(QVBoxLayout):
                 self.cached_seed_phrases[k] = seed
             else:
                 seed = self.cached_seed_phrases[k]
-            self.seed_warning.setText(SEED_WARNING_1(seed))
+            self.seed_warning.setText(seed_warning_msg(seed))
             self.seed_e.setText(seed)
             self.bit = b
 
@@ -383,7 +382,7 @@ class SeedLayoutDisplay(QVBoxLayout):
                     self.cached_seed_phrases[k] = seed
                 else:
                     seed = self.cached_seed_phrases[k]
-                self.seed_warning.setText(SEED_WARNING_1(seed))
+                self.seed_warning.setText(seed_warning_msg(seed))
                 self.seed_e.setText(seed)
                 self.seed_type = 'bip39'
             else:
@@ -398,39 +397,13 @@ class SeedLayoutDisplay(QVBoxLayout):
                     self.cached_seed_phrases[k] = seed
                 else:
                     seed = self.cached_seed_phrases[k]
-                self.seed_warning.setText(SEED_WARNING_1(seed))
+                self.seed_warning.setText(seed_warning_msg(seed))
                 self.seed_e.setText(seed)
                 self.seed_type = 'electrum'
 
         checked_index = seed_type_values.index(self.seed_type)
         titles = [t[1] for t in seed_types]
         self.clayout = ChoicesLayout(_('Seed type'), titles, on_clicked=f, checked_index=checked_index)
-
-        vbox = QVBoxLayout()
-
-        if not only_display:
-            vbox.addLayout(self.clayout.layout())
-            h_b = QHBoxLayout()
-            if options:
-                h_b.addWidget(self.opt_button)
-            h_b.addWidget(self.lang_cb)
-            help = HelpButton(_('The standard electrum seed phrase is not ' +
-                                'BIP39 compliant and will not work with other wallets. ' +
-                                'It does however, have some advantages over BIP39 as explained ' +
-                                'here:') +
-                                '\n\nhttps://electrum.readthedocs.io/en/latest/seedphrase.html\n\n' +
-                                _('If you wish to use your seed phrase with other wallets, choose BIP39.'))
-            h_b.addWidget(help)
-
-            h_b2 = QHBoxLayout()
-            h_b2.addWidget(self.bits_label)
-            h_b2.addWidget(self.bits_cb)
-            h_b2.setStretch(1, 1)
-
-            vbox.addLayout(h_b)
-            vbox.addLayout(h_b2)
-
-        hbox.addLayout(vbox)
 
         if passphrase:
             hbox = QHBoxLayout()
@@ -449,13 +422,9 @@ class SeedLayoutDisplay(QVBoxLayout):
         self.addWidget(self.seed_status)
         self.seed_warning = WWLabel('')
         if msg:
-            self.seed_warning.setText(SEED_WARNING_1(seed))
+            self.seed_warning.setText(seed_warning_msg(seed))
 
-        sub_hbox.addWidget(self.seed_warning)
-        sub_hbox.addLayout(hbox)
-
-        self.addLayout(sub_hbox)
-        self.addWidget(WWLabel(SEED_WARNING_2(seed)))
+        self.addWidget(self.seed_warning)
 
         self.lang = 'en'
         self.bit = 128
@@ -465,9 +434,28 @@ class SeedLayoutDisplay(QVBoxLayout):
         vbox = QVBoxLayout(dialog)
 
         if 'ext' in self.options:
-            cb_ext = QCheckBox(_('Extend this seed with custom words (the "passphrase")'))
+            cb_ext = QCheckBox(_('Extend this seed with custom words'))
             cb_ext.setChecked(self.is_ext)
             vbox.addWidget(cb_ext)
+
+        vbox.addLayout(self.clayout.layout())
+        h_b = QHBoxLayout()
+        h_b.addWidget(self.lang_cb)
+        help = HelpButton(_('The standard electrum seed phrase is not ' +
+                            'BIP39 compliant and will not work with other wallets. ' +
+                            'It does however, have some advantages over BIP39 as explained ' +
+                            'here:') +
+                          '\n\nhttps://electrum.readthedocs.io/en/latest/seedphrase.html\n\n' +
+                          _('If you wish to use your seed phrase with other wallets, choose BIP39.'))
+        h_b.addWidget(help)
+
+        h_b2 = QHBoxLayout()
+        h_b2.addWidget(self.bits_label)
+        h_b2.addWidget(self.bits_cb)
+        h_b2.setStretch(1, 1)
+
+        vbox.addLayout(h_b)
+        vbox.addLayout(h_b2)
 
         vbox.addLayout(Buttons(OkButton(dialog)))
         if not dialog.exec_():

@@ -448,13 +448,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.network_signal.emit(event, args)
 
     def on_network_qt(self, event, args=None):
-        # Defer expensive updates when syncing the headers;
-        # We don't want every single block to trigger these when syncing
-        server_height = self.network.get_server_height()
-        local_height = self.network.get_local_height()
-        if local_height < server_height - 100:
-            return
-
         # Handle a network message in the GUI thread
         # note: all windows get events from all wallets!
         if event == 'wallet_updated':
@@ -944,12 +937,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             # this updates "synchronizing" progress
             self.update_status()
         self.request_list.refresh_status()
-
-        # Quit early if syncing headers
-        server_height = self.network.get_server_height()
-        local_height = self.network.get_local_height()
-        if local_height < server_height - 100:
-            return
 
         # resolve aliases
         # FIXME this is a blocking network call that has a timeout of 5 sec

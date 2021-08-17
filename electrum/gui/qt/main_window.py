@@ -237,7 +237,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.history_tab_layout = QVBoxLayout()
         self.header_tracker = HeaderTrackerLayout(self.network)
         self.header_tracker.begin()
-        self.history_tab_layout.addLayout(self.header_tracker)
+        self.displaying_tracker = False
+        self.history_tab_layout.addWidget(self.history_tab)
         history_tab_widget.setLayout(self.history_tab_layout)
         tabs.addTab(history_tab_widget, read_QIcon("tab_history.png"), _('History'))
         tabs.addTab(self.assets_tab, read_QIcon('tab_assets.png'), _('Assets'))
@@ -1062,12 +1063,15 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 else:
                     icon = read_QIcon("status_connected_proxy%s.png" % fork_str)
             local_height = self.network.get_local_height()
-            if local_height > server_height - 100 and self.header_tracker:
+            if local_height < server_height - (2016*2) and self.header_tracker:
+                self.history_tab_layout.removeItem(self.history_tab_layout.itemAt(0))
+                self.displaying_tracker = True
+                self.history_tab_layout.addLayout(self.header_tracker)
+            elif self.displaying_tracker:
                 self.history_tab_layout.removeItem(self.history_tab_layout.itemAt(0))
                 self.header_tracker.finished()
                 self.header_tracker.deleteLater()
                 self.header_tracker = None  # Garbage collect
-
                 self.history_tab_layout.addWidget(self.history_tab)
         else:
             if self.network.proxy:

@@ -51,7 +51,7 @@ from .transaction import (Transaction, multisig_script, TxOutput, PartialTransac
 from .interface import MAX_INCOMING_MSG_SIZE
 from .invoices import PR_PAID, PR_UNPAID, PR_UNKNOWN, PR_EXPIRED
 from .synchronizer import Notifier
-from .wallet import Abstract_Wallet, create_new_wallet, restore_wallet_from_text, Deterministic_Wallet
+from .wallet import Abstract_Wallet, create_new_wallet, restore_wallet_from_text, Deterministic_Wallet, BumpFeeStrategy
 from .address_synchronizer import TX_HEIGHT_LOCAL
 from .mnemonic import Mnemonic
 from .lnutil import SENT, RECEIVED
@@ -743,6 +743,37 @@ class Commands:
     #    lightning_history = wallet.lnworker.get_history() if wallet.lnworker else []
     #    return json_normalize(lightning_history)
 
+    @command('wp')
+    async def bumpfee(self, tx, new_fee_rate, from_coins=None, strategies=None, password=None, unsigned=False, wallet: Abstract_Wallet = None):
+        """ Bump the Fee for an unconfirmed Transaction """
+        tx = Transaction(tx)
+        domain_coins = from_coins.split(',') if from_coins else None
+        coins = wallet.get_spendable_coins(None)
+        if domain_coins is not None:
+            coins = [coin for coin in coins if (coin.prevout.to_str() in domain_coins)]
+        strategies = strategies.split(',') if strategies else None
+        bumpfee_strategies = None
+        if strategies is not None:
+            bumpfee_strategies = []
+            for strategy in strategies:
+                if strategy == 'CoinChooser':
+                    bumpfee_strategies.append(BumpFeeStrategy.COINCHOOSER)
+                elif strategy == 'DecreaseChange':
+                    bumpfee_strategies.append(BumpFeeStrategy.DECREASE_CHANGE)
+                elif strategy == 'DecreasePayment':
+                    bumpfee_strategies.append(BumpFeeStrategy.DECREASE_PAYMENT)
+                else:
+                    raise Exception("Invalid Choice of Strategies")
+        new_tx = wallet.bump_fee(
+            tx=tx,
+            txid=tx.txid(),
+            coins=coins,
+            strategies=bumpfee_strategies,
+            new_fee_rate=new_fee_rate)
+        if not unsigned:
+            wallet.sign_transaction(new_tx, password)
+        return new_tx.serialize()
+
     @command('w')
     async def setlabel(self, key, label, wallet: Abstract_Wallet = None):
         """Assign a label to an item. Item may be a bitcoin address or a
@@ -1366,6 +1397,8 @@ command_options = {
     'iknowwhatimdoing': (None, "Acknowledge that I understand the full implications of what I am about to do"),
     'gossip':      (None, "Apply command to gossip node instead of wallet"),
     'connection_string':      (None, "Lightning network node ID or network address"),
+    'new_fee_rate': (None, "The Updated/Increased Transaction fee rate (in sat/byte)"),
+    'strategies': (None, "Select RBF any one or multiple RBF strategies in any order, separated by ','; Options : 'CoinChooser','DecreaseChange','DecreasePayment' "),
 }
 
 

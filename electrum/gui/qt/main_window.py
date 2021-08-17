@@ -2364,12 +2364,15 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         else:
             self.payment_request_error_signal.emit()
 
-    def parse_lightning_invoice(self, invoice):
+    def set_ln_invoice(self, invoice: str):
         """Parse ln invoice, and prepare the send tab for it."""
         try:
             lnaddr = lndecode(invoice)
-        except Exception as e:
-            raise LnDecodeException(e) from e
+        except LnInvoiceException as e:
+            self.show_error(_("Error parsing Lightning invoice") + f":\n{e}")
+            return
+
+        self.payto_e.lightning_invoice = invoice
         pubkey = bh2u(lnaddr.pubkey.serialize())
         for k, v in lnaddr.tags:
             if k == 'd':
@@ -2382,6 +2385,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.message_e.setText(description)
         if lnaddr.get_amount_sat() is not None:
             self.amount_e.setAmount(lnaddr.get_amount_sat())
+
         # self.amount_e.textEdited.emit("")
         self.set_onchain(False)
 
@@ -2389,15 +2393,12 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self._is_onchain = b
         self.max_button.setEnabled(b)
 
-    def pay_to_URI(self, URI):
-        if not URI:
-            return
+    def set_bip21(self, text: str):
         try:
-            out = util.parse_URI(URI, self.on_pr)
+            out = util.parse_URI(text, self.on_pr)
         except InvalidBitcoinURI as e:
             self.show_error(_("Error parsing URI") + f":\n{e}")
             return
-        self.show_send_tab()
         self.payto_URI = out
         r = out.get('r')
         sig = out.get('sig')
@@ -2418,7 +2419,19 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.message_e.setText(message)
         if amount:
             self.amount_e.setAmount(amount)
-            self.amount_e.textEdited.emit("")
+
+    def pay_to_URI(self, text: str):
+        if not text:
+            return
+        # first interpret as lightning invoice
+        bolt11_invoice = maybe_extract_bolt11_invoice(text)
+        if bolt11_invoice:
+            self.set_ln_invoice(bolt11_invoice)
+        else:
+            self.set_bip21(text)
+        # update fiat amount
+        self.amount_e.textEdited.emit("")
+        self.show_send_tab()
 
     def do_clear(self):
         self.max_button.setChecked(False)

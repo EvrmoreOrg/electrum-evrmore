@@ -48,7 +48,7 @@ from .lnpeer import Peer, LN_P2P_NETWORK_TIMEOUT
 from .lnaddr import lnencode, LnAddr, lndecode
 from .ecc import der_sig_from_sig_string
 from .lnchannel import Channel, AbstractChannel
-from .lnchannel import ChannelState, PeerState
+from .lnchannel import ChannelState, PeerState, HTLCWithStatus
 from .lnrater import LNRater
 from . import lnutil
 from .lnutil import funding_output_script
@@ -777,24 +777,27 @@ class LNWallet(LNWorker):
             util.trigger_callback('channel', self.wallet, chan)
         super().peer_closed(peer)
 
-    def get_payments(self, *, status=None):
-        # return one item per payment_hash
-        # note: with AMP we will have several channels per payment
+    def get_payments(self, *, status=None) -> Mapping[bytes, List[HTLCWithStatus]]:
         out = defaultdict(list)
         for chan in self.channels.values():
             d = chan.get_payments(status=status)
-            for k, v in d.items():
-                out[k] += v
+            for payment_hash, plist in d.items():
+                out[payment_hash] += plist
         return out
 
-    def get_payment_value(self, info: Optional['PaymentInfo'], plist):
+    def get_payment_value(
+            self, info: Optional['PaymentInfo'], plist: List[HTLCWithStatus],
+    ) -> Tuple[int, int, int]:
+        assert plist
         amount_msat = 0
         fee_msat = None
-        for chan_id, htlc, _direction, _status in plist:
+        for htlc_with_status in plist:
+            htlc = htlc_with_status.htlc
+            _direction = htlc_with_status.direction
             amount_msat += int(_direction) * htlc.amount_msat
             if _direction == SENT and info and info.amount_msat:
                 fee_msat = (fee_msat or 0) - info.amount_msat - amount_msat
-        timestamp = min([htlc.timestamp for chan_id, htlc, _direction, _status in plist])
+        timestamp = min([htlc_with_status.htlc.timestamp for htlc_with_status in plist])
         return amount_msat, fee_msat, timestamp
 
     def get_lightning_history(self):
@@ -1464,11 +1467,12 @@ class LNWallet(LNWorker):
         invoice_features = LnFeatures(invoice_features)
         trampoline_features = LnFeatures.VAR_ONION_OPT
         local_height = self.network.get_local_height()
-        active_channels = [chan for chan in self.channels.values() if chan.is_active() and not chan.is_frozen_for_sending()]
+        my_active_channels = [chan for chan in self.channels.values() if
+            chan.is_active() and not chan.is_frozen_for_sending()]
         try:
             # try to send over a single channel
             if not self.channel_db:
-                for chan in active_channels:
+                for chan in my_active_channels:
                     if not self.is_trampoline_peer(chan.node_id):
                         continue
                     if chan.node_id == invoice_pubkey:
@@ -1519,7 +1523,7 @@ class LNWallet(LNWorker):
                         min_cltv_expiry=min_cltv_expiry,
                         r_tags=r_tags,
                         invoice_features=invoice_features,
-                        channels=active_channels,
+                        my_sending_channels=my_active_channels,
                         full_path=full_path
                     )
                 )
@@ -1527,9 +1531,8 @@ class LNWallet(LNWorker):
         except NoPathFound:
             if not invoice_features.supports(LnFeatures.BASIC_MPP_OPT):
                 raise
-            channels_with_funds = {
-                (chan.channel_id, chan.node_id): int(chan.available_to_spend(HTLCOwner.LOCAL))
-                for chan in active_channels}
+            channels_with_funds = {(chan.channel_id, chan.node_id): int(chan.available_to_spend(HTLCOwner.LOCAL))
+                for chan in my_active_channels}
             self.logger.info(f"channels_with_funds: {channels_with_funds}")
             # for trampoline mpp payments we have to restrict ourselves to pay
             # to a single node due to some incompatibility in Eclair, see:
@@ -1600,7 +1603,7 @@ class LNWallet(LNWorker):
                                         min_cltv_expiry=min_cltv_expiry,
                                         r_tags=r_tags,
                                         invoice_features=invoice_features,
-                                        channels=[channel],
+                                        my_sending_channels=[channel],
                                         full_path=None
                                     )
                                 )
@@ -1620,13 +1623,11 @@ class LNWallet(LNWorker):
             min_cltv_expiry: int,
             r_tags,
             invoice_features: int,
-            channels: List[Channel],
+            my_sending_channels: List[Channel],
             full_path: Optional[LNPaymentPath]) -> LNPaymentRoute:
 
-        scid_to_my_channels = {
-            chan.short_channel_id: chan for chan in channels
-            if chan.short_channel_id is not None
-        }
+        my_sending_channels = {chan.short_channel_id: chan for chan in my_sending_channels
+            if chan.short_channel_id is not None}
         # Collect all private edges from route hints.
         # Note: if some route hints are multiple edges long, and these paths cross each other,
         #       we allow our path finding to cross the paths; i.e. the route hints are not isolated.
@@ -1644,7 +1645,7 @@ class LNWallet(LNWorker):
                 channel_policy = self.channel_db.get_policy_for_node(
                     short_channel_id=short_channel_id,
                     node_id=start_node,
-                    my_channels=scid_to_my_channels)
+                    my_channels=my_sending_channels)
                 if channel_policy:
                     fee_base_msat = channel_policy.fee_base_msat
                     fee_proportional_millionths = channel_policy.fee_proportional_millionths
@@ -1667,7 +1668,7 @@ class LNWallet(LNWorker):
                 nodeB=invoice_pubkey,
                 invoice_amount_msat=amount_msat,
                 path=full_path,
-                my_channels=scid_to_my_channels,
+                my_sending_channels=my_sending_channels,
                 private_route_edges=private_route_edges)
         except NoChannelPolicy as e:
             raise NoPathFound() from e

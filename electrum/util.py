@@ -762,7 +762,7 @@ DECIMAL_POINT = localeconv()['decimal_point']  # type: str
 
 
 def format_satoshis(
-        x: Union[int, float, Decimal, str, None],  # amount in satoshis
+        x: Union[int, float, Decimal, str, None, Satoshis],  # amount in satoshis
         *,
         num_zeros: int = 0,
         decimal_point: int = 8,  # how much to shift decimal point to left (default: sat->BTC)
@@ -775,6 +775,8 @@ def format_satoshis(
         return 'unknown'
     if x == '!':
         return 'max'
+    if isinstance(x, Satoshis):
+        x = x.value
     assert isinstance(x, (int, float, Decimal)), f"{x!r} should be a number"
     # lose redundant precision
     x = Decimal(x).quantize(Decimal(10) ** (-precision))

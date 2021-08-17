@@ -104,7 +104,7 @@ class HeaderTrackerLayout(QVBoxLayout):
 
         eta = self.last_eta
 
-        if headers_left != 0 and sec_delta != 0:
+        if headers_left != 0 and sec_delta != 0 and header_delta != 0:
             secs = sec_delta / header_delta * headers_left
             eta = str(datetime.timedelta(seconds=round(secs)))
 

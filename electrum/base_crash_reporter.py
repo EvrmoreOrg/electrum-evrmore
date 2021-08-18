@@ -98,7 +98,7 @@ class BaseCrashReporter(Logger):
 
     def get_additional_info(self):
         args = {
-            "app_version": get_git_version() or ELECTRUM_VERSION,
+            "app_version": ELECTRUM_VERSION,  #get_git_version() or ELECTRUM_VERSION,
             "python_version": sys.version,
             "os": describe_os_version(),
             "wallet_type": "unknown",

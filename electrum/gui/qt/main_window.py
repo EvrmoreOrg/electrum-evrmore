@@ -232,15 +232,18 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.contacts_tab = self.create_contacts_tab()
         self.messages_tab = self.create_messages_tab()
         # self.channels_tab = self.create_channels_tab()
+
         self.history_tab = self.create_history_tab()
         history_tab_widget = QWidget()
         self.history_tab_layout = QVBoxLayout()
-        self.header_tracker = HeaderTrackerLayout(self.network)
+        self.header_tracker = HeaderTrackerLayout()
         self.header_tracker.begin()
         self.displaying_tracker = False
+        self.last_header = -1
         self.history_tab_layout.addWidget(self.history_tab)
         history_tab_widget.setLayout(self.history_tab_layout)
         tabs.addTab(history_tab_widget, read_QIcon("tab_history.png"), _('History'))
+
         tabs.addTab(self.assets_tab, read_QIcon('tab_assets.png'), _('Assets'))
         tabs.addTab(self.send_tab, read_QIcon("tab_send.png"), _('Send'))
         tabs.addTab(self.receive_tab, read_QIcon("tab_receive.png"), _('Receive'))
@@ -1024,13 +1027,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             return
 
         status_text = ''
+        local_height = self.network.get_local_height()
         server_height = self.network.get_server_height()
         if self.network is None:
             text = _("Offline")
             icon = read_QIcon("status_disconnected.png")
 
         elif self.network.is_connected():
-            server_lag = self.network.get_local_height() - server_height
+            server_lag = local_height - server_height
             fork_str = "_fork" if len(self.network.get_blockchains()) > 1 else ""
             # Server height can be 0 after switching to a new server
             # until we get a headers subscription request response.
@@ -1062,12 +1066,16 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                     icon = read_QIcon("status_connected%s.png" % fork_str)
                 else:
                     icon = read_QIcon("status_connected_proxy%s.png" % fork_str)
-            local_height = self.network.get_local_height()
             if local_height < server_height - (2016*2) and self.header_tracker:
-                self.history_tab_layout.removeItem(self.history_tab_layout.itemAt(0))
-                self.displaying_tracker = True
-                self.history_tab_layout.addLayout(self.header_tracker)
+                if not self.displaying_tracker:
+                    self.history_tab_layout.removeItem(self.history_tab_layout.itemAt(0))
+                    self.displaying_tracker = True
+                    self.history_tab_layout.addLayout(self.header_tracker)
+                elif self.last_header != local_height:
+                    self.last_header = local_height
+                    self.header_tracker.calculate_stats(local_height, server_height)
             elif self.displaying_tracker and self.header_tracker:
+                self.displaying_tracker = False
                 self.history_tab_layout.removeItem(self.history_tab_layout.itemAt(0))
                 self.header_tracker.finished()
                 self.header_tracker.deleteLater()

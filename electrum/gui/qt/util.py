@@ -69,15 +69,18 @@ TRANSACTION_FILE_EXTENSION_FILTER_SEPARATE = (f"{TRANSACTION_FILE_EXTENSION_FILT
 
 
 class HeaderTrackerLayout(QVBoxLayout):
-    def __init__(self, network):
+    def __init__(self):
         super().__init__()
 
-        self.network = network
         self.timer = QTimer()
-        self.timer.timeout.connect(self.calculate_stats)
+        self.timer.timeout.connect(self.update_timer)
         self.start = time.time()
-        self.headers_start = self.network.get_local_height()
+        self.headers_start = -1
         self.last_eta = '...'
+
+        self.loading_chars = u'\U0001f311\U0001f312\U0001f313\U0001f314\U0001f315\U0001f316\U0001f317\U0001f318'
+        self.loading_pointer = 0
+        self.current_char = self.loading_chars[self.loading_pointer]
 
         gen_info = QLabel(_('You are currently synchronizing and verifying Ravencoin block headers.\n'
                             'Please leave electrum open until this process is complete.\n'
@@ -94,9 +97,10 @@ class HeaderTrackerLayout(QVBoxLayout):
 
         self.setStretch(1, 1)
 
-    def calculate_stats(self):
-        local_height = self.network.get_local_height()
-        server_height = self.network.get_server_height()
+    def calculate_stats(self, local_height, server_height):
+
+        if self.headers_start < 0:
+            self.headers_start = local_height
 
         sec_delta = time.time() - self.start
         headers_left = server_height - local_height
@@ -112,13 +116,26 @@ class HeaderTrackerLayout(QVBoxLayout):
         self.last_eta = eta
 
     def update_stats(self, local, server, time):
-        self.header_stats.setText(_('Header Status:\n'
+        self.header_stats.setText(_('Header Status {}\n'
                                     '{}/{}\n\n'
                                     'Estimated time until completion:\n'
-                                    '{}').format(local, server, time))
+                                    '{}').format(self.current_char,
+                                                 local, server, time))
+
+    def update_timer(self):
+        self.current_char = c = self.loading_chars[self.loading_pointer]
+
+        self.loading_pointer += 1
+        self.loading_pointer %= len(self.loading_chars)
+
+        splitted = self.header_stats.text().split('\n')
+        splitted[0] = splitted[0][:-1] + c
+
+        n = '\n'.join(splitted)
+        self.header_stats.setText(n)
 
     def begin(self):
-        self.timer.start(2000)
+        self.timer.start(250)
 
     def finished(self):
         self.timer.stop()

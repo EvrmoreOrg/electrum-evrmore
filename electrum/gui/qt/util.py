@@ -68,9 +68,11 @@ TRANSACTION_FILE_EXTENSION_FILTER_SEPARATE = (f"{TRANSACTION_FILE_EXTENSION_FILT
                                               f"All files (*)")
 
 
-class HeaderTrackerLayout(QVBoxLayout):
+class HeaderTracker(QWidget):
     def __init__(self):
         super().__init__()
+
+        vbox = QVBoxLayout()
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_timer)
@@ -88,14 +90,16 @@ class HeaderTrackerLayout(QVBoxLayout):
                             'This electrum client uses these headers to verify information sent by electrum servers.\n'
                             'Transaction information you might have will not be visible while this synchronization is occuring.\n\n'
                             'The GUI will be laggy while this synchronization is in progress. A fix is in the works...'))
-        self.addWidget(gen_info)
+        vbox.addWidget(gen_info)
 
         self.header_stats = QLabel('')
         self.update_stats(0, 0, '...')
 
-        self.addWidget(self.header_stats)
+        vbox.addWidget(self.header_stats)
 
-        self.setStretch(1, 1)
+        vbox.setStretch(1, 1)
+
+        self.setLayout(vbox)
 
     def calculate_stats(self, local_height, server_height):
 

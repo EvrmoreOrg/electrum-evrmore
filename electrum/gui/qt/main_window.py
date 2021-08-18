@@ -1067,7 +1067,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 self.history_tab_layout.removeItem(self.history_tab_layout.itemAt(0))
                 self.displaying_tracker = True
                 self.history_tab_layout.addLayout(self.header_tracker)
-            elif self.displaying_tracker:
+            elif self.displaying_tracker and self.header_tracker:
                 self.history_tab_layout.removeItem(self.history_tab_layout.itemAt(0))
                 self.header_tracker.finished()
                 self.header_tracker.deleteLater()

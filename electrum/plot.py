@@ -25,7 +25,7 @@ def plot_history(history):
             continue
         if item['timestamp'] is None:
             continue
-        value = item['value'].value/COIN
+        value = item['value'].rvn_value.value/COIN
         date = item['date']
         datenum = int(md.date2num(datetime.date(date.year, date.month, 1)))
         if value > 0:
@@ -37,7 +37,7 @@ def plot_history(history):
     plt.subplots_adjust(bottom=0.2)
     plt.xticks(rotation=25)
     ax = plt.gca()
-    plt.ylabel('BTC')
+    plt.ylabel('RVN')
     plt.xlabel('Month')
     xfmt = md.DateFormatter('%Y-%m-%d')
     ax.xaxis.set_major_formatter(xfmt)

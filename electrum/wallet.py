@@ -1043,7 +1043,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 fiat_fields = self.get_tx_item_fiat(tx_hash=tx_hash, amount_sat=value.rvn_value.value, fx=fx, tx_fee=tx_fee)
                 fiat_value = fiat_fields['fiat_value'].value
                 item.update(fiat_fields)
-                if value < 0:
+                if value < RavenValue():
                     capital_gains += fiat_fields['capital_gain'].value
                     fiat_expenditures += -fiat_value
                 else:
@@ -1128,11 +1128,11 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
     def acquisition_price(self, coins, price_func, ccy):
         return Decimal(
-            sum(self.coin_price(coin.prevout.txid.hex(), price_func, ccy, self.get_txin_value(coin)) for coin in coins))
+            sum(self.coin_price(coin.prevout.txid.hex(), price_func, ccy, self.get_txin_value(coin).rvn_value.value) for coin in coins))
 
     def liquidation_price(self, coins, price_func, timestamp):
         p = price_func(timestamp)
-        return sum([coin.value_sats() for coin in coins]) * p / Decimal(COIN)
+        return sum([coin.value_sats().rvn_value.value for coin in coins]) * p / Decimal(COIN)
 
     def default_fiat_value(self, tx_hash, fx, value_sat):
         return Decimal(int(value_sat)) / Decimal(COIN) * self.price_at_timestamp(tx_hash, fx.timestamp_rate)

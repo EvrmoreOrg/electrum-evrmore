@@ -1110,20 +1110,31 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
         if is_csv:
             for item in txns:
                 rvn_value = item['bc_value']
-                val = rvn_value.rvn_value.value
-                asset = ''
+                val = rvn_value.rvn_value
+
+                if val != 0:
+                    lines.append([item['txid'],
+                                  item.get('label', ''),
+                                  item['confirmations'],
+                                  val,
+                                  '',
+                                  item.get('fiat_value', ''),
+                                  item.get('fee', ''),
+                                  item.get('fiat_fee', ''),
+                                  item['date']])
+
                 assets = rvn_value.assets
-                if assets:
-                    asset, val = list(assets.items())[0]
-                lines.append([item['txid'],
-                              item.get('label', ''),
-                              item['confirmations'],
-                              val,
-                              asset,
-                              item.get('fiat_value', '') if not asset else '',
-                              item.get('fee', '') if not asset else '',
-                              item.get('fiat_fee', '') if not asset else '',
-                              item['date']])
+                for asset, val in assets.items():
+                    lines.append([item['txid'],
+                                  item.get('label', ''),
+                                  item['confirmations'],
+                                  val,
+                                  asset,
+                                  '',
+                                  '',
+                                  '',
+                                  item['date']])
+
         with open(file_name, "w+", encoding='utf-8') as f:
             if is_csv:
                 import csv

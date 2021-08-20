@@ -762,7 +762,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         history_menu = wallet_menu.addMenu(_("&History"))
         history_menu.addAction(_("&Filter"), lambda: self.history_list.toggle_toolbar(self.config))
         history_menu.addAction(_("&Summary"), self.history_list.show_summary)
-        history_menu.addAction(_("&Plot"), self.history_list.plot_history_dialog)
+        #history_menu.addAction(_("&Plot"), self.history_list.plot_history_dialog)
         history_menu.addAction(_("&Export"), self.history_list.export_history_dialog)
         contacts_menu = wallet_menu.addMenu(_("Contacts"))
         contacts_menu.addAction(_("&New"), self.new_contact_dialog)

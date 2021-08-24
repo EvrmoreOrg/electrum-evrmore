@@ -89,7 +89,11 @@ class MissingTxInputAmount(Exception):
     pass
 
 
-SIGHASH_ALL = 1
+class SIGHASH(IntEnum):
+    ALL = 0x01
+    NONE = 0x02
+    SINGLE = 0x03
+    ANYONECANPAY = 0x80
 
 
 class RavenValue:  # The raw RVN value as well as asset values of a transaction
@@ -2179,9 +2183,9 @@ class PartialTransaction(Transaction):
         inputs = self.inputs()
         outputs = self.outputs()
         txin = inputs[txin_index]
-        sighash = txin.sighash if txin.sighash is not None else SIGHASH_ALL
-        if sighash != SIGHASH_ALL:
-            raise Exception("only SIGHASH_ALL signing is supported!")
+        sighash = txin.sighash if txin.sighash is not None else SIGHASH.ALL
+        if sighash not in list(map(int, SIGHASH)):
+            raise Exception("invalid sighash: {}".format(sighash))
         nHashType = int_to_hex(sighash, 4)
         preimage_script = self.get_preimage_script(txin, self._wallet)
         _logger.info(f"Preimage script for {txin.prevout.txid.hex()}\n{bfh(preimage_script)}")
@@ -2222,14 +2226,14 @@ class PartialTransaction(Transaction):
         _logger.debug(f"is_complete {self.is_complete()}")
         self.invalidate_ser_cache()
 
-    def sign_txin(self, txin_index, privkey_bytes, *, bip143_shared_txdigest_fields=None) -> str:
+    def sign_txin(self, txin_index, privkey_bytes, *, bip143_shared_txdigest_fields=None, sighash=SIGHASH.ALL) -> str:
         txin = self.inputs()[txin_index]
         txin.validate_data(for_signing=True)
         pre_hash = sha256d(bfh(self.serialize_preimage(txin_index,
                                                        bip143_shared_txdigest_fields=bip143_shared_txdigest_fields)))
         privkey = ecc.ECPrivkey(privkey_bytes)
         sig = privkey.sign_transaction(pre_hash)
-        sig = bh2u(sig) + '01'  # SIGHASH_ALL
+        sig = bh2u(sig) + '{0:02x}'.format(sighash)
         return sig
 
     def is_complete(self) -> bool:

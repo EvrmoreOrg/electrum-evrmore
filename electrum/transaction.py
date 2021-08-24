@@ -1506,7 +1506,8 @@ class PartialTxInput(TxInput, PSBTSection):
                              script_sig=None if strip_witness else txin.script_sig,
                              nsequence=txin.nsequence,
                              witness=None if strip_witness else txin.witness,
-                             is_coinbase_output=txin.is_coinbase_output())
+                             is_coinbase_output=txin.is_coinbase_output(),
+                             sighash = txin.sighash)
         return res
 
     def validate_data(self, *, for_signing=False) -> None:

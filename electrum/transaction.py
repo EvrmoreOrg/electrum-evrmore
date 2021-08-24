@@ -94,6 +94,9 @@ class SIGHASH(IntEnum):
     NONE = 0x02
     SINGLE = 0x03
     ANYONECANPAY = 0x80
+    ALL_ANYONECANPAY = ALL + ANYONECANPAY
+    NONE_ANYONECANPAY = NONE + ANYONECANPAY
+    SINGLE_ANYONECANPAY = SINGLE + ANYONECANPAY
 
 
 class RavenValue:  # The raw RVN value as well as asset values of a transaction
@@ -381,18 +384,21 @@ class TxInput:
     nsequence: int
     witness: Optional[bytes]
     _is_coinbase_output: bool
+    sighash: Optional[int]
 
     def __init__(self, *,
                  prevout: TxOutpoint,
                  script_sig: bytes = None,
                  nsequence: int = 0xffffffff - 1,
                  witness: bytes = None,
-                 is_coinbase_output: bool = False):
+                 is_coinbase_output: bool = False,
+                 sighash: Optional[int] = None):
         self.prevout = prevout
         self.script_sig = script_sig
         self.nsequence = nsequence
         self.witness = witness
         self._is_coinbase_output = is_coinbase_output
+        self.sighash = sighash
 
     def is_coinbase_input(self) -> bool:
         """Whether this is the input of a coinbase tx."""
@@ -693,7 +699,18 @@ def parse_input(vds: BCDataStream) -> TxInput:
     prevout = TxOutpoint(txid=prevout_hash, out_idx=prevout_n)
     script_sig = vds.read_bytes(vds.read_compact_size())
     nsequence = vds.read_uint32()
-    return TxInput(prevout=prevout, script_sig=script_sig, nsequence=nsequence)
+
+    # Calculate the sig hash type
+
+    sigtype = None
+    try:
+        # Theoretically the script_sig is the very next value
+        l = script_sig[0]
+        sigtype = script_sig[1+l]
+    finally:
+        pass
+
+    return TxInput(prevout=prevout, script_sig=script_sig, nsequence=nsequence, sighash=sigtype)
 
 
 def parse_witness(vds: BCDataStream, txin: TxInput) -> None:
@@ -1409,7 +1426,6 @@ class PartialTxInput(TxInput, PSBTSection):
         self._utxo = None  # type: Optional[Transaction]
         self._witness_utxo = None  # type: Optional[TxOutput]
         self.part_sigs = {}  # type: Dict[bytes, bytes]  # pubkey -> sig
-        self.sighash = None  # type: Optional[int]
         self.bip32_paths = {}  # type: Dict[bytes, Tuple[bytes, Sequence[int]]]  # pubkey -> (xpub_fingerprint, path)
         self.redeem_script = None  # type: Optional[bytes]
         self.witness_script = None  # type: Optional[bytes]
@@ -2316,6 +2332,7 @@ class PartialTransaction(Transaction):
         txin.witness = None
         self.invalidate_ser_cache()
 
+    #TODO: Move asset info to here
     def add_info_from_wallet(
             self,
             wallet: 'Abstract_Wallet',

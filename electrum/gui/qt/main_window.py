@@ -747,8 +747,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.password_menu = wallet_menu.addAction(_("&Password"), self.change_password_dialog)
         self.seed_menu = wallet_menu.addAction(_("&Seed"), self.show_seed_dialog)
         self.private_keys_menu = wallet_menu.addMenu(_("&Private keys"))
-        #TODO: Implement sweep
-        #self.private_keys_menu.addAction(_("&Sweep"), self.sweep_key_dialog)
+        self.private_keys_menu.addAction(_("&Sweep"), self.sweep_key_dialog)
         self.import_privkey_menu = self.private_keys_menu.addAction(_("&Import"), self.do_import_privkey)
         self.export_menu = self.private_keys_menu.addAction(_("&Export"), self.export_privkeys_dialog)
         self.import_address_menu = wallet_menu.addAction(_("Import addresses"), self.import_addresses)
@@ -3495,7 +3494,11 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         d.setMinimumSize(600, 300)
         vbox = QVBoxLayout(d)
         hbox_top = QHBoxLayout()
-        hbox_top.addWidget(QLabel(_("Enter private keys:")))
+        hbox_top.addWidget(QLabel(_("Your sweep will occur in two steps. "
+                                    "First assets will be swept (if any). "
+                                    "Then RVN will be swept (if any).\n"
+                                    "RVN currently in your wallet will be used for the fee to sweep assets.\n"
+                                    "Enter private keys:")))
         hbox_top.addWidget(InfoButton(WIF_HELP_TEXT), alignment=Qt.AlignRight)
         vbox.addLayout(hbox_top)
         keys_e = ScanQRTextEdit(allow_multi=True, config=self.config)
@@ -3554,9 +3557,22 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         def on_success(result):
             coins, keypairs = result
-            outputs = [PartialTxOutput.from_address_and_value(addr, value='!')]
+            total_held = sum([coin.value_sats() for coin in coins], RavenValue())
+
+            coins_rvn = [coin for coin in coins if coin.value_sats().rvn_value.value != 0]
+            coins_assets = [coin for coin in coins if coin.value_sats().assets]
+
             self.warn_if_watching_only()
-            self.pay_onchain_dialog(coins, outputs, external_keypairs=keypairs)
+
+            # First sweep assets (use our RVN)
+            if total_held.assets:
+                outputs = [PartialTxOutput.from_address_and_value(addr, value=value, asset=asset) for asset, value in total_held.assets.items()]
+                self.pay_onchain_dialog(coins_assets + list(self.get_coins()), outputs, external_keypairs=keypairs)
+
+            # Then sweep RVN
+            outputs = [PartialTxOutput.from_address_and_value(addr, value=total_held.rvn_value)]
+            self.pay_onchain_dialog(coins_rvn, outputs, external_keypairs=keypairs)
+
 
         def on_failure(exc_info):
             self.on_error(exc_info)

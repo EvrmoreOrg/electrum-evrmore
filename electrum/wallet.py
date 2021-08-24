@@ -110,7 +110,7 @@ async def _append_utxos_to_inputs(*, inputs: List[PartialTxInput], network: 'Net
         scripthash = ravencoin.address_to_scripthash(address)
     elif txin_type == 'p2pk':
         script = ravencoin.public_key_to_p2pk_script(pubkey)
-        scripthash = ravencoin.script_to_scripthash(script)
+        scripthash = ravencoin.script_to_scripthash(bfh(script))
     else:
         raise Exception(f'unexpected txin_type to sweep: {txin_type}')
 
@@ -118,7 +118,7 @@ async def _append_utxos_to_inputs(*, inputs: List[PartialTxInput], network: 'Net
         prev_tx_raw = await network.get_transaction(item['tx_hash'])
         prev_tx = Transaction(prev_tx_raw)
         prev_txout = prev_tx.outputs()[item['tx_pos']]
-        if scripthash != ravencoin.script_to_scripthash(prev_txout.scriptpubkey.hex()):
+        if scripthash != ravencoin.script_to_scripthash(prev_txout.scriptpubkey):
             raise Exception('scripthash mismatch when sweeping')
         prevout_str = item['tx_hash'] + ':%d' % item['tx_pos']
         prevout = TxOutpoint.from_str(prevout_str)

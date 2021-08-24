@@ -249,13 +249,16 @@ class CoinChooserBase(Logger):
         max_change_rvn = max(max([o.value for o in output_amounts_rvn]) * 1.25, 0.02 * COIN)
 
         # Use N change outputs
-        for n in range(1, count + 1):
+        change_amount_rvn = 0
+        n = 1
+        for n1 in range(1, count + 1):
             # How much is left if we add this many change outputs?
             # tx.get_fee() returns our ins - outs
             # i.e. what should be going in our vouts
+            n = n1
             change_amount_rvn = max(0, tx.get_fee().rvn_value.value -
-                                    fee_estimator_numchange(n, asset_divisions.keys()))
-            if change_amount_rvn // n <= max_change_rvn:
+                                    fee_estimator_numchange(n1, asset_divisions.keys()))
+            if change_amount_rvn // n1 <= max_change_rvn:
                 break
 
         # Get a handle on the precision of the output amounts; round our

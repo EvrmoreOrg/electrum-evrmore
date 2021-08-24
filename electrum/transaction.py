@@ -706,7 +706,7 @@ def parse_input(vds: BCDataStream) -> TxInput:
     try:
         # Theoretically the script_sig is the very next value
         l = script_sig[0]
-        sigtype = script_sig[1+l]
+        sigtype = script_sig[l]
     finally:
         pass
 

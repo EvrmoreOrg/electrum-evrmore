@@ -3522,7 +3522,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         vbox.addStretch(1)
         button = OkButton(d, _('Sweep'))
-        vbox.addLayout(Buttons(CancelButton(d), button))
+        use_own_cb = QCheckBox(_('Force use own RVN'))
+        vbox.addLayout(Buttons(use_own_cb, CancelButton(d), button))
         button.setEnabled(False)
 
         def get_address():
@@ -3572,7 +3573,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
             # If there is not RVN in the privkeys, use our own
             # TODO: dynamically use our own RVN if not enough
-            use_own = total_held.rvn_value.value < 0.1
+            # TODO: Ensure that any RVN held in the privkey is moved over
+            use_own = total_held.rvn_value.value < 0.1 or use_own_cb.isChecked()
             if use_own:
                 coins_rvn += list(self.get_coins())
 

@@ -98,7 +98,7 @@ def strip_unneeded(bkts: List[Bucket], needs_more) -> List[Bucket]:
                       key=lambda bkt: bkt.value.rvn_value.value, reverse=True)
 
     bkts_asset = {asset: sorted([b for b in bkts if asset in b.value.assets.keys()],
-                                key=lambda bkt: bkt.value.assets[asset].value) for asset in a}
+                                key=lambda bkt: bkt.value.assets[asset].value, reverse=True) for asset in a}
 
     rvn_ptr = 0
 

@@ -2100,7 +2100,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             outputs: List[PartialTxOutput], *,
             external_keypairs=None,
             coinbase_outputs=None,
-            change_addr=None) -> None:
+            change_addr=None,
+            mixed=False) -> None:
         # trustedcoin requires this
         if run_hook('abort_send', self):
             return
@@ -2132,7 +2133,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 window=self,
                 make_tx=make_tx,
                 external_keypairs=external_keypairs,
-                output_value=output_value)
+                output_value=output_value,
+                mixed=mixed)
             preview_dlg.show()
             return
 
@@ -2146,13 +2148,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 if success:
                     self.broadcast_or_show(tx)
             self.sign_tx_with_password(tx, callback=sign_done, password=password,
-                                       external_keypairs=external_keypairs)
+                                       external_keypairs=external_keypairs, mixed=mixed)
         else:
             preview_dlg = PreviewTxDialog(
                 window=self,
                 make_tx=make_tx,
                 external_keypairs=external_keypairs,
-                output_value=output_value)
+                output_value=output_value,
+                mixed=mixed)
             preview_dlg.show()
 
     def broadcast_or_show(self, tx: Transaction):
@@ -2167,10 +2170,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.broadcast_transaction(tx)
 
     @protected
-    def sign_tx(self, tx, *, callback, external_keypairs, password):
-        self.sign_tx_with_password(tx, callback=callback, password=password, external_keypairs=external_keypairs)
+    def sign_tx(self, tx, *, callback, external_keypairs, password, mixed=False):
+        self.sign_tx_with_password(tx, callback=callback, password=password, external_keypairs=external_keypairs, mixed=mixed)
 
-    def sign_tx_with_password(self, tx: PartialTransaction, *, callback, password, external_keypairs=None):
+    def sign_tx_with_password(self, tx: PartialTransaction, *, callback, password, external_keypairs=None, mixed=False):
         '''Sign the transaction in a separate thread.  When done, calls
         the callback with a success code of True or False.
         '''
@@ -2183,11 +2186,16 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             callback(False)
 
         on_success = run_hook('tc_sign_wrapper', self.wallet, tx, on_success, on_failure) or on_success
-        if external_keypairs:
+
+        def sign(tx, external_keypairs, password):
+            if external_keypairs:
             # can sign directly
-            task = partial(tx.sign, external_keypairs)
-        else:
-            task = partial(self.wallet.sign_transaction, tx, password)
+                tx.sign(external_keypairs)
+            if not external_keypairs or mixed:
+                self.wallet.sign_transaction(tx, password)
+
+        task = partial(sign, tx, external_keypairs, password)
+
         msg = _('Signing transaction...')
         WaitingDialog(self, msg, task, on_success, on_failure)
 
@@ -3495,7 +3503,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         vbox = QVBoxLayout(d)
         hbox_top = QHBoxLayout()
         hbox_top.addWidget(QLabel(_("RVN currently in your wallet will be used for the fee to sweep assets\n"
-                                    "if there is no RVN held in the private keys\n"
+                                    "if there is no RVN held in the private keys.\n"
                                     "Enter private keys:")))
         hbox_top.addWidget(InfoButton(WIF_HELP_TEXT), alignment=Qt.AlignRight)
         vbox.addLayout(hbox_top)
@@ -3564,12 +3572,17 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
             # If there is not RVN in the privkeys, use our own
             # TODO: dynamically use our own RVN if not enough
-            if total_held.rvn_value.value < 0.1:
+            use_own = total_held.rvn_value.value < 0.1
+            if use_own:
                 coins_rvn += list(self.get_coins())
 
-            outputs = [PartialTxOutput.from_address_and_value(addr, value=value, asset=asset) for asset, value in total_held.assets.items()]
-            outputs += [PartialTxOutput.from_address_and_value(addr, value=total_held.rvn_value, is_max=True)]
-            self.pay_onchain_dialog(coins_rvn + coins_assets, outputs, external_keypairs=keypairs)
+            outputs = []
+            if total_held.assets:
+                outputs = [PartialTxOutput.from_address_and_value(addr, value=value, asset=asset) for asset, value in total_held.assets.items()]
+            if total_held.rvn_value.value != 0:
+                outputs += [PartialTxOutput.from_address_and_value(addr, value=total_held.rvn_value, is_max=not use_own)]
+
+            self.pay_onchain_dialog(coins_rvn + coins_assets, outputs, external_keypairs=keypairs, mixed=use_own)
 
         def on_failure(exc_info):
             self.on_error(exc_info)

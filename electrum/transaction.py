@@ -239,14 +239,15 @@ class TxOutput:
         self._value = value
 
     @classmethod
-    def from_address_and_value(cls, address: str, value: Satoshis, asset: str = None) -> Union['TxOutput', 'PartialTxOutput']:
+    def from_address_and_value(cls, address: str, value: Satoshis, asset: str = None, *, is_max = False) -> Union['TxOutput', 'PartialTxOutput']:
         script = bfh(ravencoin.address_to_script(address))
         if asset:
             script = assets.create_transfer_asset_script(script, asset, value.value)
 
         return cls(scriptpubkey=script,
                    value=value,
-                   asset=asset)
+                   asset=asset,
+                   is_max=is_max)
 
     def serialize_to_network(self) -> bytes:
         if self.asset:

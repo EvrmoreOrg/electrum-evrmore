@@ -133,8 +133,13 @@ async def _append_utxos_to_inputs(*, inputs: List[PartialTxInput], network: 'Net
         inputs.append(txin)
 
     u = await network.listunspent_for_scripthash(scripthash)
+    u1 = await network.listasset_for_scripthash(scripthash)
     async with TaskGroup() as group:
         for item in u:
+            if len(inputs) >= imax:
+                break
+            await group.spawn(append_single_utxo(item))
+        for item in u1:
             if len(inputs) >= imax:
                 break
             await group.spawn(append_single_utxo(item))
@@ -1369,7 +1374,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 if i_max is not None:
                     raise MultipleSpendMaxTxOutputs()
                 i_max = i
-        if i_max and len(outputs) > 1:
+        if i_max and len([o for o in outputs if o.asset is None]) > 1:
             raise MultipleSpendMaxTxOutputs()
 
         if fee is None and self.config.fee_per_kb() is None:
@@ -1432,7 +1437,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         change_addrs = self.get_change_addresses_for_new_transaction(change_addr or old_change_addrs,
                                                                      extra_addresses=extra_addresses)
 
-        if i_max is not None and not outputs[0].asset:
+        if i_max is not None and not outputs[i_max].asset:
             # We want to spend all RVN, leave enough to spend the fee
             sendable = sum(map(lambda c: c.value_sats(), coins), RavenValue())
             outputs[i_max].value = Satoshis(0)

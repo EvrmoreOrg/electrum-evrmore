@@ -79,7 +79,7 @@ from electrum.exchange_rate import FxThread
 from electrum.simple_config import SimpleConfig
 from electrum.logging import Logger
 from electrum.lnutil import ln_dummy_address, extract_nodeid, ConnStringFormatError
-from electrum.lnaddr import lndecode, LnDecodeException
+from electrum.lnaddr import lndecode, LnDecodeException, LnInvoiceException
 from .asset_workspace import AssetCreateWorkspace, AssetReissueWorkspace
 
 from .exception_window import Exception_Hook
@@ -3494,10 +3494,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         d.setMinimumSize(600, 300)
         vbox = QVBoxLayout(d)
         hbox_top = QHBoxLayout()
-        hbox_top.addWidget(QLabel(_("Your sweep will occur in two steps. "
-                                    "First assets will be swept (if any). "
-                                    "Then RVN will be swept (if any).\n"
-                                    "RVN currently in your wallet will be used for the fee to sweep assets.\n"
+        hbox_top.addWidget(QLabel(_("RVN currently in your wallet will be used for the fee to sweep assets\n"
+                                    "if there is no RVN held in the private keys\n"
                                     "Enter private keys:")))
         hbox_top.addWidget(InfoButton(WIF_HELP_TEXT), alignment=Qt.AlignRight)
         vbox.addLayout(hbox_top)
@@ -3564,15 +3562,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
             self.warn_if_watching_only()
 
-            # First sweep assets (use our RVN)
-            if total_held.assets:
-                outputs = [PartialTxOutput.from_address_and_value(addr, value=value, asset=asset) for asset, value in total_held.assets.items()]
-                self.pay_onchain_dialog(coins_assets + list(self.get_coins()), outputs, external_keypairs=keypairs)
+            # If there is not RVN in the privkeys, use our own
+            # TODO: dynamically use our own RVN if not enough
+            if total_held.rvn_value.value < 0.1:
+                coins_rvn += list(self.get_coins())
 
-            # Then sweep RVN
-            outputs = [PartialTxOutput.from_address_and_value(addr, value=total_held.rvn_value)]
-            self.pay_onchain_dialog(coins_rvn, outputs, external_keypairs=keypairs)
-
+            outputs = [PartialTxOutput.from_address_and_value(addr, value=value, asset=asset) for asset, value in total_held.assets.items()]
+            outputs += [PartialTxOutput.from_address_and_value(addr, value=total_held.rvn_value, is_max=True)]
+            self.pay_onchain_dialog(coins_rvn + coins_assets, outputs, external_keypairs=keypairs)
 
         def on_failure(exc_info):
             self.on_error(exc_info)

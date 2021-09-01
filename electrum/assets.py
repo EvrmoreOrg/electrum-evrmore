@@ -188,14 +188,8 @@ def guess_asset_script_for_vin(script: bytes, asset: str, amt: int, txin, wallet
                                                          bytes([meta.divisions]), meta.is_reissuable,
                                                          base_decode(meta.ipfs_str,
                                                                      base=58) if meta.ipfs_str else None).hex()
-        elif txin.prevout.txid.hex() in [x for x, _ in reissue_outpoints]:
-            script_t = None
-            for id, s in reissue_outpoints:
-                if id == txin.prevout.txid.hex():
-                    script_t = s
-                    break
-            script = script_t
-            assert script
+        elif txin.prevout.to_str() in reissue_outpoints:
+            script = reissue_outpoints[txin.prevout.to_str()]
         else:
             script = create_transfer_asset_script(script, asset, amt).hex()
 

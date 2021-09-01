@@ -608,6 +608,7 @@ class OPPushDataGeneric:
 
 OPPushDataPubkey = OPPushDataGeneric(lambda x: x in (33, 65))
 
+SCRIPTPUBKEY_TEMPLATE_P2PK = [OPPushDataGeneric(lambda x: x in (33, 65)), opcodes.OP_CHECKSIG]
 SCRIPTPUBKEY_TEMPLATE_P2PKH = [opcodes.OP_DUP, opcodes.OP_HASH160,
                                OPPushDataGeneric(lambda x: x == 20),
                                opcodes.OP_EQUALVERIFY, opcodes.OP_CHECKSIG]
@@ -657,20 +658,84 @@ def get_script_type_from_output_script(_bytes: bytes) -> Optional[str]:
     return None
 
 
-def get_address_from_output_script(_bytes: bytes, *, net=None) -> Optional[str]:
-
-    # TODO: Generalize
-    # Cut off assets if any for correct address -> scripthash <- script
-    if len(_bytes) > 22 and _bytes[0] == 0xA9 and _bytes[1] == 0x14 and _bytes[22] == 0x87:  # Script hash
-        end = 23
-    else:  # Assumed Pubkey hash
-        end = 25
-    _bytes = _bytes[:end]
-
+def is_output_script_p2pk(_bytes: bytes) -> bool:
     try:
-        decoded = [x for x in script_GetOp(_bytes)]
+        raw_decoded = [x for x in script_GetOp(_bytes)]
+    except MalformedBitcoinScript:
+        return False
+
+    decoded = []
+    for tup in raw_decoded:
+        if tup[0] == opcodes.OP_RVN_ASSET:
+            break
+        decoded.append(tup)
+
+    # p2pk (deprecated)
+    if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2PK):
+        return True
+    return False
+
+
+def is_asset_output_script_malformed(_bytes: bytes) -> bool:
+    try:
+        raw_decoded = [x for x in script_GetOp(_bytes)]
+    except MalformedBitcoinScript:
+        return True
+
+    decoded = []
+    record = False
+    for tup in raw_decoded:
+        if tup[0] == opcodes.OP_RVN_ASSET:
+            record = True
+        if record:
+            decoded.append(tup)
+
+    asset_portion = BCDataStream()
+    try:
+        asset_portion.write(decoded[1][1])
+        assert asset_portion.read_bytes(3) == b'rvn'
+        script_type = asset_portion.read_bytes(1)
+        asset_name_len = asset_portion.read_bytes(1)[0]
+        asset_name = asset_portion.read_bytes(asset_name_len)
+        assert len(asset_name) == asset_name_len
+        if script_type != b'o':
+            asset_portion.read_int64()
+            if script_type == b'q':
+                if asset_portion.read_bytes(3)[2] == 1:
+                    asset_portion.read_bytes(34)
+            elif script_type == b'r':
+                asset_portion.read_bytes(2)
+                if asset_portion.can_read_more():
+                    asset_portion.read_bytes(34)
+            elif script_type == b't':
+                if asset_portion.can_read_more():
+                    asset_portion.read_bytes(34)
+            else:
+                return True
+        if asset_portion.can_read_more():
+            return True
+    except:
+        return True
+    return False
+
+
+def get_address_from_output_script(_bytes: bytes, *, net=None) -> Optional[str]:
+    try:
+        raw_decoded = [x for x in script_GetOp(_bytes)]
     except MalformedBitcoinScript:
         return None
+
+    decoded = []
+    for tup in raw_decoded:
+        if tup[0] == opcodes.OP_RVN_ASSET:
+            break
+        decoded.append(tup)
+
+    # p2pk (deprecated)
+    if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2PK):
+        pubkey_bytes = decoded[0][1]
+        h160 = hash_160(pubkey_bytes)
+        return hash160_to_p2pkh(h160, net=net)
 
     # p2pkh
     if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2PKH):
@@ -1031,6 +1096,9 @@ class Transaction:
         if a:
             asset, amt = list(a.items())[0]
             script = guess_asset_script_for_vin(bfh(script), asset, amt, txin, wallet)
+
+        script = wallet.get_nonstandard_outpoints().get(txin.prevout.to_str(), script)
+
         return script
 
     @classmethod

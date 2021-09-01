@@ -190,6 +190,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         self.asset_blacklist = self.wallet.config.get('asset_blacklist', [])
         self.asset_whitelist = self.wallet.config.get('asset_whitelist', [])
+        self.use_own_cb = QCheckBox(_('Force use own RVN'))
+        self.force_use_own = False
+
+        def on_cb(x):
+            self.force_use_own = x == Qt.Checked
+
+        self.use_own_cb.stateChanged.connect(on_cb)
 
         # Tracks sendable things
         self.send_options = []  # type: List[str]
@@ -3522,8 +3529,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         vbox.addStretch(1)
         button = OkButton(d, _('Sweep'))
-        use_own_cb = QCheckBox(_('Force use own RVN'))
-        vbox.addLayout(Buttons(use_own_cb, CancelButton(d), button))
+        vbox.addLayout(Buttons(self.use_own_cb, CancelButton(d), button))
         button.setEnabled(False)
 
         def get_address():
@@ -3574,7 +3580,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             # If there is not RVN in the privkeys, use our own
             # TODO: dynamically use our own RVN if not enough
             # TODO: Ensure that any RVN held in the privkey is moved over
-            use_own = total_held.rvn_value.value < 0.1 or use_own_cb.isChecked()
+            use_own = total_held.rvn_value.value < 0.1 or self.force_use_own
             if use_own:
                 coins_rvn += list(self.get_coins())
 

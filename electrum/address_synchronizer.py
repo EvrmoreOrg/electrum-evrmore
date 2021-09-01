@@ -33,7 +33,8 @@ from . import ravencoin, util
 from .assets import pull_meta_from_create_or_reissue_script
 from .ravencoin import COINBASE_MATURITY
 from .util import profiler, bfh, TxMinedInfo, UnrelatedTransactionException, with_lock
-from .transaction import Transaction, TxOutput, TxInput, PartialTxInput, TxOutpoint, PartialTransaction, AssetMeta, RavenValue
+from .transaction import Transaction, TxOutput, TxInput, PartialTxInput, TxOutpoint, PartialTransaction, AssetMeta, \
+    RavenValue, is_output_script_p2pk, is_asset_output_script_malformed
 from .synchronizer import Synchronizer
 from .verifier import SPV
 
@@ -350,16 +351,20 @@ class AddressSynchronizer(Logger):
                 self.db.add_prevout_by_scripthash(scripthash, prevout=TxOutpoint.from_str(ser), value=v)
                 addr = txo.address
                 if addr and self.is_mine(addr):
-
                     if txo.asset:
                         if asset not in self.get_assets():
                             self.add_asset(asset)
                         try:
                             d = pull_meta_from_create_or_reissue_script(txo.scriptpubkey)
                             if d['type'] == 'r':
-                                self.db.add_asset_reissue_point(asset, tx.txid(), txo.scriptpubkey.hex())
+                                self.db.add_asset_reissue_point(asset, ser, txo.scriptpubkey.hex())
                         except:
                             pass
+                        if is_asset_output_script_malformed(txo.scriptpubkey):
+                            self.db.add_nonstandard_outpoint(ser, txo.scriptpubkey.hex())
+
+                    if is_output_script_p2pk(txo.scriptpubkey):
+                        self.db.add_nonstandard_outpoint(ser, txo.scriptpubkey.hex())
 
                     self.db.add_txo_addr(tx_hash, addr, n, v, is_coinbase)
                     self._get_addr_balance_cache.pop(addr, None)  # invalidate cache
@@ -368,6 +373,7 @@ class AddressSynchronizer(Logger):
                     if next_tx is not None:
                         self.db.add_txi_addr(next_tx, addr, ser, v)
                         self._add_tx_to_local_history(next_tx)
+
             # add to local history
             self._add_tx_to_local_history(tx_hash)
             # save
@@ -434,8 +440,11 @@ class AddressSynchronizer(Logger):
                 children |= self.get_depending_transactions(other_hash)
             return children
 
-    def get_asset_reissue_outpoints(self, asset: str) -> List[Tuple[str, str]]:
+    def get_asset_reissue_outpoints(self, asset: str) -> Dict[str, str]:
         return self.db.get_asset_reissue_points(asset)
+
+    def get_nonstandard_outpoints(self) -> Dict[str, str]:
+        return self.db.get_nonstandard_outpoints()
 
     def recieve_asset_callback(self, asset: str, meta: AssetMeta):
         self.db.add_asset_meta(asset, meta)

@@ -1387,8 +1387,11 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         for utxo in outputs:
             assets.add(utxo.asset)
         assets.discard(None)
+        # If we have the minimum asset division amount, plug that into the coinchooser,
+        # Otherwise, assume 8.
         asset_divs = {asset: self.get_asset_meta(asset).divisions
-                      for asset in assets}
+                        if asset in self.get_assets() else 8
+                        for asset in assets}
 
         extra_addresses = len(assets)
 

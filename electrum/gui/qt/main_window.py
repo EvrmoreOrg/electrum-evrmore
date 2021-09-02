@@ -193,11 +193,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.use_own_cb = QCheckBox(_('Force use own RVN'))
         self.force_use_own = False
 
-        def on_cb(x):
-            self.force_use_own = x == Qt.Checked
-
-        self.use_own_cb.stateChanged.connect(on_cb)
-
         # Tracks sendable things
         self.send_options = []  # type: List[str]
 
@@ -3529,6 +3524,12 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         vbox.addStretch(1)
         button = OkButton(d, _('Sweep'))
+        self.use_own_cb = QCheckBox()
+
+        def on_cb(x):
+            self.force_use_own = x == Qt.Checked
+
+        self.use_own_cb.stateChanged.connect(on_cb)
         vbox.addLayout(Buttons(self.use_own_cb, CancelButton(d), button))
         button.setEnabled(False)
 

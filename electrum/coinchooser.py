@@ -136,7 +136,7 @@ def strip_unneeded(bkts: List[Bucket], needs_more) -> List[Bucket]:
             increment_asset_ptr(asset)
             bucket_value_sum += get_asset_bucket_value(asset)
             needed = needs_more(get_buckets(), bucket_value_sum=bucket_value_sum)
-            if needed and needed != {None} and is_asset_done(asset):
+            if needed and (needed & {asset}) and is_asset_done(asset):
                 raise Exception("keeping all {} buckets is still not enough: {}".format(asset, bucket_value_sum))
 
     return get_buckets()

@@ -770,10 +770,9 @@ def parse_input(vds: BCDataStream) -> TxInput:
 
     sigtype = None
     try:
-        # Theoretically the script_sig is the very next value
-        l = script_sig[0]
-        sigtype = script_sig[l]
-    finally:
+        # Theoretically the script_sig is the very end of the first stack push
+        sigtype = next(iter(script_GetOp(script_sig)))[1][-1]
+    except:
         pass
 
     return TxInput(prevout=prevout, script_sig=script_sig, nsequence=nsequence, sighash=sigtype)
@@ -1576,7 +1575,7 @@ class PartialTxInput(TxInput, PSBTSection):
                              nsequence=txin.nsequence,
                              witness=None if strip_witness else txin.witness,
                              is_coinbase_output=txin.is_coinbase_output(),
-                             sighash = txin.sighash)
+                             sighash=txin.sighash)
         return res
 
     def validate_data(self, *, for_signing=False) -> None:

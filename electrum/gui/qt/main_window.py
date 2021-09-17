@@ -3547,7 +3547,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         vbox.addStretch(1)
         button = OkButton(d, _('Sweep'))
-        self.use_own_cb = QCheckBox()
+        self.use_own_cb = QCheckBox(_('Force use own RVN'))
 
         def on_cb(x):
             self.force_use_own = x == Qt.Checked

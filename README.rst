@@ -45,6 +45,8 @@ is a TL;DR::
     sudo apt-get install cmake
     sudo pip3 install virtualenv
     ./electrum-env
+    
+If you get a protobuf _internal_create_key error, run sudo pip install --upgrade protobuf
 
 Not pure-python dependencies
 ----------------------------

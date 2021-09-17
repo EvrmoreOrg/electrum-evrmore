@@ -521,7 +521,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.update_lightning_icon()
         elif event == 'cert_mismatch':
             self.show_cert_mismatch_error()
-        #elif event == 'asset_meta':
+        elif event == 'asset_meta':
+            pass
         #    self.reissue_workspace.refresh_owners(True)
         #    self.create_workspace.refresh_owners(True)
         else:
@@ -611,6 +612,28 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 _("Make sure you own the seed phrase or the private keys, before you request Ravencoins to be sent to this wallet.")
             ])
             self.show_warning(msg, title=_('Watch-only wallet'))
+
+    def warn_if_hardware(self):
+        if not self.wallet.keystore or self.wallet.keystore.get_type_text()[:2] != 'hw':
+            return
+        if self.config.get('dont_show_hardware_warning', False):
+            return
+        msg = ''.join([
+            _("This is a hardware wallet."), '\n',
+            _("Mining to this wallet may cause you problems. If mining, ensure you make your mining payouts sporadic"), '\n',
+            _("or mine to an electrum software wallet and transfer to hardware.")
+        ])
+        cb = QCheckBox(_("Don't show this again."))
+        cb_checked = False
+
+        def on_cb(x):
+            nonlocal cb_checked
+            cb_checked = x == Qt.Checked
+
+        cb.stateChanged.connect(on_cb)
+        self.show_warning(msg, title=_('Hardware Wallet'), checkbox=cb)
+        if cb_checked:
+            self.config.set_key('dont_show_hardware_warning', True)
 
     def warn_if_testnet(self):
         if not constants.net.TESTNET:

@@ -25,6 +25,7 @@ if [ -e ./env/bin/activate ]; then
 else
     python3 -m venv env
     source ./env/bin/activate
+    pip install --upgrade cython
     pip install -e .
 fi
 

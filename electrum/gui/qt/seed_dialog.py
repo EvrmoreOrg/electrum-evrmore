@@ -213,6 +213,9 @@ class SeedConfirmDisplay(QVBoxLayout):
         s = ' '.join(self.get_seed_words())
         b = self.is_seed(s)
 
+        is_checksum = False
+        is_wordlist = False
+
         from electrum.keystore import bip39_is_checksum_valid
         from electrum.mnemonic import Wordlist, filenames
 

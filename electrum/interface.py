@@ -22,10 +22,14 @@
 # ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+import concurrent.futures
+import multiprocessing
 import os
 import re
 import ssl
 import sys
+import threading
+import time
 import traceback
 import asyncio
 import socket
@@ -358,7 +362,9 @@ class Interface(Logger):
         assert network.config.path
         self.cert_path = _get_cert_path_for_host(config=network.config, host=self.host)
         self.blockchain = None  # type: Optional[Blockchain]
+
         self._requested_chunks = set()  # type: Set[Tuple[int, int]]
+
         self.network = network
         self.proxy = MySocksProxy.from_proxy_dict(proxy)
         self.session = None  # type: Optional[NotificationSession]
@@ -595,6 +601,7 @@ class Interface(Logger):
             raise Exception(f"{repr(height)} is not a block height")
 
         ret = False
+
         for mi, ma in self._requested_chunks:
             if mi <= height < ma:
                 ret = True
@@ -626,7 +633,27 @@ class Interface(Logger):
             raise RequestCorrupted(f"server uses too low 'max' count for block.headers: {res['max']} < 2016")
         if res['count'] != size:
             raise RequestCorrupted(f"expected {size} headers but only got {res['count']}")
-        conn = self.blockchain.connect_chunk(height, res['hex'])
+
+        # connect_chunk will block because of its created process, so we need to wait for it
+        # in an asyncio way
+        conn = False
+
+        def intermediary():
+            nonlocal conn
+            conn = self.blockchain.connect_chunk(height, res['hex'])
+
+        loop = asyncio.get_event_loop()
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
+        finished, _ = await asyncio.wait(fs=[
+            loop.run_in_executor(executor, intermediary)
+        ], return_when=asyncio.ALL_COMPLETED)
+
+        for task in finished:
+            e = task.exception()
+            if e:
+                raise e
+
         if not conn:
             return conn, 0
         return conn, res['count']
@@ -747,7 +774,9 @@ class Interface(Logger):
         while last is None or height <= next_height:
             prev_last, prev_height = last, height
             if next_height > height + 10:
+
                 could_connect, num_headers = await self.request_chunk(height, next_height)
+
                 if not could_connect:
                     if height <= constants.net.max_checkpoint():
                         raise GracefulDisconnect('server chain conflicts with checkpoints or genesis')
@@ -760,6 +789,7 @@ class Interface(Logger):
             else:
                 last, height = await self.step(height)
             assert (prev_last, prev_height) != (last, height), 'had to prevent infinite loop in interface.sync_until'
+
         return last, height
 
     async def step(self, height, header=None):

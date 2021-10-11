@@ -20,6 +20,7 @@
 # ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+import multiprocessing
 import sys
 import os
 import threading
@@ -427,36 +428,30 @@ class Blockchain(Logger):
 
     def verify_chunk(self, start_height: int, data: bytes) -> None:
 
-        def get_headers():
-            r = []
-            p = 0
-            s = start_height
-            while p < len(data):
-                if s < KawpowActivationHeight:
-                    r.append(data[p:p + PRE_KAWPOW_HEADER_SIZE])
-                    p += PRE_KAWPOW_HEADER_SIZE
-                else:
-                    r.append(data[p:p + POST_KAWPOW_HEADER_SIZE])
-                    p += POST_KAWPOW_HEADER_SIZE
-                s += 1
-            if len(r[-1]) not in (POST_KAWPOW_HEADER_SIZE, PRE_KAWPOW_HEADER_SIZE):
-                raise Exception('Invalid header length: {}'.format(len(r[-1])))
-            return r
-
+        raw = []
+        p = 0
+        s = start_height
         prev_hash = self.get_hash(start_height - 1)
-        raw_headers = get_headers()
         headers = {}
-        for i, raw_header in enumerate(raw_headers):
-            height = start_height + i
+        while p < len(data):
+            if s < KawpowActivationHeight:
+                raw = data[p:p + PRE_KAWPOW_HEADER_SIZE]
+                p += PRE_KAWPOW_HEADER_SIZE
+            else:
+                raw = data[p:p + POST_KAWPOW_HEADER_SIZE]
+                p += POST_KAWPOW_HEADER_SIZE
             try:
-                expected_header_hash = self.get_hash(height)
+                expected_header_hash = self.get_hash(s)
             except MissingHeader:
                 expected_header_hash = None
-            header = deserialize_header(raw_header, start_height + i)
+            header = deserialize_header(raw, s)
             headers[header.get('block_height')] = header
-            target = self.get_target(start_height + i, headers)
+            target = self.get_target(s, headers)
             self.verify_header(header, prev_hash, target, expected_header_hash)
             prev_hash = hash_header(header)
+            s += 1
+        if len(raw) not in (POST_KAWPOW_HEADER_SIZE, PRE_KAWPOW_HEADER_SIZE):
+            raise Exception('Invalid header length: {}'.format(len(raw)))
 
     @with_lock
     def path(self):
@@ -723,9 +718,7 @@ class Blockchain(Logger):
             return last
 
         # params
-        BlockLastSolved = get_block_reading_from_height(height - 1)
         BlockReading = get_block_reading_from_height(height - 1)
-        BlockCreating = height
         nActualTimespan = 0
         LastBlockTime = 0
         PastBlocksMin = DGW_PASTBLOCKS
@@ -733,11 +726,8 @@ class Blockchain(Logger):
         CountBlocks = 0
         PastDifficultyAverage = 0
         PastDifficultyAveragePrev = 0
-        bnNum = 0
 
-        if BlockLastSolved is None:
-            return MAX_TARGET
-        for i in range(1, PastBlocksMax + 1):
+        for i in range(PastBlocksMax):
             CountBlocks += 1
 
             if CountBlocks <= PastBlocksMin:
@@ -860,7 +850,32 @@ class Blockchain(Logger):
         assert start_height >= 0, start_height
         try:
             data = bfh(hexdata)
-            self.verify_chunk(start_height, data)
+
+            # This is computationally intensive (thanks DGW), so lets make it a different process
+
+            # Used to store any errors that may occur
+            # Probably a better way but this seemed easiest at my level
+            # of knowledge
+
+            # The reason I call it in such a small portion of the code is that
+            # this is the most intensive part as well as the rest of the project
+            # is not built for actual real multiprocesses as opposed to python's
+            # concurrency
+            error_holder = multiprocessing.Manager().dict()
+
+            def verify_wrapper():
+                try:
+                    self.verify_chunk(start_height, data)
+                except Exception as e:
+                    error_holder[e] = None
+
+            _thread = multiprocessing.Process(target=verify_wrapper)
+            _thread.start()
+            _thread.join()
+
+            for e in error_holder.keys():
+                raise e
+
             self.save_chunk(start_height, data)
             return True
         except BaseException as e:

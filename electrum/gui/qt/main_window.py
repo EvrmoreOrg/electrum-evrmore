@@ -238,10 +238,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.history_tab = self.create_history_tab()
         history_tab_widget = QWidget()
         self.history_tab_layout = QVBoxLayout()
-        self.header_tracker = HeaderTracker()
-        self.header_tracker.begin()
-        self.displaying_tracker = False
-        self.last_header = -1
         self.history_tab_layout.addWidget(self.history_tab)
         history_tab_widget.setLayout(self.history_tab_layout)
         tabs.addTab(history_tab_widget, read_QIcon("tab_history.png"), _('History'))
@@ -1068,6 +1064,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 text = ("{} ({}/{})"
                         .format(_("Syncing transactions..."), num_answered, num_sent))
                 icon = read_QIcon("status_waiting.png")
+
             elif server_lag > 1:
                 text = _("Server is lagging ({} blocks)").format(server_lag)
                 icon = read_QIcon("status_lagging%s.png" % fork_str)
@@ -1090,21 +1087,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                     icon = read_QIcon("status_connected%s.png" % fork_str)
                 else:
                     icon = read_QIcon("status_connected_proxy%s.png" % fork_str)
-            if local_height < server_height - (2016*2) and self.header_tracker:
-                if not self.displaying_tracker:
-                    self.history_tab_layout.removeWidget(self.history_tab)
-                    self.displaying_tracker = True
-                    self.history_tab_layout.addWidget(self.header_tracker)
-                elif self.last_header != local_height:
-                    self.last_header = local_height
-                    self.header_tracker.calculate_stats(local_height, server_height)
-            elif self.displaying_tracker and self.header_tracker:
-                self.displaying_tracker = False
-                self.history_tab_layout.removeWidget(self.header_tracker)
-                self.history_tab_layout.addWidget(self.history_tab)
-                self.header_tracker.finished()
-                self.header_tracker.deleteLater()
-                self.header_tracker = None  # Garbage collect
         else:
             if self.network.proxy:
                 text = "{} ({})".format(_("Not connected"), _("proxy enabled"))

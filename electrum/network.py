@@ -771,6 +771,7 @@ class Network(Logger, NetworkRetryManager[ServerAddr]):
                 or server in self._connecting_ifaces
                 or server in self._closing_ifaces):
             return
+
         self._connecting_ifaces.add(server)
         if server == self.default_server:
             self.logger.info(f"connecting to {server} as new interface")

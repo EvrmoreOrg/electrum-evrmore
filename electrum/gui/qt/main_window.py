@@ -235,9 +235,12 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.messages_tab = self.create_messages_tab()
         # self.channels_tab = self.create_channels_tab()
 
+        self.header_tracker = HeaderTracker()
         self.history_tab = self.create_history_tab()
         history_tab_widget = QWidget()
         self.history_tab_layout = QVBoxLayout()
+        self.history_tab_layout.setAlignment(Qt.AlignCenter)
+        self.history_tab_layout.addWidget(self.header_tracker)
         self.history_tab_layout.addWidget(self.history_tab)
         history_tab_widget.setLayout(self.history_tab_layout)
         tabs.addTab(history_tab_widget, read_QIcon("tab_history.png"), _('History'))
@@ -1059,6 +1062,18 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             # Server height can be 0 after switching to a new server
             # until we get a headers subscription request response.
             # Display the synchronizing message in that case.
+
+            if self.header_tracker:
+                if server_height < local_height + 100:
+                    self.header_tracker.setVisible(True)
+                    self.header_tracker.finished()
+                    # Clean up memory
+                    self.history_tab_layout.removeWidget(self.header_tracker)
+                    self.header_tracker.deleteLater()
+                    self.header_tracker = None
+                else:
+                    self.header_tracker.calculate_stats(local_height, server_height)
+
             if not self.wallet.up_to_date or server_height == 0:
                 num_sent, num_answered = self.wallet.get_history_sync_state_details()
                 text = ("{} ({}/{})"

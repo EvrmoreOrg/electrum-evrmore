@@ -68,38 +68,23 @@ TRANSACTION_FILE_EXTENSION_FILTER_SEPARATE = (f"{TRANSACTION_FILE_EXTENSION_FILT
                                               f"All files (*)")
 
 
-class HeaderTracker(QWidget):
+class HeaderTracker(QLabel):
     def __init__(self):
         super().__init__()
-
-        vbox = QVBoxLayout()
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_timer)
         self.start = time.time()
         self.headers_start = -1
+        self.local_height = -1
+        self.server_height = -1
         self.last_eta = '...'
 
         self.loading_chars = u'\U0001f311\U0001f312\U0001f313\U0001f314\U0001f315\U0001f316\U0001f317\U0001f318'
         self.loading_pointer = 0
         self.current_char = self.loading_chars[self.loading_pointer]
 
-        gen_info = QLabel(_('You are currently synchronizing and verifying Ravencoin block headers.\n'
-                            'Please leave electrum open until this process is complete.\n'
-                            'You will only need to download these headers once.\n\n'
-                            'This electrum client uses these headers to verify information sent by electrum servers.\n'
-                            'Transaction information you might have will not be visible while this synchronization is occuring.\n\n'
-                            'The GUI will be laggy while this synchronization is in progress. A fix is in the works...'))
-        vbox.addWidget(gen_info)
-
-        self.header_stats = QLabel('')
-        self.update_stats(0, 0, '...')
-
-        vbox.addWidget(self.header_stats)
-
-        vbox.setStretch(1, 1)
-
-        self.setLayout(vbox)
+        self.begin()
 
     def calculate_stats(self, local_height, server_height):
 
@@ -116,15 +101,17 @@ class HeaderTracker(QWidget):
             secs = sec_delta / header_delta * headers_left
             eta = str(datetime.timedelta(seconds=round(secs)))
 
-        self.update_stats(local_height, server_height, eta)
         self.last_eta = eta
 
-    def update_stats(self, local, server, time):
-        self.header_stats.setText(_('Header Status {}\n'
-                                    '{}/{}\n\n'
-                                    'Estimated time until completion:\n'
-                                    '{}').format(self.current_char,
-                                                 local, server, time))
+        self.local_height = local_height
+        self.server_height = server_height
+
+        self.update()
+
+    def update(self):
+        self.setText(_('Synchronizing Headers {} {}/{} | Estimated Time Until Completion: {} | '
+                       'Headers Are Used To Verify Information').format(
+            self.current_char, self.local_height, self.server_height, self.last_eta))
 
     def update_timer(self):
         self.current_char = c = self.loading_chars[self.loading_pointer]
@@ -132,14 +119,10 @@ class HeaderTracker(QWidget):
         self.loading_pointer += 1
         self.loading_pointer %= len(self.loading_chars)
 
-        splitted = self.header_stats.text().split('\n')
-        splitted[0] = splitted[0][:-1] + c
-
-        n = '\n'.join(splitted)
-        self.header_stats.setText(n)
+        self.update()
 
     def begin(self):
-        self.timer.start(250)
+        self.timer.start(100)
 
     def finished(self):
         self.timer.stop()

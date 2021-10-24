@@ -23,16 +23,12 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 import concurrent.futures
-import multiprocessing
 import os
 import re
 import ssl
 import sys
-import threading
-import time
 import traceback
 import asyncio
-import socket
 from typing import Tuple, Union, List, TYPE_CHECKING, Optional, Set, NamedTuple, Any, Sequence, Dict
 from collections import defaultdict
 from ipaddress import IPv4Network, IPv6Network, ip_address, IPv6Address, IPv4Address
@@ -634,25 +630,7 @@ class Interface(Logger):
         if res['count'] != size:
             raise RequestCorrupted(f"expected {size} headers but only got {res['count']}")
 
-        # connect_chunk will block because of its created process, so we need to wait for it
-        # in an asyncio way
-        conn = False
-
-        def intermediary():
-            nonlocal conn
-            conn = self.blockchain.connect_chunk(height, res['hex'])
-
-        loop = asyncio.get_event_loop()
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-
-        finished, _ = await asyncio.wait(fs=[
-            loop.run_in_executor(executor, intermediary)
-        ], return_when=asyncio.ALL_COMPLETED)
-
-        for task in finished:
-            e = task.exception()
-            if e:
-                raise e
+        conn = await self.blockchain.connect_chunk(height, res['hex'])
 
         if not conn:
             return conn, 0

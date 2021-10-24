@@ -38,7 +38,7 @@ import aiohttp
 from aiohttp import web, client_exceptions
 from aiorpcx import TaskGroup, timeout_after, TaskTimeout, ignore_after
 
-from . import util
+from . import util, header_verification
 from .network import Network
 from .util import (json_decode, to_bytes, to_string, profiler, standardize_path, constant_time_compare)
 from .invoices import PR_PAID, PR_EXPIRED
@@ -572,6 +572,8 @@ class Daemon(Logger):
                 self.logger.info("removing lockfile")
                 remove_lockfile(get_lockfile(self.config))
             self.logger.info("stopped")
+            header_verification.end_process()
+            self.logger.info("ended verification daemon")
             self.asyncio_loop.call_soon_threadsafe(self.stopped_event.set)
 
     def run_gui(self, config, plugins):

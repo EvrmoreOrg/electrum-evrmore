@@ -20,15 +20,16 @@
 # ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-import multiprocessing
+import asyncio
 import sys
 import os
 import threading
 import time
 import struct
+import traceback
 from typing import Optional, Dict, Mapping, Sequence
 
-from . import util
+from . import util, header_verification
 from .ravencoin import hash_encode, int_to_hex, rev_hex
 from .crypto import sha256d
 from . import constants
@@ -275,21 +276,6 @@ class Blockchain(Logger):
     Manages blockchain headers and their verification
     """
 
-    class DGW_Cache(Dict):
-
-        def __init__(self, parent_chain: 'Blockchain'):
-            super().__init__()
-            self.parent_chain = parent_chain
-
-        def __setitem__(self, key, value):
-            super().__setitem__(key, value)
-            sorted_heights = sorted(self.keys())
-            for k in sorted_heights:
-                if k < sorted_heights[-1] - DGW_PASTBLOCKS - 50:
-                    del self[k]
-                else:
-                    break
-
     def __init__(self, config: SimpleConfig, forkpoint: int, parent: Optional['Blockchain'],
                  forkpoint_hash: str, prev_hash: Optional[str]):
         assert isinstance(forkpoint_hash, str) and len(forkpoint_hash) == 64, forkpoint_hash
@@ -305,9 +291,6 @@ class Blockchain(Logger):
         self._prev_hash = prev_hash  # blockhash immediately before forkpoint
         self.lock = threading.RLock()
         self.update_size()
-
-        # Ravencoin
-        self.dgw_cache = self.DGW_Cache(self)  # block height -> header  # stores DGW_PASTBLOCKS + 100 (for resyncs) blocks
 
     @property
     def checkpoints(self):
@@ -707,14 +690,8 @@ class Blockchain(Logger):
             except:
                 pass
             if last is None:
-                try:
-                    last = self.dgw_cache.get(height)
-                except:
-                    pass
-            if last is None:
                 last = self.read_header(height)
                 assert last is not None
-            self.dgw_cache[height] = last
             return last
 
         # params
@@ -846,35 +823,42 @@ class Blockchain(Logger):
             return False
         return True
 
-    def connect_chunk(self, start_height: int, hexdata: str) -> bool:
+    async def connect_chunk(self, start_height: int, hexdata: str) -> bool:
         assert start_height >= 0, start_height
         try:
             data = bfh(hexdata)
 
+            # self.verify_chunk(start_height, data)
             # This is computationally intensive (thanks DGW), so lets make it a different process
+            # Windows makes this difficult
 
-            # Used to store any errors that may occur
-            # Probably a better way but this seemed easiest at my level
-            # of knowledge
+            last_n_dgw_headers = {}
+            for i in range(start_height - DGW_PASTBLOCKS - 1, start_height):
+                last_n_dgw_headers[i] = self.read_header(i)
 
-            # The reason I call it in such a small portion of the code is that
-            # this is the most intensive part as well as the rest of the project
-            # is not built for actual real multiprocesses as opposed to python's
-            # concurrency
-            error_holder = multiprocessing.Manager().dict()
+            header_verification.verify_chunk((
+                constants.net.TESTNET,
+                KawpowActivationHeight,
+                nDGWActivationBlock,
+                KawpowActivationTS,
+                X16Rv2ActivationTS,
+                PRE_KAWPOW_HEADER_SIZE,
+                POST_KAWPOW_HEADER_SIZE,
+                last_n_dgw_headers,
+                DGW_PASTBLOCKS,
+                KAWPOW_LIMIT,
+                MAX_TARGET,
+                start_height,
+                data,
+                None if start_height > nDGWActivationBlock else self.checkpoints
+            ))
 
-            def verify_wrapper():
-                try:
-                    self.verify_chunk(start_height, data)
-                except Exception as e:
-                    error_holder[e] = None
+            loop = asyncio.get_event_loop()
+            output = await asyncio.gather(loop.run_in_executor(None, header_verification.get_verify_result))
 
-            _thread = multiprocessing.Process(target=verify_wrapper)
-            _thread.start()
-            _thread.join()
-
-            for e in error_holder.keys():
-                raise e
+            for o in output:
+                if o:
+                    raise o
 
             self.save_chunk(start_height, data)
             return True

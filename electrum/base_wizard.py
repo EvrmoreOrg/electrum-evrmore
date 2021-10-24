@@ -557,6 +557,7 @@ class BaseWizard(Logger):
         self.derivation_and_script_type_dialog(f, get_account_xpub=get_account_xpub)
 
     def create_keystore(self, seed, passphrase):
+        self.logger.info('Creating keystore...')
         if self.seed_type == 'bip39':
             root_seed = bip39_to_seed(seed, passphrase if passphrase else '')
             derivation = normalize_bip32_derivation(bip44_derivation(0))
@@ -728,10 +729,12 @@ class BaseWizard(Logger):
             self.run('confirm_seed', seed, '')
 
     def confirm_seed(self, seed, passphrase):
+        self.logger.info('Confirming Seed...')
         f = lambda x: self.confirm_passphrase(seed, passphrase)
         self.confirm_seed_dialog(run_next=f, seed=seed if self.config.get('debug_seed') else '', test=lambda x: x==seed)
 
     def confirm_passphrase(self, seed, passphrase):
+        self.logger.info('Confirming Passphrase...')
         f = lambda x: self.run('create_keystore', seed, x)
         if passphrase:
             title = _('Confirm Seed Extension')

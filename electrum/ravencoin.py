@@ -220,6 +220,7 @@ def int_to_hex(i: int, length: int=1) -> str:
     s = "0"*(2*length - len(s)) + s
     return rev_hex(s)
 
+
 def script_num_to_hex(i: int) -> str:
     """See CScriptNum in Bitcoin Core.
     Encodes an integer as hex, to be used in script.

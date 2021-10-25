@@ -87,11 +87,8 @@ class SeedConfirmDisplay(QVBoxLayout):
         self.seed_e.setTabChangesFocus(False)  # so that tab auto-completes
         self.is_seed = is_seed
         self.saved_is_seed = self.is_seed
-
-        def _on_edit():
-            self.on_edit(just_confirm=True)
-
-        self.seed_e.textChanged.connect(_on_edit)
+        self.full_check = full_check
+        self.seed_e.textChanged.connect(self.on_edit)
         self.initialize_completer()
 
         self.seed_e.setMaximumHeight(75)
@@ -213,7 +210,7 @@ class SeedConfirmDisplay(QVBoxLayout):
         else:
             return self.slip39_seed
 
-    def on_edit(self, *, from_click=False, just_confirm=False):
+    def on_edit(self, *, from_click=False):
         s = ' '.join(self.get_seed_words())
         b = self.is_seed(s)
 
@@ -231,7 +228,7 @@ class SeedConfirmDisplay(QVBoxLayout):
                 lang = type
                 break
 
-        if not just_confirm:
+        if self.full_check:
             if self.seed_type == 'bip39':
                 status = ('checksum: ' + ('ok' if is_checksum else 'failed')) if is_wordlist else 'unknown wordlist'
                 label = 'BIP39 - ' + lang + ' (%s)'%status

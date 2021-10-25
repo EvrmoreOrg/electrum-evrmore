@@ -261,7 +261,7 @@ class SeedConfirmDisplay(QVBoxLayout):
                     return
 
             self.seed_type_label.setText(label)
-            
+
         self.parent.next_button.setEnabled(b)
 
         # disable suggestions if user already typed an unknown word

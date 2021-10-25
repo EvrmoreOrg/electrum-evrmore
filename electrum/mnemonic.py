@@ -198,32 +198,27 @@ class Mnemonic(Logger):
         from .keystore import bip39_is_checksum_valid
 
         def _make_bip39_seed(num_bits):
-            # https://github.com/ebellocchia/bip_utils/blob/master/bip_utils/bip39/bip39_mnemonic.py
+            # https://github.com/trezor/python-mnemonic/blob/master/src/mnemonic/mnemonic.py
             if num_bits is None:
                 num_bits = 128
             if num_bits not in (128, 160, 192, 224, 256):
                 raise Exception('Invalid bit length')
             entropy = os.urandom(num_bits // 8)
-            entropy_hash = hashlib.sha512(entropy).digest()
-            entropy_bin = bin(int.from_bytes(entropy, 'big'))[2:].zfill(len(entropy) * 8)
-            entropy_hash_bin = bin(int.from_bytes(entropy_hash, 'big'))[2:].zfill(len(entropy_hash) * 8)
-            checksum_bin = entropy_hash_bin[:len(entropy) // 4]
-
-            mnemonic_entropy_bin = entropy_bin + checksum_bin
-
+            assert len(entropy) in (16, 20, 24, 28, 32)
+            entropy_hash = hashlib.sha256(entropy).hexdigest()
+            mnemonic_entropy_bin = (
+                    bin(int.from_bytes(entropy, byteorder="big"))[2:].zfill(len(entropy) * 8)
+                    + bin(int(entropy_hash, 16))[2:].zfill(256)[: len(entropy) * 8 // 32]
+            )
             mnemonic_words = []
             for i in range(len(mnemonic_entropy_bin) // 11):
                 position = int(mnemonic_entropy_bin[i * 11: (i + 1) * 11], 2)
                 mnemonic_words.append(self.wordlist[position])
 
-            words = " ".join(mnemonic_words)
-            return words
+            return " ".join(mnemonic_words)
 
-        words = ''
-        while True:
-            words = _make_bip39_seed(num_bits)
-            if bip39_is_checksum_valid(words, wordlist=self.wordlist) == (True, True):
-                break
+        words = _make_bip39_seed(num_bits)
+        assert bip39_is_checksum_valid(words, wordlist=self.wordlist) == (True, True)
         return words.replace(' ', self.wordlist.space)
 
     def make_seed(self, *, seed_type=None, num_bits=None) -> str:

@@ -257,7 +257,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             if self.config.get('show_{}_tab'.format(name), default):
                 tabs.addTab(tab, icon, description.replace("&", ""))
 
-        add_optional_tab(tabs, self.messages_tab, read_QIcon("tab_message.png"), _("Messages"), "messages", True)
+        add_optional_tab(tabs, self.messages_tab, read_QIcon("tab_message.png"), _("Messages"), "messages")
         add_optional_tab(tabs, self.addresses_tab, read_QIcon("tab_addresses.png"), _("&Addresses"), "addresses")
         # add_optional_tab(tabs, self.channels_tab, read_QIcon("lightning.png"), _("Channels"), "channels")
         add_optional_tab(tabs, self.utxo_tab, read_QIcon("tab_coins.png"), _("Co&ins"), "utxo")

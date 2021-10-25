@@ -214,24 +214,24 @@ class SeedConfirmDisplay(QVBoxLayout):
         s = ' '.join(self.get_seed_words())
         b = self.is_seed(s)
 
-        is_checksum = False
-        is_wordlist = False
-
-        from electrum.keystore import bip39_is_checksum_valid
-        from electrum.mnemonic import Wordlist, filenames
-
-        lang = ''
-        for type, file in filenames.items():
-            word_list = Wordlist.from_file(file)
-            is_checksum, is_wordlist = bip39_is_checksum_valid(s, wordlist=word_list)
-            if is_wordlist:
-                lang = type
-                break
-
         if self.full_check:
+            is_checksum = False
+            is_wordlist = False
+
+            from electrum.keystore import bip39_is_checksum_valid
+            from electrum.mnemonic import Wordlist, filenames
+
+            lang = ''
+            for type, file in filenames.items():
+                word_list = Wordlist.from_file(file)
+                is_checksum, is_wordlist = bip39_is_checksum_valid(s, wordlist=word_list)
+                if is_wordlist:
+                    lang = type
+                    break
+
             if self.seed_type == 'bip39':
                 status = ('checksum: ' + ('ok' if is_checksum else 'failed')) if is_wordlist else 'unknown wordlist'
-                label = 'BIP39 - ' + lang + ' (%s)'%status
+                label = 'BIP39 - ' + lang + ' (%s)' % status
                 if lang and lang != self.lang:
                     if lang == 'en':
                         bip39_english_list = Mnemonic('en').wordlist

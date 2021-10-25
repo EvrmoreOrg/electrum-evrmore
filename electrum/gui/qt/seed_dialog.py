@@ -87,7 +87,11 @@ class SeedConfirmDisplay(QVBoxLayout):
         self.seed_e.setTabChangesFocus(False)  # so that tab auto-completes
         self.is_seed = is_seed
         self.saved_is_seed = self.is_seed
-        self.seed_e.textChanged.connect(self.on_edit)
+
+        def _on_edit():
+            self.on_edit(just_confirm=True)
+
+        self.seed_e.textChanged.connect(_on_edit)
         self.initialize_completer()
 
         self.seed_e.setMaximumHeight(75)
@@ -209,7 +213,7 @@ class SeedConfirmDisplay(QVBoxLayout):
         else:
             return self.slip39_seed
 
-    def on_edit(self, *, from_click=False):
+    def on_edit(self, *, from_click=False, just_confirm=False):
         s = ' '.join(self.get_seed_words())
         b = self.is_seed(s)
 
@@ -227,35 +231,37 @@ class SeedConfirmDisplay(QVBoxLayout):
                 lang = type
                 break
 
-        if self.seed_type == 'bip39':
-            status = ('checksum: ' + ('ok' if is_checksum else 'failed')) if is_wordlist else 'unknown wordlist'
-            label = 'BIP39 - ' + lang + ' (%s)'%status
-            if lang and lang != self.lang:
-                if lang == 'en':
-                    bip39_english_list = Mnemonic('en').wordlist
-                    old_list = old_mnemonic.wordlist
-                    only_old_list = set(old_list) - set(bip39_english_list)
-                    self.wordlist = list(bip39_english_list) + list(only_old_list)  # concat both lists
-                    self.wordlist.sort()
-                    self.completer.model().setStringList(self.wordlist)
-                    self.lang = 'en'
-                else:
-                    self.wordlist = list(Mnemonic(lang).wordlist)
-                    self.wordlist.sort()
-                    self.completer.model().setStringList(self.wordlist)
-                    self.lang = lang
-            b = is_checksum
-        else:
-            t = seed_type(s)
-            label = _('Seed Type') + ': ' + t if t else ''
+        if not just_confirm:
+            if self.seed_type == 'bip39':
+                status = ('checksum: ' + ('ok' if is_checksum else 'failed')) if is_wordlist else 'unknown wordlist'
+                label = 'BIP39 - ' + lang + ' (%s)'%status
+                if lang and lang != self.lang:
+                    if lang == 'en':
+                        bip39_english_list = Mnemonic('en').wordlist
+                        old_list = old_mnemonic.wordlist
+                        only_old_list = set(old_list) - set(bip39_english_list)
+                        self.wordlist = list(bip39_english_list) + list(only_old_list)  # concat both lists
+                        self.wordlist.sort()
+                        self.completer.model().setStringList(self.wordlist)
+                        self.lang = 'en'
+                    else:
+                        self.wordlist = list(Mnemonic(lang).wordlist)
+                        self.wordlist.sort()
+                        self.completer.model().setStringList(self.wordlist)
+                        self.lang = lang
+                b = is_checksum
+            else:
+                t = seed_type(s)
+                label = _('Seed Type') + ': ' + t if t else ''
 
-            if is_checksum and is_wordlist and not from_click:
-                # This is a valid bip39 and this method was called from typing
-                # Emulate selecting the bip39 option
-                self.clayout.group.buttons()[1].click()
-                return
+                if is_checksum and is_wordlist and not from_click:
+                    # This is a valid bip39 and this method was called from typing
+                    # Emulate selecting the bip39 option
+                    self.clayout.group.buttons()[1].click()
+                    return
 
-        self.seed_type_label.setText(label)
+            self.seed_type_label.setText(label)
+            
         self.parent.next_button.setEnabled(b)
 
         # disable suggestions if user already typed an unknown word
@@ -550,8 +556,8 @@ class SeedLayout(QVBoxLayout):
 
             checked_index = seed_type_values.index(self.seed_type)
             titles = [t[1] for t in seed_types]
-            clayout = ChoicesLayout(_('Seed type'), titles, on_clicked=f, checked_index=checked_index)
-            hbox.addLayout(clayout.layout())
+            self.clayout = ChoicesLayout(_('Seed type'), titles, on_clicked=f, checked_index=checked_index)
+            hbox.addLayout(self.clayout.layout())
 
         # options
         self.is_ext = False

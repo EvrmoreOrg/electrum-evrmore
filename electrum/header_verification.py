@@ -1,3 +1,6 @@
+# Minimize imports to decrease overhead
+# Changes to blockchain.py must be reflected here
+
 import hashlib
 import multiprocessing
 import struct
@@ -358,14 +361,17 @@ def _verify_process(q_in, q_out):
             q_out.put(e)
 
 
+# Blocking, but shouldn't block
 def verify_chunk(data_tup):
     return queue_in.put(data_tup)
 
 
+# Blocking, will block
 def get_verify_result():
     return queue_out.get()
 
 
+# Blocking, but shouldn't block
 def end_process():
     queue_in.put('STOP')
     _proc.join()

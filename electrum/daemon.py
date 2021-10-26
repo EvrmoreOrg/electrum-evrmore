@@ -573,7 +573,7 @@ class Daemon(Logger):
                 remove_lockfile(get_lockfile(self.config))
             self.logger.info("stopped")
             header_verification.end_process()
-            self.logger.info("ended verification daemon")
+            self.logger.info("ended verification process")
             self.asyncio_loop.call_soon_threadsafe(self.stopped_event.set)
 
     def run_gui(self, config, plugins):

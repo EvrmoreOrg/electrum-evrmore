@@ -371,7 +371,7 @@ def get_verify_result():
     return queue_out.get()
 
 
-# Blocking, but shouldn't block
+# Blocking, may block if syncing
 def end_process():
     queue_in.put('STOP')
     _proc.join()

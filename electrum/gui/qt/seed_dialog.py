@@ -129,7 +129,7 @@ class SeedConfirmDisplay(QVBoxLayout):
             self.is_seed = (lambda x: bool(x)) if self.seed_type != 'bip39' else self.saved_is_seed
             self.seed_status.setText('')
             self.on_edit(from_click=True)
-            self.initialize_completer()
+            #self.initialize_completer()
             self.seed_warning.setText(None)
 
             #if self.seed_type == 'bip39':
@@ -225,27 +225,28 @@ class SeedConfirmDisplay(QVBoxLayout):
             for type, file in filenames.items():
                 word_list = Wordlist.from_file(file)
                 is_checksum, is_wordlist = bip39_is_checksum_valid(s, wordlist=word_list)
+                if not is_wordlist and len(s.split()) > 1:
+                    is_checksum, is_wordlist = bip39_is_checksum_valid(' '.join(s.split()[:-1]), wordlist=word_list)
                 if is_wordlist:
                     lang = type
                     break
 
+            if lang and lang != self.lang:
+                if lang == 'en':
+                    bip39_english_list = Mnemonic('en').wordlist
+                    old_list = old_mnemonic.wordlist
+                    only_old_list = set(old_list) - set(bip39_english_list)
+                    self.wordlist = list(bip39_english_list) + list(only_old_list)  # concat both lists
+                else:
+                    self.wordlist = list(Mnemonic(lang).wordlist)
+
+                self.wordlist.sort()
+                self.completer.model().setStringList(self.wordlist)
+                self.lang = lang
+
             if self.seed_type == 'bip39':
                 status = ('checksum: ' + ('ok' if is_checksum else 'failed')) if is_wordlist else 'unknown wordlist'
                 label = 'BIP39 - ' + lang + ' (%s)' % status
-                if lang and lang != self.lang:
-                    if lang == 'en':
-                        bip39_english_list = Mnemonic('en').wordlist
-                        old_list = old_mnemonic.wordlist
-                        only_old_list = set(old_list) - set(bip39_english_list)
-                        self.wordlist = list(bip39_english_list) + list(only_old_list)  # concat both lists
-                        self.wordlist.sort()
-                        self.completer.model().setStringList(self.wordlist)
-                        self.lang = 'en'
-                    else:
-                        self.wordlist = list(Mnemonic(lang).wordlist)
-                        self.wordlist.sort()
-                        self.completer.model().setStringList(self.wordlist)
-                        self.lang = lang
                 b = is_checksum
             else:
                 t = seed_type(s)
@@ -548,7 +549,7 @@ class SeedLayout(QVBoxLayout):
                 self.seed_status.setText('')
                 #self.on_edit()
                 self.update_share_buttons()
-                self.initialize_completer()
+                #self.initialize_completer()
                 self.seed_warning.setText(msg)
 
             checked_index = seed_type_values.index(self.seed_type)

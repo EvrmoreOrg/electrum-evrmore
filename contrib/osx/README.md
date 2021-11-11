@@ -33,7 +33,8 @@ Before starting, make sure that the Xcode command line tools are installed (e.g.
 
 #### Build Electrum
 
-    cd electrum
+    cd electrum-ravencoin
+    git submodule update --init
     ./contrib/osx/make_osx
 
 This creates both a folder named Electrum.app and the .dmg file.

@@ -73,7 +73,7 @@ function DoCodeSignMaybe { # ARGS: infoName fileOrDirName
         echo ">>> [sign] Verifying code signature"
         codesign --display --verbose "${file}"
         codesign --verbose=4 --deep --strict "${file}"
-        spctl --assess --verbose "${file}"
+        #spctl --assess --verbose "${file}"
         return
     fi
     codesign -f -v $deep -s "$CODESIGN_CERT" $hardened_arg "$file" || fail "Could not code sign ${infoName}"

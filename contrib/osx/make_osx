@@ -4,7 +4,7 @@ set -e
 
 # Parameterize
 PYTHON_VERSION=3.8.9
-BUILDDIR=/tmp/electrum-build
+BUILDDIR=/tmp/electrum-ravencoin-build
 PACKAGE=Electrum-Ravencoin
 GIT_REPO=https://github.com/Electrum-RVN-SIG/electrum-ravencoin
 
@@ -187,9 +187,9 @@ VERSION=`git describe --tags --dirty --always`
 info "Building binary"
 pyinstaller --noconfirm --ascii --clean --name $VERSION contrib/osx/osx.spec || fail "Could not build binary"
 
-info "Adding bitcoin URI types to Info.plist"
+info "Adding ravencoin URI types to Info.plist"
 plutil -insert 'CFBundleURLTypes' \
-	-xml '<array><dict> <key>CFBundleURLName</key> <string>bitcoin</string> <key>CFBundleURLSchemes</key> <array><string>bitcoin</string><string>lightning</string></array> </dict></array>' \
+	-xml '<array><dict> <key>CFBundleURLName</key> <string>raven</string> <key>CFBundleURLSchemes</key> <array><string>raven</string><string>lightning</string></array> </dict></array>' \
 	-- dist/$PACKAGE.app/Contents/Info.plist \
 	|| fail "Could not add keys to Info.plist. Make sure the program 'plutil' exists and is installed."
 

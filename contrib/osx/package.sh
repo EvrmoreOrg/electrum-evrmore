@@ -31,8 +31,8 @@ fi
 mkdir -p ~/bin
 
 if ! which ${genisoimage} > /dev/null 2>&1; then
-	mkdir -p /tmp/electrum-macos
-	cd /tmp/electrum-macos
+	mkdir -p /tmp/electrum-ravencoin-macos
+	cd /tmp/electrum-ravencoin-macos
 	info "Downloading cdrkit $cdrkit_version"
 	wget -nc ${cdrkit_download_path}/${cdrkit_file_name}
 	tar xvf ${cdrkit_file_name}
@@ -48,8 +48,8 @@ if ! which ${genisoimage} > /dev/null 2>&1; then
 fi
 
 if ! which dmg > /dev/null 2>&1; then
-    mkdir -p /tmp/electrum-macos
-	cd /tmp/electrum-macos
+    mkdir -p /tmp/electrum-ravencoin-macos
+	cd /tmp/electrum-ravencoin-macos
 	info "Downloading libdmg"
     LD_PRELOAD= git clone ${libdmg_url}
     cd libdmg-hfsplus
@@ -67,9 +67,9 @@ test -f "$plist" || fail "Info.plist not found"
 VERSION=$(grep -1 ShortVersionString $plist |tail -1|gawk 'match($0, /<string>(.*)<\/string>/, a) {print a[1]}')
 echo $VERSION
 
-rm -rf /tmp/electrum-macos/image > /dev/null 2>&1
-mkdir /tmp/electrum-macos/image/
-cp -r $1 /tmp/electrum-macos/image/
+rm -rf /tmp/electrum-ravencoin-macos/image > /dev/null 2>&1
+mkdir /tmp/electrum-ravencoin-macos/image/
+cp -r $1 /tmp/electrum-ravencoin-macos/image/
 
 build_dir=$(dirname "$1")
 test -n "$build_dir" -a -d "$build_dir" || exit

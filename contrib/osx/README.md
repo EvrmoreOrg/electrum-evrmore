@@ -78,6 +78,7 @@ Make sure it is the "selected" xcode (e.g.):
 #### 2. Build Electrum
 
     cd electrum
+    git submodule update --init
     ./contrib/osx/make_osx
 
 This creates both a folder named Electrum.app and the .dmg file.

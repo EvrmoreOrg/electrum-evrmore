@@ -77,7 +77,7 @@ Make sure it is the "selected" xcode (e.g.):
 
 #### 2. Build Electrum
 
-    cd electrum
+    cd electrum-ravencoin
     git submodule update --init
     ./contrib/osx/make_osx
 

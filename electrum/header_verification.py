@@ -383,5 +383,7 @@ def spawn_process():
     multiprocessing.freeze_support()
     queue_in = multiprocessing.Queue()
     queue_out = multiprocessing.Queue()
+    if 'forking' in multiprocessing.get_all_start_methods():
+        multiprocessing.set_start_method('forking')
     _proc = multiprocessing.Process(target=_verify_process, args=(queue_in, queue_out))
     _proc.start()

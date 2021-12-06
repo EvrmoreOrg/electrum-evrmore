@@ -1,6 +1,7 @@
 # taken (with minor modifications) from pycoin
 # https://github.com/richardkiss/pycoin/blob/01b1787ed902df23f99a55deb00d8cd076a906fe/pycoin/ecdsa/native/secp256k1.py
 
+import multiprocessing
 import os
 import sys
 import traceback
@@ -59,7 +60,7 @@ def load_library():
         else:
             break
     if not secp256k1:
-        _logger.error(f'libsecp256k1 library failed to load. exceptions: {repr(exceptions)}')
+        _logger.error(f'libsecp256k1 library failed to load. parent process: {multiprocessing.parent_process().name} exceptions: {repr(exceptions)}')
         return None
 
     try:

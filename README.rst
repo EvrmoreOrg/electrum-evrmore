@@ -109,7 +109,7 @@ Development version (git clone)
 
 Check out the code from GitHub::
 
-    git clone git://github.com/spesmilo/electrum.git
+    git clone git://github.com/Electrum-RVN-SIG/electrum-ravencoin.git
     cd electrum
     git submodule update --init
 

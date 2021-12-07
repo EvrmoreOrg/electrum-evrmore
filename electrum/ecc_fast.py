@@ -1,7 +1,6 @@
 # taken (with minor modifications) from pycoin
 # https://github.com/richardkiss/pycoin/blob/01b1787ed902df23f99a55deb00d8cd076a906fe/pycoin/ecdsa/native/secp256k1.py
 
-import multiprocessing
 import os
 import sys
 import traceback
@@ -38,7 +37,7 @@ class LibModuleMissing(Exception): pass
 
 
 def load_library():
-    if sys.platform == 'darwin':
+    if sys.platform in ('darwin',):
         library_paths = (os.path.join(os.path.dirname(__file__), 'libsecp256k1.0.dylib'),
                          'libsecp256k1.0.dylib')
     elif sys.platform in ('windows', 'win32'):
@@ -60,7 +59,7 @@ def load_library():
         else:
             break
     if not secp256k1:
-        _logger.error(f'libsecp256k1 library failed to load. parent process: {multiprocessing.parent_process().name} exceptions: {repr(exceptions)}')
+        _logger.error(f'libsecp256k1 library failed to load. exceptions: {repr(exceptions)}')
         return None
 
     try:

@@ -109,12 +109,13 @@ class UTXOList(MyTreeView):
         label = self.wallet.get_label_for_txid(utxo.prevout.txid.hex()) or self.wallet.get_label(address)
 
         rvn_val = utxo.value_sats().rvn_value.value
-        if rvn_val != 0:
+        assets = list(utxo.value_sats().assets.items())
+        if len(assets) == 0:
             amount = self.parent.format_amount(rvn_val, whitespaces=True)
             amount += ' RVN'
         else:
             # There should only be one asset per utxo
-            asset, amt = list(utxo.value_sats().assets.items())[0]
+            asset, amt = assets[0]
             amount = self.parent.format_amount(amt.value, whitespaces=True)
             amount += ' ' + asset
 

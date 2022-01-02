@@ -356,7 +356,7 @@ class AddressSynchronizer(Logger):
                             self.add_asset(asset)
                         try:
                             d = pull_meta_from_create_or_reissue_script(txo.scriptpubkey)
-                            if d['type'] == 'r':
+                            if d['type'] in ('r', 'q'):
                                 self.db.add_asset_reissue_point(asset, ser, txo.scriptpubkey.hex())
                         except:
                             pass

@@ -105,7 +105,10 @@ def strip_unneeded(bkts: List[Bucket], needs_more) -> List[Bucket]:
     asset_ptr = {asset: -1 for asset in a}
 
     def get_rvn_bucket_value() -> RavenValue:
-        return bkts_rvn[rvn_ptr].value
+        try:
+            return bkts_rvn[rvn_ptr].value
+        except IndexError:
+            return RavenValue()
 
     def get_asset_bucket_value(asset) -> RavenValue:
         return bkts_asset[asset][asset_ptr[asset]].value

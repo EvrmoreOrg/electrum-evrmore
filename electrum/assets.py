@@ -162,6 +162,7 @@ def guess_asset_script_for_vin(script: bytes, asset: str, amt: int, txin, wallet
     else:
         meta = wallet.get_asset_meta(asset)
         reissue_outpoints = wallet.get_asset_reissue_outpoints(asset)
+        
         if not meta:
             _logger.warning("Using best effort pre-image script for asset: no meta: {}".format(asset))
             script = create_transfer_asset_script(script, asset, amt).hex()

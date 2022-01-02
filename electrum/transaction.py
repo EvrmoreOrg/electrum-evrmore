@@ -655,6 +655,8 @@ def get_script_type_from_output_script(_bytes: bytes) -> Optional[str]:
         return 'p2wpkh'
     if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2WSH):
         return 'p2wsh'
+    if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2PK):
+        return 'p2pk'
     return None
 
 
@@ -1753,7 +1755,7 @@ class PartialTxInput(TxInput, PSBTSection):
                 inner_type = get_script_type_from_output_script(self.witness_script)
             if inner_type is not None:
                 type = inner_type + '-' + type
-            if type in ('p2pkh', 'p2wpkh-p2sh', 'p2wpkh'):
+            if type in ('p2pkh', 'p2wpkh-p2sh', 'p2wpkh', 'p2pk'):
                 self.script_type = type
         return
 

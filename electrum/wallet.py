@@ -69,7 +69,7 @@ from .storage import StorageEncryptionVersion, WalletStorage
 from .wallet_db import WalletDB
 from . import transaction, ravencoin, coinchooser, paymentrequest, ecc, bip32
 from .transaction import (Transaction, TxInput, UnknownTxinType, TxOutput,
-                          PartialTransaction, PartialTxInput, PartialTxOutput, TxOutpoint, RavenValue)
+                          PartialTransaction, PartialTxInput, PartialTxOutput, TxOutpoint, RavenValue, get_script_type_from_output_script)
 from .plugin import run_hook
 from .address_synchronizer import (AddressSynchronizer, TX_HEIGHT_LOCAL,
                                    TX_HEIGHT_UNCONF_PARENT, TX_HEIGHT_UNCONFIRMED, TX_HEIGHT_FUTURE)
@@ -1999,6 +1999,13 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 return
         # set script_type first, as later checks might rely on it:
         txin.script_type = self.get_txin_type(address)
+
+        possible_p2pk = self.get_nonstandard_outpoints()
+        if txin.script_type == 'p2pkh' and txin.prevout.to_str() in possible_p2pk:
+            pubkey = bfh(possible_p2pk.get(txin.prevout.to_str()))
+            txin.script_type = get_script_type_from_output_script(pubkey)
+            
+
         txin.num_sig = self.m if isinstance(self, Multisig_Wallet) else 1
         if txin.redeem_script is None:
             try:

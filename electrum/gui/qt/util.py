@@ -109,9 +109,12 @@ class HeaderTracker(QLabel):
         self.update()
 
     def update(self):
-        self.setText(_('Synchronizing Headers {} {}/{} | Estimated Time Until Completion: {} | '
+        if self.local_height == -1 or self.server_height == -1:
+            self.setText(_('Synchronizing Headers (Waiting for connection...)'))
+        else:
+            self.setText(_('Synchronizing Headers {} {}/{} | Estimated Time Until Completion: {} | '
                        'Headers Are Used To Verify Information').format(
-            self.current_char, self.local_height, self.server_height, self.last_eta))
+                self.current_char, self.local_height, self.server_height, self.last_eta))
 
     def update_timer(self):
         self.current_char = c = self.loading_chars[self.loading_pointer]

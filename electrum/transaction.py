@@ -26,6 +26,7 @@
 
 
 # Note: The deserialization code originally comes from ABE.
+import enum
 import logging
 import struct
 import traceback
@@ -42,8 +43,8 @@ import copy
 
 from . import ecc, ravencoin, constants, segwit_addr, bip32, assets
 from .assets import guess_asset_script_for_vin
-from .bip32 import BIP32Node
-from .util import profiler, to_bytes, bh2u, bfh, chunks, is_hex_str, Satoshis
+from .bip32 import UINT32_MAX, BIP32Node
+from .util import format_satoshis, profiler, to_bytes, bh2u, bfh, chunks, is_hex_str, Satoshis, format_satoshis
 from .ravencoin import (TYPE_ADDRESS, TYPE_SCRIPT, hash_160,
                         hash160_to_p2sh, hash160_to_p2pkh, hash_to_segwit_addr,
                         var_int, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN,
@@ -126,6 +127,16 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
 
     def __repr__(self):
         return 'RavenValue(RVN: {}, ASSETS: {})'.format(self.__rvn_value, {k: v.__str__() for k, v in self.__asset_value.items()})
+
+    def __str__(self):
+        ret = []
+        r = self.__rvn_value
+        if r:
+            ret.append(f'{format_satoshis(r, num_zeros=1)} RVN')
+        for a, v in self.__asset_value.items():
+            ret.append(f'{format_satoshis(v, num_zeros=1)} {a}')
+
+        return ', '.join(ret)
 
     def __add__(self, other):
         if isinstance(other, RavenValue):
@@ -400,6 +411,18 @@ class TxInput:
         self.witness = witness
         self._is_coinbase_output = is_coinbase_output
         self.sighash = sighash
+
+    @property
+    def nsequence(self):
+        return self._nsequence
+
+    @nsequence.setter
+    def nsequence(self, sig):
+        #if self.prevout.txid.hex() == 'f619e4425cafe9e4aa211beb8c08f6529535cf37f94929c990e6366ce8dea799':
+        #    traceback.print_stack()
+        #    print(sig)
+        
+        self._nsequence = sig
 
     def is_coinbase_input(self) -> bool:
         """Whether this is the input of a coinbase tx."""
@@ -774,8 +797,10 @@ def parse_input(vds: BCDataStream) -> TxInput:
     try:
         # Theoretically the script_sig is the very end of the first stack push
         sigtype = next(iter(script_GetOp(script_sig)))[1][-1]
-    except:
-        pass
+        if sigtype not in list(map(int, SIGHASH)):
+            raise Exception("invalid sighash: {}".format(sigtype))
+    except Exception:
+        sigtype = None
 
     return TxInput(prevout=prevout, script_sig=script_sig, nsequence=nsequence, sighash=sigtype)
 
@@ -843,6 +868,7 @@ def multisig_script(public_keys: Sequence[str], m: int) -> str:
 
 class Transaction:
     _cached_network_ser: Optional[str]
+    for_swap = False
 
     def __str__(self):
         return self.serialize()
@@ -884,6 +910,12 @@ class Transaction:
     @locktime.setter
     def locktime(self, value: int):
         assert isinstance(value, int), f"locktime must be int, not {value!r}"
+        # Assume we have the correct locktime for SIGHASH_SINGLE
+        if self.for_swap:
+            return
+        if value != 0:
+            traceback.print_stack()
+            print(value)
         self._locktime = value
         self.invalidate_ser_cache()
 
@@ -903,6 +935,7 @@ class Transaction:
             'locktime': self.locktime,
             'inputs': [txin.to_json() for txin in self.inputs()],
             'outputs': [txout.to_json() for txout in self.outputs()],
+            'swap': self.for_swap
         }
         return d
 
@@ -1557,6 +1590,7 @@ class PartialTxInput(TxInput, PSBTSection):
             'utxo': str(self.utxo) if self.utxo else None,
             'witness_utxo': self.witness_utxo.serialize_to_network().hex() if self.witness_utxo else None,
             'sighash': self.sighash,
+            'script_sig': self.script_sig,
             'redeem_script': self.redeem_script.hex() if self.redeem_script else None,
             'witness_script': self.witness_script.hex() if self.witness_script else None,
             'part_sigs': {pubkey.hex(): sig.hex() for pubkey, sig in self.part_sigs.items()},
@@ -1784,7 +1818,7 @@ class PartialTxInput(TxInput, PSBTSection):
             # BIP-174: "All other data except the UTXO and unknown fields in the
             #           input key-value map should be cleared from the PSBT"
             self.part_sigs = {}
-            self.sighash = None
+            #self.sighash = None
             self.bip32_paths = {}
             self.redeem_script = None
             self.witness_script = None
@@ -1991,13 +2025,14 @@ class PartialTransaction(Transaction):
         return d
 
     @classmethod
-    def from_tx(cls, tx: Transaction) -> 'PartialTransaction':
+    def from_tx(cls, tx: Transaction, strip = True) -> 'PartialTransaction':
         res = cls()
-        res._inputs = [PartialTxInput.from_txin(txin, strip_witness=True)
+        res._inputs = [PartialTxInput.from_txin(txin, strip_witness=strip)
                        for txin in tx.inputs()]
         res._outputs = [PartialTxOutput.from_txout(txout) for txout in tx.outputs()]
         res.version = tx.version
         res.locktime = tx.locktime
+        res.for_swap = tx.for_swap
         return res
 
     @classmethod
@@ -2099,7 +2134,7 @@ class PartialTransaction(Transaction):
 
     @classmethod
     def from_io(cls, inputs: Sequence[PartialTxInput], outputs: Sequence[PartialTxOutput], *, wallet = None,
-                locktime: int = None, version: int = None):
+                locktime: int = None, version: int = None, for_swap = False):
         self = cls()
         self._inputs = list(inputs)
         self._outputs = list(outputs)
@@ -2108,6 +2143,7 @@ class PartialTransaction(Transaction):
             self.locktime = locktime
         if version is not None:
             self.version = version
+        self.for_swap = for_swap
         self.BIP69_sort()
         return self
 
@@ -2194,10 +2230,16 @@ class PartialTransaction(Transaction):
     def set_rbf(self, rbf: bool) -> None:
         nSequence = 0xffffffff - (2 if rbf else 1)
         for txin in self.inputs():
+            # Ensure 0 for SIGHASH_SINGLE
+            if self.for_swap and txin.sighash and txin.sighash & SIGHASH.SINGLE != 0:
+                continue
             txin.nsequence = nSequence
         self.invalidate_ser_cache()
 
     def BIP69_sort(self, inputs=True, outputs=True):
+        # Do not change the ordering for SIGHASH_SINGLE
+        if self.for_swap:
+            return
         # NOTE: other parts of the code rely on these sorts being *stable* sorts
         if inputs:
             self._inputs.sort(key = lambda i: (i.prevout.txid, i.prevout.out_idx))
@@ -2278,20 +2320,50 @@ class PartialTransaction(Transaction):
         _logger.info(f"Preimage script for {txin.prevout.txid.hex()}\n{bfh(preimage_script)}")
         if txin.is_segwit():
             raise NotImplementedError()
-            #if bip143_shared_txdigest_fields is None:
-            #    bip143_shared_txdigest_fields = self._calc_bip143_shared_txdigest_fields()
-            #hashPrevouts = bip143_shared_txdigest_fields.hashPrevouts
-            #hashSequence = bip143_shared_txdigest_fields.hashSequence
-            #hashOutputs = bip143_shared_txdigest_fields.hashOutputs
-            #outpoint = txin.prevout.serialize_to_network().hex()
-            #scriptCode = var_int(len(preimage_script) // 2) + preimage_script
-            #amount = int_to_hex(txin.value_sats(), 8)
-            #nSequence = int_to_hex(txin.nsequence, 4)
-            #preimage = nVersion + hashPrevouts + hashSequence + outpoint + scriptCode + amount + nSequence + hashOutputs + nLocktime + nHashType
+            if bip143_shared_txdigest_fields is None:
+                bip143_shared_txdigest_fields = self._calc_bip143_shared_txdigest_fields()
+            hashPrevouts = bip143_shared_txdigest_fields.hashPrevouts
+            hashSequence = bip143_shared_txdigest_fields.hashSequence
+            hashOutputs = bip143_shared_txdigest_fields.hashOutputs
+            outpoint = txin.prevout.serialize_to_network().hex()
+            scriptCode = var_int(len(preimage_script) // 2) + preimage_script
+            amount = int_to_hex(txin.value_sats(), 8)
+            nSequence = int_to_hex(txin.nsequence, 4)
+            preimage = nVersion + hashPrevouts + hashSequence + outpoint + scriptCode + amount + nSequence + hashOutputs + nLocktime + nHashType
         else:
-            txins = var_int(len(inputs)) + ''.join(self.serialize_input(txin, preimage_script if txin_index==k else '')
-                                                   for k, txin in enumerate(inputs))
-            txouts = var_int(len(outputs)) + ''.join(o.serialize_to_network().hex() for o in outputs)
+            if sighash & int(SIGHASH.ANYONECANPAY) != 0:
+                txins = var_int(1) + self.serialize_input(txin, preimage_script)
+                # We only need to check the next 2 bits now
+                sighash &= 3
+            else:
+                txins = var_int(len(inputs))
+                for k, txin in enumerate(inputs):
+                    if (sighash == int(SIGHASH.NONE) or sighash == int(SIGHASH.SINGLE)) and txin_index != k:
+                        txin = PartialTxInput.from_txin(txin)
+                        txin.nsequence = 0
+                    s_in = self.serialize_input(txin, preimage_script if txin_index==k else '')
+                    txins += s_in
+            
+            if sighash == int(SIGHASH.NONE):
+                txouts = var_int(0)
+            elif sighash == int(SIGHASH.SINGLE):
+                if txin_index > len(outputs):
+                    raise Exception("Not enough outputs for SIGHASH_SINGLE!")
+                txouts = var_int(txin_index)
+                for k, txout in enumerate(outputs):
+                    if k < txin_index:
+                        txout = PartialTxOutput.from_txout(txout)
+                        txout.scriptpubkey = b''
+                        txout.value = Satoshis((1 << 64) - 1)
+                        txout.asset = None
+                        txouts += txout.serialize_to_network().hex()
+                    elif k == txin_index:
+                        txouts += txout.serialize_to_network().hex()
+                    else:
+                        break
+            else:
+                txouts = var_int(len(outputs)) + ''.join(o.serialize_to_network().hex() for o in outputs)
+
             preimage = nVersion + txins + txouts + nLocktime + nHashType
         return preimage
 
@@ -2313,14 +2385,14 @@ class PartialTransaction(Transaction):
         _logger.debug(f"is_complete {self.is_complete()}")
         self.invalidate_ser_cache()
 
-    def sign_txin(self, txin_index, privkey_bytes, *, bip143_shared_txdigest_fields=None, sighash=SIGHASH.ALL) -> str:
+    def sign_txin(self, txin_index, privkey_bytes, *, bip143_shared_txdigest_fields=None) -> str:
         txin = self.inputs()[txin_index]
         txin.validate_data(for_signing=True)
         pre_hash = sha256d(bfh(self.serialize_preimage(txin_index,
                                                        bip143_shared_txdigest_fields=bip143_shared_txdigest_fields)))
         privkey = ecc.ECPrivkey(privkey_bytes)
         sig = privkey.sign_transaction(pre_hash)
-        sig = bh2u(sig) + '{0:02x}'.format(sighash)
+        sig = bh2u(sig) + '{0:02x}'.format(txin.sighash if txin.sighash else SIGHASH.ALL)
         return sig
 
     def is_complete(self) -> bool:

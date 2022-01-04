@@ -1352,12 +1352,15 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
     def make_unsigned_transaction(
             self, *,
             coins: Sequence[PartialTxInput],
+            inputs: List[PartialTxInput] = list(),
             outputs: List[PartialTxOutput],
             fee=None,
             change_addr: str = None,
             is_sweep=False,
             rbf=False,
-            coinbase_outputs=None) -> PartialTransaction:
+            coinbase_outputs=None,
+            freeze_locktime=None,
+            for_swap=False) -> PartialTransaction:
 
         if not coins:  # any bitcoin tx must have at least 1 input by consensus
             raise NotEnoughFunds()
@@ -1433,7 +1436,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             txo = list(filter(lambda o: not self.is_change(o.address), base_tx.outputs()))
             old_change_addrs = [o.address for o in base_tx.outputs() if self.is_change(o.address)]
         else:
-            txi = []
+            txi = inputs
             txo = []
             old_change_addrs = []
         # change address. if empty, coin_chooser will set it
@@ -1461,7 +1464,9 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 dust_threshold=self.dust_threshold(),
                 asset_divs=asset_divs,
                 coinbase_outputs=coinbase_outputs,
-                wallet=self)
+                wallet=self,
+                freeze_locktime=freeze_locktime,
+                for_swap=for_swap)
         #else:
             # "spend max" branch
             # note: This *will* spend inputs with negative effective value (if there are any).
@@ -1488,6 +1493,9 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         #    tx = PartialTransaction.from_io(list(coins), list(outputs))
 
         # Timelock tx to current height.
+
+        print(tx.to_json())
+
         tx.locktime = get_locktime_for_new_transaction(self.network)
 
         tx.set_rbf(rbf)

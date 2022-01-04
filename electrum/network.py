@@ -1116,6 +1116,11 @@ class Network(Logger, NetworkRetryManager[ServerAddr]):
 
     @best_effort_reliable
     @catch_server_exceptions
+    async def listunspentassets_for_scripthash(self, sh: str) -> List[dict]:
+        return await self.interface.listunspentassets_for_scripthash(sh)
+
+    @best_effort_reliable
+    @catch_server_exceptions
     async def get_balance_for_scripthash(self, sh: str) -> dict:
         return await self.interface.get_balance_for_scripthash(sh)
 

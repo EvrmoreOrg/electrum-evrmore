@@ -1006,6 +1006,25 @@ class Interface(Logger):
             assert_hash256_str(utxo_item['tx_hash'])
         return res
 
+    async def listunspentassets_for_scripthash(self, sh: str) -> List[dict]:
+        if not is_hash256_str(sh):
+            raise Exception(f"{repr(sh)} is not a scripthash")
+        # do request
+        res = await self.session.send_request('blockchain.scripthash.listassets', [sh])
+        # check response
+        assert_list_or_tuple(res)
+        for utxo_item in res:
+            assert_dict_contains_field(utxo_item, field_name='tx_pos')
+            assert_dict_contains_field(utxo_item, field_name='value')
+            assert_dict_contains_field(utxo_item, field_name='tx_hash')
+            assert_dict_contains_field(utxo_item, field_name='height')
+            assert_dict_contains_field(utxo_item, field_name='name')
+            assert_non_negative_integer(utxo_item['tx_pos'])
+            assert_non_negative_integer(utxo_item['value'])
+            assert_non_negative_integer(utxo_item['height'])
+            assert_hash256_str(utxo_item['tx_hash'])
+        return res
+
     async def get_balance_for_scripthash(self, sh: str) -> dict:
         if not is_hash256_str(sh):
             raise Exception(f"{repr(sh)} is not a scripthash")

@@ -95,7 +95,7 @@ def show_transaction(tx: Transaction, *, parent: 'ElectrumWindow', desc=None, pr
 
 class BaseTxDialog(QDialog, MessageBoxMixin):
 
-    def __init__(self, *, parent: 'ElectrumWindow', desc, prompt_if_unsaved, finalized: bool, external_keypairs=None, mixed=False):
+    def __init__(self, *, parent: 'ElectrumWindow', desc, prompt_if_unsaved, finalized: bool, external_keypairs=None, mixed=False, freeze_locktime=None):
         '''Transactions in the wallet will show their description.
         Pass desc to give a description for txs not yet in the wallet.
         '''
@@ -104,6 +104,7 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
         self.tx = None  # type: Optional[Transaction]
         self.external_keypairs = external_keypairs
         self.mixed = mixed
+        self.freeze_locktime = freeze_locktime
         self.finalized = finalized
         self.main_window = parent
         self.config = parent.config
@@ -732,6 +733,9 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
         locktime_setter_label = TxDetailLabel()
         locktime_setter_label.setText("LockTime: ")
         self.locktime_e = LockTimeEdit(self)
+        if self.freeze_locktime is not None:
+            self.locktime_e.setEnabled(False)
+            self.locktime_e.set_locktime(self.freeze_locktime)
         locktime_setter_hbox.addWidget(locktime_setter_label)
         locktime_setter_hbox.addWidget(self.locktime_e)
         locktime_setter_hbox.addStretch(1)
@@ -818,7 +822,8 @@ class PreviewTxDialog(BaseTxDialog, TxEditor):
             external_keypairs,
             window: 'ElectrumWindow',
             output_value: Union[int, str],
-            mixed = False
+            mixed = False,
+            freeze_locktime=None
     ):
         TxEditor.__init__(
             self,
@@ -828,7 +833,8 @@ class PreviewTxDialog(BaseTxDialog, TxEditor):
             output_value=output_value,
         )
         BaseTxDialog.__init__(self, parent=window, desc='', prompt_if_unsaved=False,
-                              finalized=False, external_keypairs=external_keypairs, mixed=mixed)
+                              finalized=False, external_keypairs=external_keypairs, mixed=mixed, 
+                              freeze_locktime=freeze_locktime)
         BlockingWaitingDialog(window, _("Preparing transaction..."),
                               lambda: self.update_tx(fallback_to_zero_fee=True))
         self.update()

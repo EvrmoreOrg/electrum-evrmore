@@ -327,8 +327,10 @@ class CoinChooserBase(Logger):
                                             wallet,
                                             asset_divs: Dict[str, int],
                                             has_return: bool) -> Tuple[PartialTransaction, List[PartialTxOutput]]:
+        print(f"before: {base_tx.to_json()['swap']}")
+        
         # make a copy of base_tx so it won't get mutated
-        tx = PartialTransaction.from_io(base_tx.inputs()[:], base_tx.outputs()[:], wallet=wallet)
+        tx = PartialTransaction.from_io(base_tx.inputs()[:], base_tx.outputs()[:], wallet=wallet, locktime=base_tx.locktime, version=base_tx.version, for_swap=base_tx.for_swap)
 
         tx.add_inputs([coin for b in buckets for coin in b.coins])
         tx_weight = self._get_tx_weight(buckets, base_weight=base_weight)
@@ -356,6 +358,8 @@ class CoinChooserBase(Logger):
         change = self._change_outputs(tx, change_addrs, fee_estimator_numchange, dust_threshold, asset_divs, has_return)
         tx.add_outputs(change)
 
+        print(f"after: {tx.to_json()['swap']}")
+
         return tx, change
 
     def _get_tx_weight(self, buckets: Sequence[Bucket], *, base_weight: int) -> int:
@@ -382,7 +386,9 @@ class CoinChooserBase(Logger):
                 fee_estimator_vb: Callable, dust_threshold: int,
                 asset_divs: Dict[str, int],
                 wallet,
-                coinbase_outputs=None) -> PartialTransaction:
+                coinbase_outputs=None,
+                freeze_locktime=None,
+                for_swap=False) -> PartialTransaction:
         """Select unspent coins to spend to pay outputs.  If the change is
         greater than dust_threshold (after adding the change output to
         the transaction) it is kept, otherwise none is sent and it is
@@ -402,6 +408,10 @@ class CoinChooserBase(Logger):
 
         # Copy the outputs so when adding change we don't modify "outputs"
         base_tx = PartialTransaction.from_io(inputs[:], outputs[:], wallet=wallet)
+        if freeze_locktime is not None:
+            base_tx.locktime = freeze_locktime
+        base_tx.for_swap = for_swap
+
         input_value = base_tx.input_value()
 
         # Weight of the transaction with no inputs and no change

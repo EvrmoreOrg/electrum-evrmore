@@ -53,7 +53,7 @@ import electrum
 from electrum.gui import messages
 from electrum import (keystore, ecc, constants, util, ravencoin, commands,
                       paymentrequest, lnutil)
-from electrum.ravencoin import COIN, is_address, base_decode, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC
+from electrum.ravencoin import COIN, is_address, base_decode, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, address_to_scripthash
 from electrum.plugin import run_hook, BasePlugin
 from electrum.i18n import _
 from electrum.util import (format_time,
@@ -67,8 +67,8 @@ from electrum.util import (format_time,
                            InvoiceError)
 from electrum.invoices import PR_TYPE_ONCHAIN, PR_TYPE_LN, PR_DEFAULT_EXPIRATION_WHEN_CREATING, Invoice
 from electrum.invoices import PR_PAID, PR_FAILED, pr_expiration_values, LNInvoice, OnchainInvoice
-from electrum.transaction import (Transaction, PartialTxInput,
-                                  PartialTransaction, PartialTxOutput, RavenValue, script_GetOp)
+from electrum.transaction import (SIGHASH, Transaction, PartialTxInput,
+                                  PartialTransaction, PartialTxOutput, RavenValue, script_GetOp, TxOutpoint)
 from electrum.wallet import (Multisig_Wallet, CannotBumpFee, Abstract_Wallet,
                              sweep_preparations, InternalAddressCorruption,
                              CannotDoubleSpendTx, CannotCPFP)
@@ -233,6 +233,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.console_tab = self.create_console_tab()
         self.contacts_tab = self.create_contacts_tab()
         self.messages_tab = self.create_messages_tab()
+        self.swap_tab = self.create_swap_tab()
         # self.channels_tab = self.create_channels_tab()
 
         self.header_tracker = HeaderTracker()
@@ -248,6 +249,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         tabs.addTab(self.assets_tab, read_QIcon('tab_assets.png'), _('Assets'))
         tabs.addTab(self.send_tab, read_QIcon("tab_send.png"), _('Send'))
         tabs.addTab(self.receive_tab, read_QIcon("tab_receive.png"), _('Receive'))
+        tabs.addTab(self.swap_tab, read_QIcon("tab_swap.png"), _('Atomic Swap'))
 
         def add_optional_tab(tabs, tab, icon, description, name, default=False):
             tab.tab_icon = icon
@@ -357,10 +359,12 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                                    wallet=self.wallet)
 
 
-    def run_coroutine_from_thread(self, coro, on_result=None):
+    def run_coroutine_from_thread(self, coro, on_result=None, *, is_swap=False):
         def task():
             try:
                 f = asyncio.run_coroutine_threadsafe(coro, self.network.asyncio_loop)
+                if is_swap:
+                    self.current_swap_coro = f
                 r = f.result()
                 if on_result:
                     on_result(r)
@@ -1493,7 +1497,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.send_options = new_send_options
         self.to_send_combo.addItems(self.send_options)
 
-
     def create_send_tab(self):
         # A 4-column grid layout.  All the stretch is in the last column.
         # The exchange rate plugin adds a fiat widget in column 2
@@ -1640,6 +1643,154 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.message_list = l = MessageList(self)
         tab = self.create_list_tab(l)
         return tab
+
+    def create_swap_tab(self):
+        self.current_swap_coro = None
+        self.current_swap_psbt = None
+
+        self.current_swap_in = None
+        self.current_swap_out = None
+
+        w = QWidget()
+        vbox = QVBoxLayout(w)
+
+        info = QLabel()
+
+        async def query_and_parse_tx(tx):
+            input_values = []
+            for input in tx.inputs():
+                v = input.value_sats()
+                if v:
+                    input_values.append(v)
+                else:
+                    try:
+                        old_tx_raw = await self.network.interface.get_transaction(input.prevout.txid.hex(), timeout=10)
+                        # We do not need to verify because if this is invalid, it won't be accepted on the chain
+                        old_tx = Transaction(old_tx_raw)
+                        outpoint = old_tx.outputs()[input.prevout.out_idx]
+                        a = outpoint.asset
+                        try:
+                            # Best effort check if still valid
+                            hashX = address_to_scripthash(outpoint.address)
+                            if a:
+                                unspent_for_addr = await self.network.interface.listunspentassets_for_scripthash(hashX)
+                            else:
+                                unspent_for_addr = await self.network.interface.listunspent_for_scripthash(hashX)
+                            unspents = set(TxOutpoint.from_str(f'{d["tx_hash"]}:{d["tx_pos"]}') for d in unspent_for_addr)
+                            if input.prevout not in unspents:
+                                info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                                info.setText(_('This partial transaction has already been redeemed!'))
+                                return
+                        except Exception:
+                            pass
+                        input_values.append(RavenValue(0, {a: outpoint.value}) if a else RavenValue(outpoint.value))
+                    except Exception as e:
+                        self.logger.exception('')
+                        input_values.append(None)
+            
+            if not all(input_values):
+                info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                info.setText(_('Unable to query information for what you will receive. Try using another Electrum server.'))
+                return
+
+            output_values = []
+            for output in tx.outputs():
+                a = output.asset
+                output_values.append(RavenValue(0, {a: output.value}) if a else RavenValue(output.value))
+
+            if not all(output_values):
+                info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                info.setText(_('Unable to query information for what you will receive. Try using another Electrum server.'))
+                return
+                  
+            self.current_swap_in = input_values
+            total_in = sum(input_values, RavenValue())
+            self.current_swap_out = total_out = sum(output_values, RavenValue())
+
+            info.setText(_(f'You will receive: {total_in}\nYou will spend: {total_out}'))
+
+        # Input
+        def parse_psbt(w):
+            self.current_swap_in = None
+            self.current_swap_out = None
+            self.current_swap_psbt = None
+            if self.current_swap_coro:
+                self.current_swap_coro.cancel()
+            info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+            raw = w.toPlainText()
+            if len(raw) == 0:
+                info.setText('')
+                return
+            try:
+                self.current_swap_psbt = psbt = PartialTransaction.from_tx(Transaction(raw, wallet=self.wallet), strip=False)
+                if any([i.sighash for i in psbt.inputs() if i.sighash != SIGHASH.SINGLE_ANYONECANPAY]):
+                    raise Exception('Not SINGLE_ANYONECANPAY')
+                info.setText(_('Waiting for data...'))
+                self.run_coroutine_from_thread(query_and_parse_tx(psbt), is_swap=True)
+            except Exception as e:
+                info.setStyleSheet(ColorScheme.RED.as_stylesheet())
+                info.setText(_('Invalid Signed Partial'))
+
+        input_text = QTextEdit()
+        input_label = QLabel(_('Signed Partial:'))
+        input_text.textChanged.connect(partial(parse_psbt, input_text))
+
+        input = QWidget()
+        input_l = QHBoxLayout(input)
+
+        input_l.addWidget(input_label)
+        input_l.addWidget(input_text)
+
+        input.setLayout(input_l)
+
+
+        # Execute
+
+        def make_payment():
+            if not self.current_swap_in or \
+                not self.current_swap_out or \
+                not self.current_swap_psbt:
+                return
+
+            coins = []
+            if self.current_swap_out.rvn_value != 0:
+                coins += self.get_coins()
+            for asset in self.current_swap_out.assets.keys():
+                coins += self.get_coins(asset=asset)
+
+            inputs = self.current_swap_psbt.inputs()[:]
+
+            for input, amount in zip(inputs, self.current_swap_in):
+                input._trusted_value_sats = amount
+
+            outputs = self.current_swap_psbt.outputs()[:]
+
+            addr = self.wallet.get_receiving_address()
+            
+            total_in = sum(self.current_swap_in, RavenValue())
+
+            if total_in.rvn_value != 0:
+                outputs.append(PartialTxOutput.from_address_and_value(addr, self.current_swap_in.rvn_value))
+            for a, v in total_in.assets.items(): 
+                outputs.append(PartialTxOutput.from_address_and_value(addr, v, asset=a))
+
+            self.pay_onchain_dialog(coins, outputs, mandatory_inputs=inputs, freeze_locktime=self.current_swap_psbt.locktime, for_swap=True)
+
+        button = EnterButton(_("Redeem") + "...", make_payment)
+
+
+        vbox.addWidget(input, 3)
+        vbox.addWidget(info, 7)
+        vbox.addWidget(button, 1)
+
+        w.setLayout(vbox)
+
+        l2 = QLabel('TEST2')
+
+        self.internal_swap_tabs = tabwidget = QTabWidget()
+        tabwidget.addTab(w, "Redeem Swap")
+        tabwidget.addTab(l2, "Create Swap")
+        return tabwidget
 
     def create_assets_tab(self):
 
@@ -2120,10 +2271,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
     def pay_onchain_dialog(
             self, inputs: Sequence[PartialTxInput],
             outputs: List[PartialTxOutput], *,
+            mandatory_inputs=list(),
             external_keypairs=None,
             coinbase_outputs=None,
             change_addr=None,
-            mixed=False) -> None:
+            mixed=False,
+            freeze_locktime=None,
+            for_swap=False) -> None:
         # trustedcoin requires this
         if run_hook('abort_send', self):
             return
@@ -2131,10 +2285,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         make_tx = lambda fee_est: self.wallet.make_unsigned_transaction(
             coins=inputs,
             outputs=outputs,
+            inputs=mandatory_inputs,
             fee=fee_est,
             is_sweep=is_sweep,
             coinbase_outputs=coinbase_outputs,
-            change_addr=change_addr)
+            change_addr=change_addr,
+            freeze_locktime=freeze_locktime,
+            for_swap=for_swap)
 
         output_value = \
             sum([RavenValue(0, {x.asset: x.value}) if x.asset else RavenValue(x.value) for x in outputs +
@@ -2156,7 +2313,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 make_tx=make_tx,
                 external_keypairs=external_keypairs,
                 output_value=output_value,
-                mixed=mixed)
+                mixed=mixed,
+                freeze_locktime=freeze_locktime)
             preview_dlg.show()
             return
 
@@ -2177,7 +2335,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 make_tx=make_tx,
                 external_keypairs=external_keypairs,
                 output_value=output_value,
-                mixed=mixed)
+                mixed=mixed,
+                freeze_locktime=freeze_locktime)
             preview_dlg.show()
 
     def broadcast_or_show(self, tx: Transaction):

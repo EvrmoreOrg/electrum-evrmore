@@ -481,6 +481,23 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             wallet, tx = args
             if wallet == self.wallet:
                 self.tx_notification_queue.put(tx)
+
+            # If a swap went thru, reset the swap tab
+            if self.current_swap_psbt:
+                this_prevouts = [vin.prevout.to_str() for vin in tx.inputs()]
+                this_outs = [f'{vout.asset if vout.asset else "RVN"}:{vout.value}' for vout in tx.outputs()]
+
+                wanted_prevout = [vin.prevout.to_str() for vin in self.current_swap_psbt.inputs()]
+                wanted_outs = [f'{vout.asset if vout.asset else "RVN"}:{vout.value}' for vout in self.current_swap_psbt.outputs()]
+
+                if all(vin in this_prevouts for vin in wanted_prevout) and \
+                    all(vout in this_outs for vout in wanted_outs):
+                  
+                    self.swap_input_text.setText('')
+                    self.swap_info.setStyleSheet(ColorScheme.GREEN.as_stylesheet())
+                    self.swap_info.setText(_('Success'))
+                    self.current_swap_psbt = None
+
         elif event == 'on_quotes':
             self.on_fx_quotes()
         elif event == 'on_history':
@@ -1654,7 +1671,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         w = QWidget()
         vbox = QVBoxLayout(w)
 
-        info = QLabel()
+        self.swap_info = info = QLabel()
 
         async def query_and_parse_tx(tx):
             input_values = []
@@ -1664,7 +1681,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                     input_values.append(v)
                 else:
                     try:
-                        old_tx_raw = await self.network.interface.get_transaction(input.prevout.txid.hex(), timeout=10)
+                        old_tx_raw = await self.network.interface.get_transaction(input.prevout.txid.hex(), timeout=2)
                         # We do not need to verify because if this is invalid, it won't be accepted on the chain
                         old_tx = Transaction(old_tx_raw)
                         outpoint = old_tx.outputs()[input.prevout.out_idx]
@@ -1707,7 +1724,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             total_in = sum(input_values, RavenValue())
             self.current_swap_out = total_out = sum(output_values, RavenValue())
 
-            info.setText(_(f'You will receive: {total_in}\nYou will spend: {total_out}'))
+            info.setText(_(f'You will receive: {total_in}\nYou will spend: {total_out}\nYou will handle the transaction fees.'))
 
         # Input
         def parse_psbt(w):
@@ -1731,7 +1748,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 info.setStyleSheet(ColorScheme.RED.as_stylesheet())
                 info.setText(_('Invalid Signed Partial'))
 
-        input_text = QTextEdit()
+        self.swap_input_text = input_text = QTextEdit()
         input_label = QLabel(_('Signed Partial:'))
         input_text.textChanged.connect(partial(parse_psbt, input_text))
 
@@ -1776,11 +1793,11 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
             self.pay_onchain_dialog(coins, outputs, mandatory_inputs=inputs, freeze_locktime=self.current_swap_psbt.locktime, for_swap=True)
 
-        button = EnterButton(_("Redeem") + "...", make_payment)
+        button = EnterButton(_("Redeem"), make_payment)
+        button.setMaximumWidth(100)
 
-
-        vbox.addWidget(input, 3)
-        vbox.addWidget(info, 7)
+        vbox.addWidget(input, 4)
+        vbox.addWidget(info, 6)
         vbox.addWidget(button, 1)
 
         w.setLayout(vbox)

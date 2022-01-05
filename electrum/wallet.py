@@ -1494,8 +1494,6 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
         # Timelock tx to current height.
 
-        print(tx.to_json())
-
         tx.locktime = get_locktime_for_new_transaction(self.network)
 
         tx.set_rbf(rbf)

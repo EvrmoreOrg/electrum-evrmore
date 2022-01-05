@@ -327,7 +327,6 @@ class CoinChooserBase(Logger):
                                             wallet,
                                             asset_divs: Dict[str, int],
                                             has_return: bool) -> Tuple[PartialTransaction, List[PartialTxOutput]]:
-        print(f"before: {base_tx.to_json()['swap']}")
         
         # make a copy of base_tx so it won't get mutated
         tx = PartialTransaction.from_io(base_tx.inputs()[:], base_tx.outputs()[:], wallet=wallet, locktime=base_tx.locktime, version=base_tx.version, for_swap=base_tx.for_swap)
@@ -357,8 +356,6 @@ class CoinChooserBase(Logger):
 
         change = self._change_outputs(tx, change_addrs, fee_estimator_numchange, dust_threshold, asset_divs, has_return)
         tx.add_outputs(change)
-
-        print(f"after: {tx.to_json()['swap']}")
 
         return tx, change
 
@@ -407,10 +404,9 @@ class CoinChooserBase(Logger):
         self.p = PRNG(b''.join(sorted(utxos)))
 
         # Copy the outputs so when adding change we don't modify "outputs"
-        base_tx = PartialTransaction.from_io(inputs[:], outputs[:], wallet=wallet)
+        base_tx = PartialTransaction.from_io(inputs[:], outputs[:], wallet=wallet, for_swap=for_swap)
         if freeze_locktime is not None:
             base_tx.locktime = freeze_locktime
-        base_tx.for_swap = for_swap
 
         input_value = base_tx.input_value()
 

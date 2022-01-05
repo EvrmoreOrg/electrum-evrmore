@@ -913,9 +913,9 @@ class Transaction:
         # Assume we have the correct locktime for SIGHASH_SINGLE
         if self.for_swap:
             return
-        if value != 0:
-            traceback.print_stack()
-            print(value)
+        #if value != 0:
+        #    traceback.print_stack()
+        #    print(value)
         self._locktime = value
         self.invalidate_ser_cache()
 

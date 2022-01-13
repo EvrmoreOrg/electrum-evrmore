@@ -22,6 +22,47 @@ _logger = get_logger(__name__)
 class BadAssetScript(Exception): pass
 
 
+def is_name_valid(name: str) -> bool:
+    if len(name) < 3 or len(name) > 31:
+        return False
+    if name[0] == '$':
+        # Restricted asset; only main
+        return is_main_asset_name_good(name[1:]) is None
+    elif name[0] == '#':
+        # Qualifier asset; can have sub, no ownership
+        strs = name.split('/')
+        good = True
+        for s in strs:
+            if not good:
+                break
+            good = is_main_asset_name_good(s[1:]) is None
+        return good
+    else:
+        # Normal
+        if name[-1] == '!':
+            # Remove ownership (this is a valid string)
+            name = name[:-1]
+        subs = name.split('/')
+        good = is_main_asset_name_good(subs[0]) is None
+        if not good or len(subs) < 2:
+            return good
+        for sub in subs[1:-1]:
+            if not good:
+                break
+            good = is_sub_asset_name_good(sub) is None
+        if not good:
+            return good
+        subs2 = subs[-1].split('#')
+        if len(subs2) < 2:
+            return is_sub_asset_name_good(subs2[0]) is None
+        elif len(subs2) == 2:
+            return is_sub_asset_name_good(subs2[0]) is None and \
+                is_unique_asset_name_good(subs2[1]) is None
+        else:
+            # Too many #
+            return False
+
+
 def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
     if script[-1] != 0x75:
         raise BadAssetScript('No OP_DROP')

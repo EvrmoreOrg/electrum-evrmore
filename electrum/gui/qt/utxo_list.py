@@ -46,16 +46,18 @@ class UTXOList(MyTreeView):
         ADDRESS = 1
         LABEL = 2
         AMOUNT = 3
-        HEIGHT = 4
+        TYPE = 4
+        HEIGHT = 5
 
     headers = {
         Columns.ADDRESS: _('Address'),
         Columns.LABEL: _('Label'),
         Columns.AMOUNT: _('Amount'),
+        Columns.TYPE: _('Type'),
         Columns.HEIGHT: _('Height'),
         Columns.OUTPOINT: _('Output point'),
     }
-    filter_columns = [Columns.ADDRESS, Columns.LABEL, Columns.OUTPOINT]
+    filter_columns = [Columns.ADDRESS, Columns.LABEL, Columns.OUTPOINT, Columns.TYPE]
     stretch_column = Columns.LABEL
 
     ROLE_PREVOUT_STR = Qt.UserRole + 1000
@@ -112,14 +114,14 @@ class UTXOList(MyTreeView):
         assets = list(utxo.value_sats().assets.items())
         if len(assets) == 0:
             amount = self.parent.format_amount(rvn_val, whitespaces=True)
-            amount += ' RVN'
+            type = 'RVN'
         else:
             # There should only be one asset per utxo
             asset, amt = assets[0]
             amount = self.parent.format_amount(amt.value, whitespaces=True)
-            amount += ' ' + asset
+            type = asset
 
-        labels = [name_short, address, label, amount, '%d'%height]
+        labels = [name_short, address, label, amount, type, '%d'%height]
         utxo_item = [QStandardItem(x) for x in labels]
         self.set_editability(utxo_item)
         utxo_item[self.Columns.OUTPOINT].setData(name, self.ROLE_CLIPBOARD_DATA)

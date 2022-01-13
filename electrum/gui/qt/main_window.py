@@ -50,6 +50,7 @@ from PyQt5.QtWidgets import (QMessageBox, QComboBox, QSystemTrayIcon, QTabWidget
                              QMenu, QAction, QStackedWidget, QToolButton, )
 
 import electrum
+from electrum.blockchain import DGW_PASTBLOCKS, hash_header
 from electrum.gui import messages
 from electrum import (keystore, ecc, constants, util, ravencoin, commands,
                       paymentrequest, lnutil)
@@ -1668,8 +1669,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.current_swap_in = None
         self.current_swap_out = None
 
-        w = QWidget()
-        vbox = QVBoxLayout(w)
+        # Redeem transaction
+
+        w1 = QWidget()
+        vbox = QVBoxLayout(w1)
 
         self.swap_info = info = QLabel()
 
@@ -1800,13 +1803,18 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         vbox.addWidget(info, 6)
         vbox.addWidget(button, 1)
 
-        w.setLayout(vbox)
+        w1.setLayout(vbox)
 
-        l2 = QLabel('TEST2')
+        # Create swap
+
+        w2 = QWidget()
+        grid = QGridLayout(w2)
+
+        w2.setLayout(grid)
 
         self.internal_swap_tabs = tabwidget = QTabWidget()
-        tabwidget.addTab(w, "Redeem Swap")
-        tabwidget.addTab(l2, "Create Swap")
+        tabwidget.addTab(w1, "Redeem Swap")
+        tabwidget.addTab(w2, "Create Swap")
         return tabwidget
 
     def create_assets_tab(self):

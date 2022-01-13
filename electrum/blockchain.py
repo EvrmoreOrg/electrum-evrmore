@@ -296,6 +296,10 @@ class Blockchain(Logger):
     def checkpoints(self):
         return constants.net.CHECKPOINTS
 
+    @property
+    def dgw_checkpoints(self):
+        return constants.net.DGW_CHECKPOINTS
+
     def get_max_child(self) -> Optional[int]:
         children = self.get_direct_children()
         return max([x.forkpoint for x in children]) if children else None
@@ -627,11 +631,26 @@ class Blockchain(Logger):
             return True
         return False
 
+    @staticmethod
+    def is_dgw_height_checkpoint(height) -> Optional[int]:
+        if height < constants.net.DGW_CHECKPOINTS_START:
+            return False
+        if height > constants.net.max_dgw_checkpoint() + DGW_PASTBLOCKS - 1:
+            return False
+        height_mod = height % constants.net.DGW_CHECKPOINTS_SPACING
+        if height_mod == 0:
+            return 0
+        elif height_mod == DGW_PASTBLOCKS - 1:
+            return 1
+        return None
+
     def get_hash(self, height: int) -> str:
         def is_height_checkpoint():
             within_cp_range = height <= nDGWActivationBlock
             at_chunk_boundary = (height + 1) % 2016 == 0
             return within_cp_range and at_chunk_boundary
+
+        dgw_height_checkpoint = self.is_dgw_height_checkpoint(height)
 
         if height == -1:
             return '0000000000000000000000000000000000000000000000000000000000000000'
@@ -641,6 +660,10 @@ class Blockchain(Logger):
             index = height // 2016
             h, t = self.checkpoints[index]
             return h
+        #elif dgw_height_checkpoint is not None:
+        #    index = height // constants.net.DGW_CHECKPOINTS_SPACING - 5
+        #    h, t = self.dgw_checkpoints[index][dgw_height_checkpoint]
+        #    return h
         else:
             header = self.read_header(height)
             if header is None:
@@ -648,6 +671,8 @@ class Blockchain(Logger):
             return hash_header(header)
 
     def get_target(self, height: int, chain=None) -> int:
+        dgw_height_checkpoint = self.is_dgw_height_checkpoint(height)
+
         if constants.net.TESTNET:
             return 0
         # Before we switched to Dark Wave Gravity Difficulty,
@@ -662,6 +687,10 @@ class Blockchain(Logger):
         elif height < nDGWActivationBlock:
             h, t = self.checkpoints[height // 2016]
             return t
+        #elif dgw_height_checkpoint is not None:
+        #    index = height // constants.net.DGW_CHECKPOINTS_SPACING - 5
+        #    h, t = self.dgw_checkpoints[index][dgw_height_checkpoint]
+        #    return t
         # There was a difficulty reset for kawpow
         elif not constants.net.TESTNET and height in range(1219736, 1219736 + 180):  # kawpow reset
             return KAWPOW_LIMIT

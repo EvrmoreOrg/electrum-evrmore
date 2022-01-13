@@ -108,6 +108,7 @@ from .transaction_dialog import PreviewTxDialog
 from .rbf_dialog import BumpFeeDialog, DSCancelDialog
 from ...assets import is_main_asset_name_good, is_sub_asset_name_good, is_unique_asset_name_good
 from .qrreader import scan_qrcode
+from electrum import assets
 
 if TYPE_CHECKING:
     from . import ElectrumGui
@@ -1752,6 +1753,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 info.setText(_('Invalid Signed Partial'))
 
         self.swap_input_text = input_text = QTextEdit()
+        input_text.setAcceptRichText(False)
         input_label = QLabel(_('Signed Partial:'))
         input_text.textChanged.connect(partial(parse_psbt, input_text))
 
@@ -1790,7 +1792,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             total_in = sum(self.current_swap_in, RavenValue())
 
             if total_in.rvn_value != 0:
-                outputs.append(PartialTxOutput.from_address_and_value(addr, self.current_swap_in.rvn_value))
+                outputs.append(PartialTxOutput.from_address_and_value(addr, total_in.rvn_value))
             for a, v in total_in.assets.items(): 
                 outputs.append(PartialTxOutput.from_address_and_value(addr, v, asset=a))
 
@@ -1807,14 +1809,71 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         # Create swap
 
+        internal_tab = QTabWidget()
+
+        # Buy asset
         w2 = QWidget()
-        grid = QGridLayout(w2)
+        vbox2 = QVBoxLayout(w2)
 
-        w2.setLayout(grid)
+        buy_error = QLabel()
+        buy_error.setStyleSheet(ColorScheme.RED.as_stylesheet())
+        self.swap_buy_amt = buy_amt = RVNAmountEdit(self.get_decimal_point)
 
+        def on_edit(w):
+            buy_error.setText('')    
+            raw = w.text()
+            if len(raw) >= 3 and not assets.is_name_valid(raw):
+                buy_error.setText('Invalid asset name!')
+
+        self.swap_buy_text = buy_text = SizedFreezableLineEdit(width=buy_amt._width)
+        buy_text.textChanged.connect(partial(on_edit, buy_text))
+
+        buy_label = QLabel(_("Wanted Asset:"))
+        vbox2.addWidget(buy_label, 1)
+        vbox2.addWidget(buy_text, 1)
+        vbox2.addWidget(buy_error, 1)
+
+        buy_amt_label = QLabel(_("RVN Offered:"))
+        vbox2.addWidget(buy_amt_label, 1)
+        vbox2.addWidget(buy_amt, 1)
+
+        def generate():
+            offer = self.swap_buy_amt.get_amount()
+            coins = self.get_coins()
+            for c in coins:
+                if c.value_sats().rvn_value == offer:
+                    return
+            addr = self.wallet.get_new_sweep_address_for_channel()
+            self.pay_onchain_dialog(coins, [PartialTxOutput.from_address_and_value(addr, offer)])
+
+        button1 = EnterButton(_("Generate Signed Partial"), generate)
+        button1.setMaximumWidth(300)
+        vbox2.addWidget(button1, 1)
+        vbox2.addWidget(QWidget(), 4)
+
+        w2.setLayout(vbox2)
+
+        w3 = QWidget()
+        vbox3 = QVBoxLayout(w3)
+        w3.setLayout(vbox3)
+
+        w4 = QWidget()
+        vbox4 = QVBoxLayout(w4)
+        w4.setLayout(vbox4)
+
+        internal_tab.addTab(w2, _("Buy Asset"))
+        internal_tab.addTab(w3, _("Sell Asset"))  
+        internal_tab.addTab(w4, _("Trade Assets"))  
+
+        # List swaps
+        w5 = QWidget()
+        vbox5 = QVBoxLayout(w5)
+        w5.setLayout(vbox5)
+        
         self.internal_swap_tabs = tabwidget = QTabWidget()
-        tabwidget.addTab(w1, "Redeem Swap")
-        tabwidget.addTab(w2, "Create Swap")
+        tabwidget.addTab(w1, _("Redeem Swap"))
+        tabwidget.addTab(internal_tab, _("Create Swap"))
+        tabwidget.addTab(w5, _("My Swaps"))
         return tabwidget
 
     def create_assets_tab(self):

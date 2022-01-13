@@ -128,7 +128,7 @@ class AddressList(MyTreeView):
             self.Columns.TYPE: _('Type'),
             self.Columns.ADDRESS: _('Address'),
             self.Columns.LABEL: _('Label'),
-            self.Columns.COIN_BALANCE: _('Balance'),
+            self.Columns.COIN_BALANCE: _('Balance') + ' (RVN)',
             self.Columns.FIAT_BALANCE: ccy + ' ' + _('Balance'),
             self.Columns.NUM_TXS: _('Tx'),
         }

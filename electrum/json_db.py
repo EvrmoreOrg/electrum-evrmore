@@ -78,8 +78,16 @@ class StoredDict(dict):
         for k, v in list(data.items()):
             self.__setitem__(k, v)
 
+    def convert_key(self, key):
+        """Convert int keys to str keys, as only those are allowed in json."""
+        # NOTE: this is evil. really hard to keep in mind and reason about. :(
+        #       e.g.: imagine setting int keys everywhere, and then iterating over the dict:
+        #             suddenly the keys are str...
+        return str(int(key)) if isinstance(key, int) else key
+
     @locked
     def __setitem__(self, key, v):
+        key = self.convert_key(key)
         is_new = key not in self
         # early return to prevent unnecessary disk writes
         if not is_new and self[key] == v:
@@ -111,12 +119,24 @@ class StoredDict(dict):
 
     @locked
     def __delitem__(self, key):
+        key = self.convert_key(key)
         dict.__delitem__(self, key)
         if self.db:
             self.db.set_modified(True)
 
     @locked
+    def __getitem__(self, key):
+        key = self.convert_key(key)
+        return dict.__getitem__(self, key)
+
+    @locked
+    def __contains__(self, key):
+        key = self.convert_key(key)
+        return dict.__contains__(self, key)
+
+    @locked
     def pop(self, key, v=_RaiseKeyError):
+        key = self.convert_key(key)
         if v is _RaiseKeyError:
             r = dict.pop(self, key)
         else:
@@ -125,7 +145,11 @@ class StoredDict(dict):
             self.db.set_modified(True)
         return r
 
-
+    @locked
+    def get(self, key, default=None):
+        key = self.convert_key(key)
+        return dict.get(self, key, default)
+        
 class JsonDB(Logger):
 
     def __init__(self, data):

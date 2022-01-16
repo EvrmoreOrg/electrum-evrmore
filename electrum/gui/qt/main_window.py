@@ -235,7 +235,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.console_tab = self.create_console_tab()
         self.contacts_tab = self.create_contacts_tab()
         self.messages_tab = self.create_messages_tab()
-        self.swap_tab = self.create_swap_tab()
+        #self.swap_tab = self.create_swap_tab()
         # self.channels_tab = self.create_channels_tab()
 
         self.header_tracker = HeaderTracker()
@@ -1569,11 +1569,11 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.pubkey_e.setVisible(vis)
         grid.addWidget(self.pubkey_e, 3, 1, 1, -1)
 
-        msg = _('Amount to be sent.') + '\n\n' \
-              + _('The amount will be displayed in red if you do not have enough funds in your wallet.') + ' ' \
-              + _(
-            'Note that if you have frozen some of your addresses, the available funds will be lower than your total balance.') + '\n\n' \
-              + _('Keyboard shortcut: type "!" to send all your coins.')
+        msg = (_('The amount to be received by the recipient.') + ' '
+               + _('Fees are paid by the sender.') + '\n\n'
+               + _('The amount will be displayed in red if you do not have enough funds in your wallet.') + ' '
+               + _('Note that if you have frozen some of your addresses, the available funds will be lower than your total balance.'))
+
         amount_label = HelpLabel(_('Amount'), msg)
         grid.addWidget(amount_label, 4, 0)
         grid.addWidget(self.amount_e, 4, 1)
@@ -1817,7 +1817,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         buy_error = QLabel()
         buy_error.setStyleSheet(ColorScheme.RED.as_stylesheet())
-        self.swap_buy_amt = buy_amt = RVNAmountEdit(self.get_decimal_point)
+        buy_amt = RVNAmountEdit(self.get_decimal_point)
 
         def on_edit(w):
             buy_error.setText('')    
@@ -1825,7 +1825,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             if len(raw) >= 3 and not assets.is_name_valid(raw):
                 buy_error.setText('Invalid asset name!')
 
-        self.swap_buy_text = buy_text = SizedFreezableLineEdit(width=buy_amt._width)
+        buy_text = SizedFreezableLineEdit(width=buy_amt._width)
         buy_text.textChanged.connect(partial(on_edit, buy_text))
 
         buy_label = QLabel(_("Wanted Asset:"))
@@ -1838,11 +1838,21 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         vbox2.addWidget(buy_amt, 1)
 
         def generate():
-            offer = self.swap_buy_amt.get_amount()
+            if not buy_text.text():
+                return
+            offer = buy_amt.get_amount()
+            if offer <= 0:
+                return
             coins = self.get_coins()
             for c in coins:
-                if c.value_sats().rvn_value == offer:
+                if c.value_sats().rvn_value == offer and self.question(
+                    _("You already have an unspent transaction output with this amount. "
+                      "Would you like use this UTXO?"),
+                    title=_("UTXO")
+                ):
+                    self.create_and_freeze_swap(c, )
                     return
+                    
             addr = self.wallet.get_new_sweep_address_for_channel()
             self.pay_onchain_dialog(coins, [PartialTxOutput.from_address_and_value(addr, offer)])
 
@@ -1855,6 +1865,41 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         w3 = QWidget()
         vbox3 = QVBoxLayout(w3)
+        l = QTextEdit()
+
+        def test():
+            from electrum.ravencoin import address_to_script
+            from electrum.transaction import Satoshis
+            
+            i1 = PartialTxInput(prevout=TxOutpoint(bytes.fromhex('7e602949d4c149b433f368046c0c478e2557a20ced1b394bf10045ff358768fb'), 0), is_coinbase_output=False)
+            i2 = PartialTxInput(prevout=TxOutpoint(bytes.fromhex('126d25a4c779cc4e92853ea872aa23d20afbc87bb99a8136bc0fc1c472bf9356'), 1), is_coinbase_output=False)
+            
+            i1.script_type = 'p2pkh'
+            i2.script_type = 'p2pkh'
+
+            i1._trusted_value_sats = RavenValue(449500)
+            i2._trusted_value_sats = RavenValue(350000)
+
+            self.wallet._add_input_sig_info(i1, 'RV1265roRyHUYuLerLfit8QmyiWDrZtbv2', only_der_suffix=None)
+            self.wallet._add_input_sig_info(i2, 'R9TonskbB14efLXRM7ZdcCDxe7nbMM9BxK', only_der_suffix=None)
+
+            ins = [
+                i1,
+                i2
+            ]
+            outs = [
+                PartialTxOutput(scriptpubkey=bfh(address_to_script('RWxATTuFXo82CwgixG7Q6npT7JBvDM3Jw9')),value=Satoshis(500000)),
+                PartialTxOutput(scriptpubkey=bfh(address_to_script('RDcookhkBm7F95dfvd4Pv8EYosNVr3mSDM')),value=Satoshis(299100)),
+            ]
+            tx = PartialTransaction.from_io(ins, outs, locktime=1901785, version=2, for_swap=True)
+            self.wallet.sign_transaction(tx, None)
+            l.setText(tx.serialize_to_network())
+
+        button2 = EnterButton("Test", test)
+
+        vbox3.addWidget(l)
+        vbox3.addWidget(button2)
+
         w3.setLayout(vbox3)
 
         w4 = QWidget()
@@ -2061,6 +2106,11 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if combo_index != 0:
             return self.send_options[combo_index]
         return None
+
+    def create_and_freeze_swap(self, vin: PartialTxInput, vout: RavenValue):
+        self.set_frozen_state_of_coins([vin])
+        self.wallet.set_label(vin.prevout.txid.hex(), _("Atomic Swap"))
+        
 
     def spend_max(self):
         if run_hook('abort_send', self):
@@ -2656,7 +2706,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.show_error(_("Error parsing Lightning invoice") + f":\n{e}")
             return
 
-        self.payto_e.lightning_invoice = invoice
         pubkey = bh2u(lnaddr.pubkey.serialize())
         for k, v in lnaddr.tags:
             if k == 'd':
@@ -2666,6 +2715,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             description = ''
         self.payto_e.setFrozen(True)
         self.payto_e.setText(pubkey)
+        self.payto_e.lightning_invoice = invoice
         self.message_e.setText(description)
         if lnaddr.get_amount_sat() is not None:
             self.amount_e.setAmount(lnaddr.get_amount_sat())
@@ -3159,24 +3209,24 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         keystore_types = [k.get_type_text() for k in self.wallet.get_keystores()]
         grid = QGridLayout()
         basename = os.path.basename(self.wallet.storage.path)
-        grid.addWidget(QLabel(_("Wallet name") + ':'), 0, 0)
-        grid.addWidget(QLabel(basename), 0, 1)
-        grid.addWidget(QLabel(_("Wallet type") + ':'), 1, 0)
-        grid.addWidget(QLabel(wallet_type), 1, 1)
-        grid.addWidget(QLabel(_("Script type") + ':'), 2, 0)
-        grid.addWidget(QLabel(self.wallet.txin_type), 2, 1)
-        grid.addWidget(QLabel(_("Seed available") + ':'), 3, 0)
-        grid.addWidget(QLabel(str(seed_available)), 3, 1)
+        grid.addWidget(WWLabel(_("Wallet name")+ ':'), 0, 0)
+        grid.addWidget(WWLabel(basename), 0, 1)
+        grid.addWidget(WWLabel(_("Wallet type")+ ':'), 1, 0)
+        grid.addWidget(WWLabel(wallet_type), 1, 1)
+        grid.addWidget(WWLabel(_("Script type")+ ':'), 2, 0)
+        grid.addWidget(WWLabel(self.wallet.txin_type), 2, 1)
+        grid.addWidget(WWLabel(_("Seed available") + ':'), 3, 0)
+        grid.addWidget(WWLabel(str(seed_available)), 3, 1)
         if len(keystore_types) <= 1:
-            grid.addWidget(QLabel(_("Keystore type") + ':'), 4, 0)
+            grid.addWidget(WWLabel(_("Keystore type") + ':'), 4, 0)
             ks_type = str(keystore_types[0]) if keystore_types else _('No keystore')
-            grid.addWidget(QLabel(ks_type), 4, 1)
+            grid.addWidget(WWLabel(ks_type), 4, 1)
         # lightning
-        grid.addWidget(QLabel(_('Lightning') + ':'), 5, 0)
+        grid.addWidget(WWLabel(_('Lightning') + ':'), 5, 0)        
         from .util import IconLabel
         if self.wallet.has_lightning():
             if self.wallet.lnworker.has_deterministic_node_id():
-                grid.addWidget(QLabel(_('Enabled')), 5, 1)
+                grid.addWidget(WWLabel(_('Enabled')), 5, 1)
             else:
                 label = IconLabel(text='Enabled, non-recoverable channels')
                 label.setIcon(read_QIcon('nocloud'))
@@ -3191,7 +3241,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                             "This means that you must save a backup of your wallet everytime you create a new channel.\n\n"
                             "If you want to have recoverable channels, you must create a new wallet with an Electrum seed")
                 grid.addWidget(HelpButton(msg), 5, 3)
-            grid.addWidget(QLabel(_('Lightning Node ID:')), 7, 0)
+            grid.addWidget(WWLabel(_('Lightning Node ID:')), 7, 0)
             # TODO: ButtonsLineEdit should have a addQrButton method
             nodeid_text = self.wallet.lnworker.node_keypair.pubkey.hex()
             nodeid_e = ButtonsLineEdit(nodeid_text)
@@ -3203,12 +3253,12 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             grid.addWidget(nodeid_e, 8, 0, 1, 4)
         else:
             if self.wallet.can_have_lightning():
-                grid.addWidget(QLabel('Not enabled'), 5, 1)
+                grid.addWidget(WWLabel('Not enabled'), 5, 1)
                 button = QPushButton(_("Enable"))
                 button.pressed.connect(lambda: self.init_lightning_dialog(dialog))
                 grid.addWidget(button, 5, 3)
             else:
-                grid.addWidget(QLabel(_("Not available for this wallet.")), 5, 1)
+                grid.addWidget(WWLabel(_("Not available for this wallet.")), 5, 1)
                 grid.addWidget(HelpButton(_("Lightning is currently restricted to HD wallets with p2wpkh addresses.")),
                                5, 2)
         vbox.addLayout(grid)
@@ -3251,13 +3301,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 der_path_hbox = QHBoxLayout()
                 der_path_hbox.setContentsMargins(0, 0, 0, 0)
 
-                der_path_hbox.addWidget(QLabel(_("Derivation path") + ':'))
-                der_path_text = QLabel(ks.get_derivation_prefix() or _("unknown"))
+                der_path_hbox.addWidget(WWLabel(_("Derivation path") + ':'))
+                der_path_text = WWLabel(ks.get_derivation_prefix() or _("unknown"))
                 der_path_text.setTextInteractionFlags(Qt.TextSelectableByMouse)
                 der_path_hbox.addWidget(der_path_text)
                 der_path_hbox.addStretch()
 
-                ks_vbox.addWidget(QLabel(_("Master Public Key")))
+                ks_vbox.addWidget(WWLabel(_("Master Public Key")))
                 ks_vbox.addWidget(mpk_text)
                 ks_vbox.addLayout(der_path_hbox)
 
@@ -4085,17 +4135,17 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             return
         d = WindowModalDialog(self, _('Child Pays for Parent'))
         vbox = QVBoxLayout(d)
-        msg = (
+        msg = (_(
             "A CPFP is a transaction that sends an unconfirmed output back to "
             "yourself, with a high fee. The goal is to have miners confirm "
             "the parent transaction in order to get the fee attached to the "
-            "child transaction.")
-        vbox.addWidget(WWLabel(_(msg)))
-        msg2 = ("The proposed fee is computed using your "
+            "child transaction."))
+        vbox.addWidget(WWLabel(msg))
+        msg2 = (_("The proposed fee is computed using your "
                 "fee/kB settings, applied to the total size of both child and "
                 "parent transactions. After you broadcast a CPFP transaction, "
-                "it is normal to see a new unconfirmed transaction in your history.")
-        vbox.addWidget(WWLabel(_(msg2)))
+                "it is normal to see a new unconfirmed transaction in your history."))
+        vbox.addWidget(WWLabel(msg2))
         grid = QGridLayout()
         grid.addWidget(QLabel(_('Total size') + ':'), 0, 0)
         grid.addWidget(QLabel('%d bytes' % total_size), 0, 1)

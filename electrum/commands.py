@@ -203,6 +203,10 @@ class Commands:
         return hash_160_.hex()
 
     @command('')
+    async def h160(self, hex):
+        return hash_160(bytes.fromhex(hex)).hex()
+
+    @command('')
     async def h160_to_address(self, h160: str, addr_type: int):
         h160 = bytes.fromhex(h160)
         return ravencoin.hash160_to_b58_address(h160, addr_type)

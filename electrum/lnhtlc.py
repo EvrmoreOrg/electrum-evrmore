@@ -27,12 +27,7 @@ class HTLCManager:
             # note: "htlc_id" keys in dict are str! but due to json_db magic they can *almost* be treated as int...
             log[LOCAL] = deepcopy(initial)
             log[REMOTE] = deepcopy(initial)
-            log['unacked_local_updates2'] = {}
-
-        if 'unfulfilled_htlcs' not in log:
-            log['unfulfilled_htlcs'] = {}  # htlc_id -> onion_packet
-        if 'fail_htlc_reasons' not in log:
-            log['fail_htlc_reasons'] = {}  # htlc_id -> error_bytes, failure_message
+            log[LOCAL]['unacked_updates'] = {}
 
         # maybe bootstrap fee_updates if initial_feerate was provided
         if initial_feerate is not None:
@@ -209,8 +204,8 @@ class HTLCManager:
                 fee_update.ctn_local = self.ctn_latest(LOCAL) + 1
 
         # no need to keep local update raw msgs anymore, they have just been ACKed.
-        self.log['unacked_local_updates2'].pop(self.log[REMOTE]['ctn'], None)
-
+        self.log[LOCAL]['unacked_updates'].pop(self.log[REMOTE]['ctn'], None)
+    
     @with_lock
     def _update_maybe_active_htlc_ids(self) -> None:
         # - Loosely, we want a set that contains the htlcs that are
@@ -282,16 +277,15 @@ class HTLCManager:
             ctn_idx = self.ctn_latest(REMOTE)
         else:
             ctn_idx = self.ctn_latest(REMOTE) + 1
-        l = self.log['unacked_local_updates2'].get(ctn_idx, [])
+        l = self.log[LOCAL]['unacked_updates'].get(ctn_idx, [])
         l.append(raw_update_msg.hex())
-        self.log['unacked_local_updates2'][ctn_idx] = l
-
+        self.log[LOCAL]['unacked_updates'][ctn_idx] = l
+    
     @with_lock
     def get_unacked_local_updates(self) -> Dict[int, Sequence[bytes]]:
         #return self.log['unacked_local_updates2']
-        return {int(ctn): [bfh(msg) for msg in messages]
-                for ctn, messages in self.log['unacked_local_updates2'].items()}
-
+        return {ctn: [bfh(msg) for msg in messages]                
+                for ctn, messages in self.log[LOCAL]['unacked_updates'].items()}
     ##### Queries re HTLCs:
 
     def get_htlc_by_id(self, htlc_proposer: HTLCOwner, htlc_id: int) -> UpdateAddHtlc:
@@ -300,7 +294,6 @@ class HTLCManager:
     @with_lock
     def is_htlc_active_at_ctn(self, *, ctx_owner: HTLCOwner, ctn: int,
                               htlc_proposer: HTLCOwner, htlc_id: int) -> bool:
-        htlc_id = int(htlc_id)
         if htlc_id >= self.get_next_htlc_id(htlc_proposer):
             return False
         settles = self.log[htlc_proposer]['settles']
@@ -345,7 +338,6 @@ class HTLCManager:
             htlc_proposer: HTLCOwner,
             htlc_id: int,
     ) -> bool:
-        htlc_id = int(htlc_id)
         if htlc_id >= self.get_next_htlc_id(htlc_proposer):
             return False
         ctns = self.log[htlc_proposer]['locked_in'][htlc_id]

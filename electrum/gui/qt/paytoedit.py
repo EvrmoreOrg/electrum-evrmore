@@ -228,7 +228,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
     def get_destination_scriptpubkey(self) -> Optional[bytes]:
         return self.payto_scriptpubkey
 
-    def get_outputs(self, is_max):
+    def get_outputs(self, is_max: bool) -> List[PartialTxOutput]:
         if self.payto_scriptpubkey:
             asset = self.win.get_asset_from_spend_tab()
             script = self.payto_scriptpubkey
@@ -240,6 +240,8 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
                     amount = amount_rval.rvn_value
             else:
                 amount = Satoshis(self.amount_edit.get_amount())
+                if amount is None:
+                    return []
             if asset:
                 script = assets.create_transfer_asset_script(script, asset, amount)
             if amount == 0:

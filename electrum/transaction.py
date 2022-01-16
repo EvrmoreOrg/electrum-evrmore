@@ -310,8 +310,8 @@ class TxOutput:
             if asset:
                 script = assets.create_transfer_asset_script(script, asset, value)
             return cls(scriptpubkey=script, value=value, is_max=False, asset=asset)
-        raise Exception(f"unexptected legacy address type: {_type}")
-
+        raise Exception(f"unexpected legacy address type: {_type}")
+    
     @property
     def address(self) -> Optional[str]:
         return get_address_from_output_script(self.scriptpubkey)  # TODO cache this?
@@ -628,8 +628,23 @@ class OPPushDataGeneric:
         return isinstance(item, cls) \
                or (isinstance(item, type) and issubclass(item, cls))
 
+class OPGeneric:
+    def __init__(self, matcher: Callable=None):
+        if matcher is not None:
+            self.matcher = matcher
+
+    def match(self, op) -> bool:
+        return self.matcher(op)
+
+    @classmethod
+    def is_instance(cls, item):
+        # accept objects that are instances of this class
+        # or other classes that are subclasses
+        return isinstance(item, cls) \
+               or (isinstance(item, type) and issubclass(item, cls))
 
 OPPushDataPubkey = OPPushDataGeneric(lambda x: x in (33, 65))
+OP_ANYSEGWIT_VERSION = OPGeneric(lambda x: x in list(range(opcodes.OP_1, opcodes.OP_16 + 1)))
 
 SCRIPTPUBKEY_TEMPLATE_P2PK = [OPPushDataGeneric(lambda x: x in (33, 65)), opcodes.OP_CHECKSIG]
 SCRIPTPUBKEY_TEMPLATE_P2PKH = [opcodes.OP_DUP, opcodes.OP_HASH160,
@@ -639,6 +654,21 @@ SCRIPTPUBKEY_TEMPLATE_P2SH = [opcodes.OP_HASH160, OPPushDataGeneric(lambda x: x 
 SCRIPTPUBKEY_TEMPLATE_WITNESS_V0 = [opcodes.OP_0, OPPushDataGeneric(lambda x: x in (20, 32))]
 SCRIPTPUBKEY_TEMPLATE_P2WPKH = [opcodes.OP_0, OPPushDataGeneric(lambda x: x == 20)]
 SCRIPTPUBKEY_TEMPLATE_P2WSH = [opcodes.OP_0, OPPushDataGeneric(lambda x: x == 32)]
+SCRIPTPUBKEY_TEMPLATE_ANYSEGWIT = [OP_ANYSEGWIT_VERSION, OPPushDataGeneric(lambda x: x in list(range(2, 40 + 1)))]
+
+def check_scriptpubkey_template_and_dust(scriptpubkey, amount: Optional[int]):
+    if match_script_against_template(scriptpubkey, SCRIPTPUBKEY_TEMPLATE_P2PKH):
+        dust_limit = ravencoin.DUST_LIMIT_P2PKH
+    elif match_script_against_template(scriptpubkey, SCRIPTPUBKEY_TEMPLATE_P2SH):
+        dust_limit = ravencoin.DUST_LIMIT_P2SH
+    elif match_script_against_template(scriptpubkey, SCRIPTPUBKEY_TEMPLATE_P2WSH):
+        dust_limit = ravencoin.DUST_LIMIT_P2WSH
+    elif match_script_against_template(scriptpubkey, SCRIPTPUBKEY_TEMPLATE_P2WPKH):
+        dust_limit = ravencoin.DUST_LIMIT_P2WPKH
+    else:
+        raise Exception(f'scriptpubkey does not conform to any template: {scriptpubkey.hex()}')
+    if amount < dust_limit:
+        raise Exception(f'amount ({amount}) is below dust limit for scriptpubkey type ({dust_limit})')
 
 
 def match_script_against_template(script, template) -> bool:
@@ -657,6 +687,8 @@ def match_script_against_template(script, template) -> bool:
         template_item = template[i]
         script_item = script[i]
         if OPPushDataGeneric.is_instance(template_item) and template_item.check_data_len(script_item[0]):
+            continue
+        if OPGeneric.is_instance(template_item) and template_item.match(script_item[0]):
             continue
         if template_item != script_item[0]:
             return False
@@ -1131,7 +1163,8 @@ class Transaction:
             asset, amt = list(a.items())[0]
             script = guess_asset_script_for_vin(bfh(script), asset, amt, txin, wallet)
 
-        script = wallet.get_nonstandard_outpoints().get(txin.prevout.to_str(), script)
+        if wallet:
+            script = wallet.get_nonstandard_outpoints().get(txin.prevout.to_str(), script)
 
         return script
 
@@ -2322,9 +2355,20 @@ class PartialTransaction(Transaction):
             raise NotImplementedError()
             if bip143_shared_txdigest_fields is None:
                 bip143_shared_txdigest_fields = self._calc_bip143_shared_txdigest_fields()
-            hashPrevouts = bip143_shared_txdigest_fields.hashPrevouts
-            hashSequence = bip143_shared_txdigest_fields.hashSequence
-            hashOutputs = bip143_shared_txdigest_fields.hashOutputs
+            if not(sighash & SIGHASH.ANYONECANPAY):
+                hashPrevouts = bip143_shared_txdigest_fields.hashPrevouts
+            else:
+                hashPrevouts = '00' * 32
+            if (not(sighash & SIGHASH.ANYONECANPAY) and (sighash & 0x1f) != SIGHASH.SINGLE and (sighash & 0x1f) != SIGHASH.NONE):
+                hashSequence = bip143_shared_txdigest_fields.hashSequence
+            else:
+                hashSequence = '00' * 32
+            if ((sighash & 0x1f) != SIGHASH.SINGLE and (sighash & 0x1f) != SIGHASH.NONE):
+                hashOutputs = bip143_shared_txdigest_fields.hashOutputs
+            elif ((sighash & 0x1f) == SIGHASH.SINGLE and txin_index < len(outputs)):
+                hashOutputs = bh2u(sha256d(outputs[txin_index].serialize_to_network()))
+            else:
+                hashOutputs = '00' * 32
             outpoint = txin.prevout.serialize_to_network().hex()
             scriptCode = var_int(len(preimage_script) // 2) + preimage_script
             amount = int_to_hex(txin.value_sats(), 8)

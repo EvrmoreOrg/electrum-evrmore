@@ -153,7 +153,7 @@ class WalletDB(JsonDB):
         return result
 
     def requires_upgrade(self):
-        return self.get_seed_version() < RAVENCOIN_SEED_VERSION
+        return self.get_seed_version() < FINAL_SEED_VERSION
 
     @profiler
     def upgrade(self):
@@ -197,7 +197,7 @@ class WalletDB(JsonDB):
         self._convert_version_43()
         self._convert_version_44()
 
-        self.put('seed_version', RAVENCOIN_SEED_VERSION)  # just to be sure
+        self.put('seed_version', FINAL_SEED_VERSION)  # just to be sure
         self._after_upgrade_tasks()
 
     def _after_upgrade_tasks(self):
@@ -938,10 +938,10 @@ class WalletDB(JsonDB):
         seed_version = self.get('seed_version')
         if not seed_version:
             seed_version = OLD_SEED_VERSION if len(self.get('master_public_key','')) == 128 else NEW_SEED_VERSION
-        if seed_version > RAVENCOIN_SEED_VERSION:
+        if seed_version > FINAL_SEED_VERSION:
             raise WalletFileException('This version of Electrum is too old to open this wallet.\n'
                                       '(highest supported storage version: {}, version of this file: {})'
-                                      .format(RAVENCOIN_SEED_VERSION, seed_version))
+                                      .format(FINAL_SEED_VERSION, seed_version))
         if seed_version==14 and self.get('seed_type') == 'segwit':
             self._raise_unsupported_version(seed_version)
         if seed_version >=12:

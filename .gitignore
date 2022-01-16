@@ -1,7 +1,7 @@
 .git/
 
 ####-*.patch
-*/*.pyc
+*.pyc
 *.swp
 build/
 dist/

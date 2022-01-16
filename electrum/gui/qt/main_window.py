@@ -251,7 +251,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         tabs.addTab(self.assets_tab, read_QIcon('tab_assets.png'), _('Assets'))
         tabs.addTab(self.send_tab, read_QIcon("tab_send.png"), _('Send'))
         tabs.addTab(self.receive_tab, read_QIcon("tab_receive.png"), _('Receive'))
-        tabs.addTab(self.swap_tab, read_QIcon("tab_swap.png"), _('Atomic Swap'))
+        #tabs.addTab(self.swap_tab, read_QIcon("tab_swap.png"), _('Atomic Swap'))
 
         def add_optional_tab(tabs, tab, icon, description, name, default=False):
             tab.tab_icon = icon

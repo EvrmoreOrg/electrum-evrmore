@@ -420,7 +420,7 @@ class DaemonThread(threading.Thread, Logger):
     def __init__(self):
         threading.Thread.__init__(self)
         Logger.__init__(self)
-        self.parent_thread = threading.currentThread()
+        self.parent_thread = threading.current_thread()
         self.running = False
         self.running_lock = threading.Lock()
         self.job_lock = threading.Lock()
@@ -1235,7 +1235,8 @@ def setup_thread_excepthook():
 
 
 def send_exception_to_crash_reporter(e: BaseException):
-    sys.excepthook(type(e), e, e.__traceback__)
+    from .base_crash_reporter import send_exception_to_crash_reporter
+    send_exception_to_crash_reporter(e)
 
 
 def versiontuple(v):
@@ -1447,7 +1448,7 @@ def create_and_start_event_loop() -> Tuple[asyncio.AbstractEventLoop,
     loop = asyncio.get_event_loop()
     loop.set_exception_handler(on_exception)
     # loop.set_debug(1)
-    stopping_fut = asyncio.Future()
+    stopping_fut = loop.create_future()
     loop_thread = threading.Thread(target=loop.run_until_complete,
                                    args=(stopping_fut,),
                                    name='EventLoop')

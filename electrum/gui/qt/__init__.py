@@ -50,6 +50,7 @@ from electrum.util import (UserCancelled, profiler, send_exception_to_crash_repo
 from electrum.wallet import Wallet, Abstract_Wallet
 from electrum.wallet_db import WalletDB
 from electrum.logging import Logger
+from electrum.gui import BaseElectrumGui
 
 from .installwizard import InstallWizard, WalletAlreadyOpenInMemory
 from .util import get_default_language, read_QIcon, ColorScheme, custom_message_box, MessageBoxMixin
@@ -64,7 +65,25 @@ if TYPE_CHECKING:
     from electrum.daemon import Daemon
     from electrum.simple_config import SimpleConfig
     from electrum.plugin import Plugins
+    from electrum.simple_config import SimpleConfig
+    from electrum.daemon import Daemon
+    from electrum.plugin import Plugins
 
+
+class BaseElectrumGui:
+    def __init__(self, *, config: 'SimpleConfig', daemon: 'Daemon', plugins: 'Plugins'):
+        self.config = config
+        self.daemon = daemon
+        self.plugins = plugins
+
+    def main(self) -> None:
+        raise NotImplementedError()
+
+    def stop(self) -> None:
+        """Stops the GUI.
+        This method must be thread-safe.
+        """
+        pass
 
 class OpenFileEventFilter(QObject):
     def __init__(self, windows):
@@ -81,21 +100,23 @@ class OpenFileEventFilter(QObject):
 
 class QElectrumApplication(QApplication):
     new_window_signal = pyqtSignal(str, object)
+    quit_signal = pyqtSignal()
 
 
 class QNetworkUpdatedSignalObject(QObject):
     network_updated_signal = pyqtSignal(str, object)
 
 
-class ElectrumGui(Logger):
+class ElectrumGui(BaseElectrumGui, Logger):
 
     network_dialog: Optional['NetworkDialog']
     lightning_dialog: Optional['LightningDialog']
     watchtower_dialog: Optional['WatchtowerDialog']
 
     @profiler
-    def __init__(self, config: 'SimpleConfig', daemon: 'Daemon', plugins: 'Plugins'):
+    def __init__(self, *, config: 'SimpleConfig', daemon: 'Daemon', plugins: 'Plugins'):
         set_language(config.get('language', get_default_language()))
+        BaseElectrumGui.__init__(self, config=config, daemon=daemon, plugins=plugins)
         Logger.__init__(self)
         self.logger.info(f"Qt GUI starting up... Qt={QtCore.QT_VERSION_STR}, PyQt={QtCore.PYQT_VERSION_STR}")
         # Uncomment this call to verify objects are being properly
@@ -108,9 +129,6 @@ class ElectrumGui(Logger):
         if hasattr(QGuiApplication, 'setDesktopFileName'):
             QGuiApplication.setDesktopFileName('electrum-ravencoin.desktop')
         self.gui_thread = threading.current_thread()
-        self.config = config
-        self.daemon = daemon
-        self.plugins = plugins
         self.windows = []  # type: List[ElectrumWindow]
         self.efilter = OpenFileEventFilter(self.windows)
         self.app = QElectrumApplication(sys.argv)
@@ -132,6 +150,7 @@ class ElectrumGui(Logger):
         self.tray = None
         self._init_tray()
         self.app.new_window_signal.connect(self.start_new_window)
+        self.app.quit_signal.connect(self.app.quit, Qt.QueuedConnection)
         self.set_dark_theme_if_needed()
         run_hook('init_qt', self)
 
@@ -430,4 +449,4 @@ class ElectrumGui(Logger):
 
     def stop(self):
         self.logger.info('closing GUI')
-        self.app.quit()
+        self.app.quit_signal.emit()

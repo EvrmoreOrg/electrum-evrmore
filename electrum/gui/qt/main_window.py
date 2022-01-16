@@ -612,10 +612,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 self.setGeometry(100, 100, 950, 550)
         self.setMinimumSize(950, 550)
 
-    def watching_only_changed(self):
+    @classmethod
+    def get_app_name_and_version_str(cls) -> str:
         name = "Electrum Ravencoin Testnet" if constants.net.TESTNET else "Electrum Ravencoin"
-        title = '%s %s  -  %s' % (name, ELECTRUM_VERSION,
-                                  self.wallet.basename())
+        return f"{name} {ELECTRUM_VERSION}"
+
+    def watching_only_changed(self):
+        name_and_version = self.get_app_name_and_version_str()
+        title = f"{name_and_version}  -  {self.wallet.basename()}"    
         extra = [self.wallet.db.get('wallet_type', '?')]
         if self.wallet.is_watching_only():
             extra.append(_('watching only'))
@@ -1072,11 +1076,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if not self.wallet:
             return
 
+        network_text = ""
+        balance_text = ""
+
         status_text = ''
         local_height = self.network.get_local_height()
         server_height = self.network.get_server_height()
         if self.network is None:
-            text = _("Offline")
+            network_text = _("Offline")
             icon = read_QIcon("status_disconnected.png")
 
         elif self.network.is_connected():
@@ -1099,27 +1106,28 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
             if not self.wallet.up_to_date or server_height == 0:
                 num_sent, num_answered = self.wallet.get_history_sync_state_details()
-                text = ("{} ({}/{})"
-                        .format(_("Syncing transactions..."), num_answered, num_sent))
+                network_text = ("{} ({}/{})"
+                                .format(_("Synchronizing..."), num_answered, num_sent))
                 icon = read_QIcon("status_waiting.png")
 
             elif server_lag > 1:
-                text = _("Server is lagging ({} blocks)").format(server_lag)
+                network_text = _("Server is lagging ({} blocks)").format(server_lag)
                 icon = read_QIcon("status_lagging%s.png" % fork_str)
             else:
+                network_text = _("Connected")
                 c, u, x = self.wallet.get_balance()
                 c, u, x = c.rvn_value, u.rvn_value, x.rvn_value
-                text = _("Balance") + ": %s " % (self.format_amount_and_units(c))
+                balance_text =  _("Balance") + ": %s "%(self.format_amount_and_units(c))
                 if u:
-                    text += " [%s unconfirmed]" % (self.format_amount(u, is_diff=True).strip())
+                    balance_text +=  " [%s unconfirmed]"%(self.format_amount(u, is_diff=True).strip())
                 if x:
-                    text += " [%s unmatured]" % (self.format_amount(x, is_diff=True).strip())
+                    balance_text +=  " [%s unmatured]"%(self.format_amount(x, is_diff=True).strip())
                 if self.wallet.has_lightning():
                     l = self.wallet.lnworker.get_balance()
-                    text += u'    \U000026a1 %s' % (self.format_amount_and_units(l).strip())
+                    balance_text += u'    \U000026a1 %s'%(self.format_amount_and_units(l).strip())
                 # append fiat balance and price
                 if self.fx.is_enabled():
-                    text += self.fx.get_fiat_status_text(c + u + x,
+                    balance_text += self.fx.get_fiat_status_text(c + u + x,
                                                          self.base_unit(), self.get_decimal_point()) or ''
                 if not self.network.proxy:
                     icon = read_QIcon("status_connected%s.png" % fork_str)
@@ -1127,15 +1135,17 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                     icon = read_QIcon("status_connected_proxy%s.png" % fork_str)
         else:
             if self.network.proxy:
-                text = "{} ({})".format(_("Not connected"), _("proxy enabled"))
+                network_text = "{} ({})".format(_("Not connected"), _("proxy enabled"))
             else:
-                text = _("Not connected")
+                network_text = _("Not connected")
             icon = read_QIcon("status_disconnected.png")
 
         if self.tray:
-            self.tray.setToolTip("%s (%s)" % (text, self.wallet.basename()))
-        self.balance_label.setText(text)
-        self.status_label.setText(status_text)
+            # note: don't include balance in systray tooltip, as some OSes persist tooltips,
+            #       hence "leaking" the wallet balance (see #5665)
+            name_and_version = self.get_app_name_and_version_str()
+            self.tray.setToolTip(f"{name_and_version} ({network_text})")
+        self.balance_label.setText(balance_text or network_text)
         if self.status_button:
             self.status_button.setIcon(icon)
 

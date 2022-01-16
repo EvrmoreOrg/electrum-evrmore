@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Please update these carefully, some versions won't work under Wine
-NSIS_FILENAME=nsis-3.05-setup.exe
-NSIS_URL=https://downloads.sourceforge.net/project/nsis/NSIS%203/3.05/$NSIS_FILENAME
-NSIS_SHA256=1a3cc9401667547b9b9327a177b13485f7c59c2303d4b6183e7bc9e6c8d6bfdb
+NSIS_FILENAME=nsis-3.08-setup.exe
+NSIS_URL=https://downloads.sourceforge.net/project/nsis/NSIS%203/3.08/$NSIS_FILENAME
+NSIS_SHA256=bbc76be36ecb2fc00d493c91befdaf71654226ad8a4fc4dc338458916bf224d0
 
 PYINSTALLER_REPO="https://github.com/SomberNight/pyinstaller.git"
 PYINSTALLER_COMMIT="80ee4d613ecf75a1226b960a560ee01459e65ddb"
@@ -12,9 +12,8 @@ PYINSTALLER_COMMIT="80ee4d613ecf75a1226b960a560ee01459e65ddb"
 LIBUSB_REPO="https://github.com/libusb/libusb.git"
 LIBUSB_COMMIT="c6a35c56016ea2ab2f19115d2ea1e85e0edae155"
 
-# Older version required for x16r, x16rv2, and kawpow modules
-PYTHON_VERSION=3.6.8
-
+# Older version required for x16r, x16rv2, and kawpow modules, maybe not
+PYTHON_VERSION=3.9.7
 # Let's begin!
 set -e
 

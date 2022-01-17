@@ -43,11 +43,11 @@ datas = [
     (home+'electrum/gui/icons', 'electrum/gui/icons'),
 ]
 datas += collect_data_files('trezorlib')
-# datas += collect_data_files('safetlib')
+datas += collect_data_files('safetlib')
 datas += collect_data_files('btchip')
-# datas += collect_data_files('keepkeylib')
-# datas += collect_data_files('ckcc')
-# datas += collect_data_files('bitbox02')
+datas += collect_data_files('keepkeylib')
+datas += collect_data_files('ckcc')
+datas += collect_data_files('bitbox02')
 
 # We don't put these files in to actually include them in the script but to make the Analysis method scan them for imports
 a = Analysis([home+'run_electrum',
@@ -63,12 +63,12 @@ a = Analysis([home+'run_electrum',
               home+'electrum/plugins/cosigner_pool/qt.py',
               home+'electrum/plugins/email_requests/qt.py',
               home+'electrum/plugins/trezor/qt.py',
-              #home+'electrum/plugins/safe_t/client.py',
-              #home+'electrum/plugins/safe_t/qt.py',
-              #home+'electrum/plugins/keepkey/qt.py',
+              home+'electrum/plugins/safe_t/client.py',
+              home+'electrum/plugins/safe_t/qt.py',
+              home+'electrum/plugins/keepkey/qt.py',
               home+'electrum/plugins/ledger/qt.py',
-              #home+'electrum/plugins/coldcard/qt.py',
-              #home+'packages/requests/utils.py'
+              home+'electrum/plugins/coldcard/qt.py',
+              home+'packages/requests/utils.py'
               ],
              binaries=binaries,
              datas=datas,

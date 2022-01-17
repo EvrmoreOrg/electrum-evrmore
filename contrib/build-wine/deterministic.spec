@@ -16,13 +16,13 @@ home = 'C:\\electrum\\'
 hiddenimports = []
 hiddenimports += collect_submodules('pkg_resources')  # workaround for https://github.com/pypa/setuptools/issues/1963
 hiddenimports += collect_submodules('trezorlib')
-# hiddenimports += collect_submodules('safetlib')
+hiddenimports += collect_submodules('safetlib')
 hiddenimports += collect_submodules('btchip')
-# hiddenimports += collect_submodules('keepkeylib')
-# hiddenimports += collect_submodules('websocket')
-# hiddenimports += collect_submodules('ckcc')
-# hiddenimports += collect_submodules('bitbox02')
-# hiddenimports += ['PyQt5.QtPrintSupport']  # needed by Revealer
+hiddenimports += collect_submodules('keepkeylib')
+hiddenimports += collect_submodules('websocket')
+hiddenimports += collect_submodules('ckcc')
+hiddenimports += collect_submodules('bitbox02')
+hiddenimports += ['PyQt5.QtPrintSupport']  # needed by Revealer
 
 
 binaries = []

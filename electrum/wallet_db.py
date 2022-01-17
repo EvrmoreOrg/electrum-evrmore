@@ -1467,10 +1467,7 @@ class WalletDB(JsonDB):
                                    TxOutpoint.from_str('{}:{}'.format(s[0], s[1])),
                                    TxOutpoint.from_str('{}:{}'.format(s_p[0], s_p[1])) if s_p else None))
                      for k, (name, amt, ownr, reis, div, ipfs, data, height, t, s, s_p) in items)
-        # convert htlc_id keys to int
-        if key in ['adds', 'locked_in', 'settles', 'fails', 'fee_updates', 'buckets',
-                   'unacked_updates', 'unfulfilled_htlcs', 'fail_htlc_reasons', 'onion_keys']:
-            v = dict((int(k), x) for k, x in v.items())
+                     
         # convert keys to HTLCOwner
         if key == 'log' or (path and path[-1] in ['locked_in', 'fails', 'settles']):
             if "1" in v:

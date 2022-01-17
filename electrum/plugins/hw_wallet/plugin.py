@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 
 def comp_tuples(t1, t2, op):
     for a, b in zip_longest(t1, t2, fillvalue=0):
-        if not op(t1, t2):
+        if not op(a, b):
             return False
     return True
 

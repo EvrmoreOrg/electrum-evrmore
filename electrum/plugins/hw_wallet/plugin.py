@@ -24,8 +24,6 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from itertools import zip_longest
-import operator
 from typing import TYPE_CHECKING, Dict, List, Union, Tuple, Sequence, Optional, Type, Iterable, Any
 from functools import partial
 
@@ -44,11 +42,6 @@ if TYPE_CHECKING:
     from electrum.wallet import Abstract_Wallet
     from electrum.base_wizard import BaseWizard
 
-def comp_tuples(t1, t2, op):
-    for a, b in zip_longest(t1, t2, fillvalue=0):
-        if not op(a, b):
-            return False
-    return True
 
 class HW_PluginBase(BasePlugin):
     keystore_class: Type['Hardware_KeyStore']
@@ -160,8 +153,8 @@ class HW_PluginBase(BasePlugin):
             library_version = self.get_library_version()
             # if no exception so far, we might still raise LibraryFoundButUnusable
             if (library_version == 'unknown'
-                    or comp_tuples(versiontuple(library_version), self.minimum_library, operator.lt)
-                    or comp_tuples(versiontuple(library_version), self.maximum_library, operator.ge)):
+                    or versiontuple(library_version) < self.minimum_library
+                    or versiontuple(library_version) >= self.maximum_library):
                 raise LibraryFoundButUnusable(library_version=library_version)
         except ImportError:
             return False

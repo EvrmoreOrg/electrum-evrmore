@@ -485,6 +485,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 self.tx_notification_queue.put(tx)
 
             # If a swap went thru, reset the swap tab
+            """
             if self.current_swap_psbt:
                 this_prevouts = [vin.prevout.to_str() for vin in tx.inputs()]
                 this_outs = [f'{vout.asset if vout.asset else "RVN"}:{vout.value}' for vout in tx.outputs()]
@@ -499,6 +500,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                     self.swap_info.setStyleSheet(ColorScheme.GREEN.as_stylesheet())
                     self.swap_info.setText(_('Success'))
                     self.current_swap_psbt = None
+            """
 
         elif event == 'on_quotes':
             self.on_fx_quotes()

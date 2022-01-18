@@ -44,11 +44,14 @@ $WINE_PYTHON -m pip install --no-dependencies --no-warn-script-location \
 $WINE_PYTHON -m pip install --no-dependencies --no-warn-script-location \
     --cache-dir "$WINE_PIP_CACHE_DIR" -r "$CONTRIB"/deterministic-build/requirements-hw.txt
 
-$WINE_PYTHON -m pip install --no-dependencies --no-warn-script-location \
-   --cache-dir "$WINE_PIP_CACHE_DIR" -r "$CONTRIB"/deterministic-build/requirements-ravencoin.txt
+download_if_not_exist "$CACHEDIR/x16r.whl" "https://raw.githubusercontent.com/kralverde/electrum-ravencoin-wheels/master/x16r_hash-1.0-cp37-cp37m-win32.whl"
+download_if_not_exist "$CACHEDIR/x16rv2.whl" "https://raw.githubusercontent.com/kralverde/electrum-ravencoin-wheels/master/x16rvw_hash-1.0-cp37-cp37m-win32.whl"
+download_if_not_exist "$CACHEDIR/kawpow.whl" "https://raw.githubusercontent.com/kralverde/electrum-ravencoin-wheels/master/ethash-0.5.1a1-cp37-cp37m-win32.whl"
 
-$WINE_PYTHON -m pip install --no-dependencies --no-warn-script-location \
-   --cache-dir "$WINE_PIP_CACHE_DIR" -r "$CONTRIB"/deterministic-build/requirements-ravencoin-binaries.txt
+$WINE_PYTHON -m pip install --cache-dir "$WINE_PIP_CACHE_DIR" "$CACHEDIR/x16r.whl"
+$WINE_PYTHON -m pip install --cache-dir "$WINE_PIP_CACHE_DIR" "$CACHEDIR/x16rv2.whl"
+$WINE_PYTHON -m pip install --cache-dir "$WINE_PIP_CACHE_DIR" "$CACHEDIR/kawpow.whl"
+
 
 pushd $WINEPREFIX/drive_c/electrum
 # see https://github.com/pypa/pip/issues/2195 -- pip makes a copy of the entire directory

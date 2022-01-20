@@ -45,7 +45,7 @@ $WINE_PYTHON -m pip install --no-dependencies --no-warn-script-location \
     --cache-dir "$WINE_PIP_CACHE_DIR" -r "$CONTRIB"/deterministic-build/requirements-hw.txt
 
 
-X16R="x16r_hash-1.0-cp39-cp39-win32.whl"
+X16R="x16r_hash-1.0.1-cp39-cp39-win32.whl"
 X16RV2="x16rv2_hash-1.0-cp39-cp39-win32.whl"
 KAWPOW="kawpow-0.9.4.4-cp39-cp39-win32.whl"
 

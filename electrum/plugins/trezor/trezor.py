@@ -421,7 +421,8 @@ class TrezorPlugin(HW_PluginBase):
                     if full_path:
                         txinputtype.address_n = full_path
 
-            txinputtype.amount = txin.value_sats().rvn_value
+            val = txin.value_sats()
+            txinputtype.amount = val.rvn_value if val else val
             txinputtype.script_sig = txin.script_sig
             txinputtype.sequence = txin.nsequence
 

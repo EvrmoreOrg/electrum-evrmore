@@ -116,11 +116,11 @@ class TrezorPlugin(HW_PluginBase):
 
     firmware_URL = 'https://wallet.trezor.io'
     libraries_URL = 'https://pypi.org/project/trezor/'
-    minimum_firmware = (1, 6, 0)
+    minimum_firmware = (1, 5, 2)
     keystore_class = TrezorKeyStore
-    minimum_library = (0, 13)
+    minimum_library = (0, 13, 0)
     maximum_library = (0, 14)
-    SUPPORTED_XTYPES = ('standard',) #'p2wpkh-p2sh', 'p2wpkh', 'p2wsh-p2sh', 'p2wsh')
+    SUPPORTED_XTYPES = ('standard', 'p2wpkh-p2sh', 'p2wpkh', 'p2wsh-p2sh', 'p2wsh')
     DEVICE_IDS = (TREZOR_PRODUCT_KEY,)
 
     MAX_LABEL_LEN = 32
@@ -341,7 +341,7 @@ class TrezorPlugin(HW_PluginBase):
         if electrum_txin_type in ('p2sh',):
             return OutputScriptType.PAYTOMULTISIG
         if electrum_txin_type in ('p2tr',):
-            return InputScriptType.PAYTOTAPROOT
+            return OutputScriptType.PAYTOTAPROOT
         raise ValueError('unexpected txin type: {}'.format(electrum_txin_type))
 
     def get_trezor_amount_unit(self):
@@ -395,7 +395,6 @@ class TrezorPlugin(HW_PluginBase):
         client = self.get_client(keystore)
         client.show_address(address_path, script_type, multisig)
 
-    # TODO: Only RVN
     def tx_inputs(self, tx: Transaction, *, for_sig=False, keystore: 'TrezorKeyStore' = None):
         inputs = []
         for txin in tx.inputs():
@@ -421,8 +420,8 @@ class TrezorPlugin(HW_PluginBase):
                     if full_path:
                         txinputtype.address_n = full_path
 
-            val = txin.value_sats()
-            txinputtype.amount = val.rvn_value if val else val
+            amt = txin.value_sats()
+            txinputtype.amount = int(amt.rvn_value) if amt else amt
             txinputtype.script_sig = txin.script_sig
             txinputtype.sequence = txin.nsequence
 
@@ -439,7 +438,6 @@ class TrezorPlugin(HW_PluginBase):
             signatures=[b''] * len(pubkeys),
             m=m)
 
-    # TODO: Currently only Ravencoin
     def tx_outputs(self, tx: PartialTransaction, *, keystore: 'TrezorKeyStore'):
 
         def create_output_by_derivation():
@@ -453,7 +451,7 @@ class TrezorPlugin(HW_PluginBase):
             assert full_path
             txoutputtype = TxOutputType(
                 multisig=multisig,
-                amount=txout.value.value,
+                amount=int(txout.value),
                 address_n=full_path,
                 script_type=script_type)
             return txoutputtype
@@ -461,16 +459,16 @@ class TrezorPlugin(HW_PluginBase):
         def create_output_by_address():
             if address:
                 return TxOutputType(
-                    amount=txout.value,
+                    amount=int(txout.value),
                     script_type=OutputScriptType.PAYTOADDRESS,
                     address=address,
                 )
             else:
                 return TxOutputType(
-                    amount=txout.value,
+                    amount=int(txout.value),
                     script_type=OutputScriptType.PAYTOOPRETURN,
                     op_return_data=trezor_validate_op_return_output_and_get_data(txout),
-                )    
+                )
 
         outputs = []
         has_change = False
@@ -479,9 +477,6 @@ class TrezorPlugin(HW_PluginBase):
         for txout in tx.outputs():
             address = txout.address
             use_create_by_derivation = False
-
-            if txout.asset:
-                raise UserFacingException(_("Trezor does not currently support asset transactions"))
 
             if txout.is_mine and not has_change:
                 # prioritise hiding outputs on the 'change' branch from user
@@ -500,7 +495,6 @@ class TrezorPlugin(HW_PluginBase):
 
         return outputs
 
-    # TODO: RVN Only
     def electrum_tx_to_txtype(self, tx: Optional[Transaction]):
         t = TransactionType()
         if tx is None:
@@ -510,12 +504,8 @@ class TrezorPlugin(HW_PluginBase):
         t.version = tx.version
         t.lock_time = tx.locktime
         t.inputs = self.tx_inputs(tx)
-        for o in tx.outputs():
-            if o.asset:
-                raise UserFacingException(_("Trezor does not currently support asset transactions"))
-
         t.bin_outputs = [
-            TxOutputBinType(amount=o.value.value, script_pubkey=o.scriptpubkey)
+            TxOutputBinType(amount=int(o.value), script_pubkey=o.scriptpubkey)
             for o in tx.outputs()
         ]
         return t

@@ -44,13 +44,18 @@ $WINE_PYTHON -m pip install --no-dependencies --no-warn-script-location \
 $WINE_PYTHON -m pip install --no-dependencies --no-warn-script-location \
     --cache-dir "$WINE_PIP_CACHE_DIR" -r "$CONTRIB"/deterministic-build/requirements-hw.txt
 
-download_if_not_exist "$CACHEDIR/x16r.whl" "https://raw.githubusercontent.com/kralverde/electrum-ravencoin-wheels/master/x16r_hash-1.0-cp37-cp37m-win32.whl"
-download_if_not_exist "$CACHEDIR/x16rv2.whl" "https://raw.githubusercontent.com/kralverde/electrum-ravencoin-wheels/master/x16rvw_hash-1.0-cp37-cp37m-win32.whl"
-download_if_not_exist "$CACHEDIR/kawpow.whl" "https://raw.githubusercontent.com/kralverde/electrum-ravencoin-wheels/master/ethash-0.5.1a1-cp37-cp37m-win32.whl"
 
-$WINE_PYTHON -m pip install --cache-dir "$WINE_PIP_CACHE_DIR" "$CACHEDIR/x16r.whl"
-$WINE_PYTHON -m pip install --cache-dir "$WINE_PIP_CACHE_DIR" "$CACHEDIR/x16rv2.whl"
-$WINE_PYTHON -m pip install --cache-dir "$WINE_PIP_CACHE_DIR" "$CACHEDIR/kawpow.whl"
+X16R="x16r_hash-1.0-cp39-cp39-win32.whl"
+X16RV2="x16rv2_hash-1.0-cp39-cp39-win32.whl"
+KAWPOW="kawpow-0.9.4.4-cp39-cp39-win32.whl"
+
+download_if_not_exist "$CACHEDIR/$X16R" "https://raw.githubusercontent.com/kralverde/electrum-ravencoin-wheels/master/$X16R"
+download_if_not_exist "$CACHEDIR/$X16RV2" "https://raw.githubusercontent.com/kralverde/electrum-ravencoin-wheels/master/$X16RV2"
+download_if_not_exist "$CACHEDIR/$KAWPOW" "https://raw.githubusercontent.com/kralverde/electrum-ravencoin-wheels/master/$KAWPOW"
+
+$WINE_PYTHON -m pip install --cache-dir "$WINE_PIP_CACHE_DIR" "$CACHEDIR/$X16R"
+$WINE_PYTHON -m pip install --cache-dir "$WINE_PIP_CACHE_DIR" "$CACHEDIR/$X16RV2"
+$WINE_PYTHON -m pip install --cache-dir "$WINE_PIP_CACHE_DIR" "$CACHEDIR/$KAWPOW"
 
 
 pushd $WINEPREFIX/drive_c/electrum

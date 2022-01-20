@@ -652,8 +652,8 @@ class Ledger_KeyStore(Hardware_KeyStore):
 
         txOutput = var_int(len(tx.outputs()))
         for o in tx.outputs():
-            #if o.asset:
-            #    self.give_error(_("Sending assets with ledger is currently not supported."))
+            if o.asset:
+                self.give_error(_("Sending assets with ledger is currently not supported."))
             txOutput += int_to_hex(0 if o.asset else o.value.value, 8)
             script = o.scriptpubkey.hex()
             txOutput += var_int(len(script) // 2)

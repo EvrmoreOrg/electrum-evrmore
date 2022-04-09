@@ -749,9 +749,15 @@ class Interface(Logger):
         if next_height is None:
             next_height = self.tip
         last = None
+        got_less_than_spacing = False
         while last is None or height <= next_height:
             prev_last, prev_height = last, height
             if next_height > height + 10:
+
+                if (not got_less_than_spacing and height >= constants.net.DGW_CHECKPOINTS_START):
+                    # For DGW, ensure we start and get a chunk amount so we can properly match
+                    # the start and end block's targets
+                    height = (height // constants.net.DGW_CHECKPOINTS_SPACING) * constants.net.DGW_CHECKPOINTS_SPACING
 
                 could_connect, num_headers = await self.request_chunk(height, next_height)
 
@@ -760,7 +766,9 @@ class Interface(Logger):
                         raise GracefulDisconnect('server chain conflicts with checkpoints or genesis')
                     last, height = await self.step(height)
                     continue
+
                 util.trigger_callback('network_updated')
+                got_less_than_spacing = num_headers < constants.net.DGW_CHECKPOINTS_SPACING
                 height = height + num_headers
                 assert height <= next_height+1, (height, self.tip)
                 last = 'catchup'

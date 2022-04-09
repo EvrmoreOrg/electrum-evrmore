@@ -29,7 +29,7 @@ import struct
 import traceback
 from typing import Optional, Dict, Mapping, Sequence
 
-from . import util, header_verification
+from . import util
 from .ravencoin import hash_encode, int_to_hex, rev_hex
 from .crypto import sha256d
 from . import constants
@@ -433,7 +433,19 @@ class Blockchain(Logger):
                 expected_header_hash = None
             header = deserialize_header(raw, s)
             headers[header.get('block_height')] = header
-            target = self.get_target(s, headers)
+            
+            # Don't bother with the target of headers in the middle of
+            # DGW checkpoints
+            target = 0
+            if constants.net.DGW_CHECKPOINTS_START <= s <= constants.net.max_dgw_checkpoint():
+                if self.is_dgw_height_checkpoint(s) is not None:
+                    target = self.get_target(s, headers)
+                else:
+                    # Just use the headers own bits for the logic
+                    target = self.bits_to_target(header['bits'])
+            else:
+                target = self.get_target(s, headers)
+            
             self.verify_header(header, prev_hash, target, expected_header_hash)
             prev_hash = hash_header(header)
             s += 1
@@ -633,14 +645,18 @@ class Blockchain(Logger):
 
     @staticmethod
     def is_dgw_height_checkpoint(height) -> Optional[int]:
+        # Less than the start of saved checkpoints
         if height < constants.net.DGW_CHECKPOINTS_START:
-            return False
-        if height > constants.net.max_dgw_checkpoint() + DGW_PASTBLOCKS - 1:
-            return False
+            return None
+        # Greater than the end of the saved checkpoints
+        if height > constants.net.max_dgw_checkpoint():
+            return None
         height_mod = height % constants.net.DGW_CHECKPOINTS_SPACING
+        # Is the first saved
         if height_mod == 0:
             return 0
-        elif height_mod == DGW_PASTBLOCKS - 1:
+        # Is the last saved
+        elif height_mod == constants.net.DGW_CHECKPOINTS_SPACING - 1:
             return 1
         return None
 
@@ -660,10 +676,10 @@ class Blockchain(Logger):
             index = height // 2016
             h, t = self.checkpoints[index]
             return h
-        #elif dgw_height_checkpoint is not None:
-        #    index = height // constants.net.DGW_CHECKPOINTS_SPACING - 5
-        #    h, t = self.dgw_checkpoints[index][dgw_height_checkpoint]
-        #    return h
+        elif dgw_height_checkpoint is not None:
+            index = height // constants.net.DGW_CHECKPOINTS_SPACING - constants.net.DGW_CHECKPOINTS_START // constants.net.DGW_CHECKPOINTS_SPACING
+            h, t = self.dgw_checkpoints[index][dgw_height_checkpoint]
+            return h
         else:
             header = self.read_header(height)
             if header is None:
@@ -687,10 +703,10 @@ class Blockchain(Logger):
         elif height < nDGWActivationBlock:
             h, t = self.checkpoints[height // 2016]
             return t
-        #elif dgw_height_checkpoint is not None:
-        #    index = height // constants.net.DGW_CHECKPOINTS_SPACING - 5
-        #    h, t = self.dgw_checkpoints[index][dgw_height_checkpoint]
-        #    return t
+        elif dgw_height_checkpoint is not None:
+            index = height // constants.net.DGW_CHECKPOINTS_SPACING - constants.net.DGW_CHECKPOINTS_START // constants.net.DGW_CHECKPOINTS_SPACING
+            h, t = self.dgw_checkpoints[index][dgw_height_checkpoint]
+            return t
         # There was a difficulty reset for kawpow
         elif not constants.net.TESTNET and height in range(1219736, 1219736 + 180):  # kawpow reset
             return KAWPOW_LIMIT
@@ -874,38 +890,9 @@ class Blockchain(Logger):
         try:
             data = bfh(hexdata)
 
-            # self.verify_chunk(start_height, data)
+            self.verify_chunk(start_height, data)
             # This is computationally intensive (thanks DGW), so lets make it a different process
-            # Windows makes this difficult
-
-            last_n_dgw_headers = {}
-            for i in range(start_height - DGW_PASTBLOCKS - 1, start_height):
-                last_n_dgw_headers[i] = self.read_header(i)
-
-            header_verification.verify_chunk((
-                constants.net.TESTNET,
-                KawpowActivationHeight,
-                nDGWActivationBlock,
-                KawpowActivationTS,
-                X16Rv2ActivationTS,
-                PRE_KAWPOW_HEADER_SIZE,
-                POST_KAWPOW_HEADER_SIZE,
-                last_n_dgw_headers,
-                DGW_PASTBLOCKS,
-                KAWPOW_LIMIT,
-                MAX_TARGET,
-                start_height,
-                data,
-                None if start_height > nDGWActivationBlock else self.checkpoints
-            ))
-
-            loop = asyncio.get_event_loop()
-            output = await asyncio.gather(loop.run_in_executor(None, header_verification.get_verify_result))
-
-            for o in output:
-                if o:
-                    raise o
-
+    
             self.save_chunk(start_height, data)
             return True
         except BaseException as e:

@@ -316,7 +316,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         self.lnworker = None
 
     def save_db(self):
-        if self.storage:
+        if (not self.config.get('nosave')) and self.storage:
             self.db.write(self.storage)
 
     def save_backup(self, backup_dir):

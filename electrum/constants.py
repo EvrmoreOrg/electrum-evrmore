@@ -75,8 +75,8 @@ class AbstractNet:
     GENESIS = None
     CHECKPOINTS = None
     DGW_CHECKPOINTS = None
-    DGW_CHECKPOINTS_SPACING = 100_000
-    DGW_CHECKPOINTS_START = 500_000
+    DGW_CHECKPOINTS_SPACING = 2016
+    DGW_CHECKPOINTS_START = 168 * DGW_CHECKPOINTS_SPACING  #338_688
 
     NET_NAME: str
     TESTNET: bool
@@ -96,8 +96,7 @@ class AbstractNet:
 
     @classmethod
     def max_dgw_checkpoint(cls) -> int:
-        # DGW Checkpoints start at height 500,000 and are every 100,000 blocks after
-        # (Arbitrary numbers)
+        # DGW Checkpoints start at height 400,000 and are every 2016 blocks after
         return max(0, cls.DGW_CHECKPOINTS_START + (len(cls.DGW_CHECKPOINTS) - 1) * cls.DGW_CHECKPOINTS_SPACING)
 
     @classmethod
@@ -118,7 +117,7 @@ class RavencoinMainnet(AbstractNet):
     DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     DEFAULT_SERVERS = read_json('servers.json', {})
     CHECKPOINTS = read_json('checkpoints.json', [])
-    DGW_CHECKPOINTS = read_json('checopoints_dgw.json', [])
+    DGW_CHECKPOINTS = read_json('checkpoints_dgw.json', [])
 
     XPRV_HEADERS = {
         'standard': 0x0488ade4,  # xprv

@@ -211,6 +211,10 @@ class Commands:
         h160 = bytes.fromhex(h160)
         return ravencoin.hash160_to_b58_address(h160, addr_type)
 
+    @command('')
+    async def scripthash_from_address(self, address: str):
+        return ravencoin.address_to_scripthash(address)
+
     @command('n')
     async def send_custom_script(self, function: str, *args):
         return await self.network.interface.session.send_request(function, args)

@@ -81,7 +81,7 @@ if not is_android:
 sys._ELECTRUM_RUNNING_VIA_RUNELECTRUM = True  # used by logging.py
 
 from electrum.logging import get_logger, configure_logging  # import logging submodule first
-from electrum import util, header_verification
+from electrum import util
 from electrum import constants
 from electrum import SimpleConfig
 from electrum.wallet_db import WalletDB
@@ -477,5 +477,4 @@ def handle_cmd(*, cmdname: str, config: 'SimpleConfig', config_options: dict):
 
 
 if __name__ == '__main__':
-    header_verification.spawn_process()
     main()

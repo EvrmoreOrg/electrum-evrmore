@@ -89,8 +89,9 @@ class SPV(NetworkJobOnDefaultServer):
             if header is None:
                 if tx_height < constants.net.max_dgw_checkpoint():
                     # FIXME these requests are not counted (self._requests_sent += 1)
-                    await self.taskgroup.spawn(self.interface.request_chunk(tx_height, None, can_return_early=True))
-                continue
+                    #await self.taskgroup.spawn(self.interface.request_chunk(tx_height, None, can_return_early=True))
+                    await self.interface.request_chunk(tx_height, None, can_return_early=True)
+                #continue
             # request now
             self.logger.info(f'requested merkle {tx_hash}')
             self.requested_merkle.add(tx_hash)

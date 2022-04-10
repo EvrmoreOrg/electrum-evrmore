@@ -318,9 +318,18 @@ class Synchronizer(SynchronizerBase):
                 if tx_hash != tx.txid():
                     raise SynchronizerFailure(f"received tx does not match expected txid ({tx_hash} != {tx.txid()})")
                 
+                # if it's in the checkpoint region, we still might not have the header
+                header = self.interface.blockchain.read_header(height)
+                if header is None:
+                    #print(f'requesting chunk from height for assets {height}')
+                    await self.interface.request_chunk(height, None, can_return_early=True)
+
                 if height != -1:
                     # Don't verify if mempool
-                    await self.wallet.verifier.request_and_verfiy_proof(tx_hash, height)
+                    try:
+                        await self.wallet.verifier.request_and_verfiy_proof(tx_hash, height)
+                    except GracefulDisconnect as e:
+                        raise SynchronizerFailure(f'Verify proof failure for asset')
                 
                 try:
                     vout = tx.outputs()[idx]

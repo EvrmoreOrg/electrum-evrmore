@@ -26,7 +26,6 @@ import os
 import threading
 import time
 import struct
-import traceback
 from typing import Optional, Dict, Mapping, Sequence
 
 from . import util
@@ -263,9 +262,14 @@ _CHAINWORK_CACHE = {
 def init_headers_file_for_best_chain():
     b = get_best_chain()
     filename = b.path()
-    if not os.path.exists(filename):
+    # We want to start with one less than the checkpoint so we have headers to calculate the new
+    # Chainwork from
+    length = POST_KAWPOW_HEADER_SIZE * constants.net.max_dgw_checkpoint()
+    if not os.path.exists(filename) or os.path.getsize(filename) < length:
         with open(filename, 'wb') as f:
-            pass
+            if length > 0:
+                f.seek(length - 1)
+                f.write(b'\x00')
         util.ensure_sparse_file(filename)
     with b.lock:
         b.update_size()
@@ -437,7 +441,7 @@ class Blockchain(Logger):
             # Don't bother with the target of headers in the middle of
             # DGW checkpoints
             target = 0
-            if constants.net.DGW_CHECKPOINTS_START <= s <= constants.net.max_dgw_checkpoint():
+            if constants.net.DGW_CHECKPOINTS_START <= s <= constants.net.max_dgw_checkpoint() + 2016:
                 if self.is_dgw_height_checkpoint(s) is not None:
                     target = self.get_target(s, headers)
                 else:
@@ -649,7 +653,7 @@ class Blockchain(Logger):
         if height < constants.net.DGW_CHECKPOINTS_START:
             return None
         # Greater than the end of the saved checkpoints
-        if height > constants.net.max_dgw_checkpoint():
+        if height > constants.net.max_dgw_checkpoint() + 2016:
             return None
         height_mod = height % constants.net.DGW_CHECKPOINTS_SPACING
         # Is the first saved
@@ -890,9 +894,9 @@ class Blockchain(Logger):
         try:
             data = bfh(hexdata)
 
+            # This is computationally intensive (thanks DGW)
             self.verify_chunk(start_height, data)
-            # This is computationally intensive (thanks DGW), so lets make it a different process
-    
+            
             self.save_chunk(start_height, data)
             return True
         except BaseException as e:

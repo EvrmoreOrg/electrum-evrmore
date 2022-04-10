@@ -97,7 +97,7 @@ class AbstractNet:
     @classmethod
     def max_dgw_checkpoint(cls) -> int:
         # DGW Checkpoints start at height 400,000 and are every 2016 blocks after
-        return max(0, cls.DGW_CHECKPOINTS_START + (len(cls.DGW_CHECKPOINTS) - 1) * cls.DGW_CHECKPOINTS_SPACING)
+        return max(0, cls.DGW_CHECKPOINTS_START + (len(cls.DGW_CHECKPOINTS) - 2) * cls.DGW_CHECKPOINTS_SPACING)
 
     @classmethod
     def rev_genesis_bytes(cls) -> bytes:

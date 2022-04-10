@@ -14,11 +14,6 @@
     "s": "50002",
     "version": "1.10"
   },
-  "electrum3.rvn.rocks": {
-    "pruning": "-",
-    "s": "50002",
-    "version": "1.10"
-  },
   "electrum.ravencoin.foundation": {
     "pruning": "-",
     "s": "50002",

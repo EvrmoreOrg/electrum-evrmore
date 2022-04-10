@@ -60,32 +60,6 @@ download_if_not_exist "$CACHEDIR/$NSIS_FILENAME" "$NSIS_URL"
 verify_hash "$CACHEDIR/$NSIS_FILENAME" "$NSIS_SHA256"
 wine "$CACHEDIR/$NSIS_FILENAME" /S
 
-info "Compiling libusb..."
-(
-    cd "$CACHEDIR"
-    if [ -f "libusb/libusb/.libs/libusb-1.0.dll" ]; then
-        info "libusb-1.0.dll already built, skipping"
-        exit 0
-    fi
-    rm -rf libusb
-    mkdir libusb
-    cd libusb
-    # Shallow clone
-    git init
-    git remote add origin $LIBUSB_REPO
-    git fetch --depth 1 origin $LIBUSB_COMMIT
-    git checkout -b pinned "${LIBUSB_COMMIT}^{commit}"
-    echo "libusb_1_0_la_LDFLAGS += -Wc,-static" >> libusb/Makefile.am
-    ./bootstrap.sh || fail "Could not bootstrap libusb"
-    host="$GCC_TRIPLET_HOST"
-    LDFLAGS="-Wl,--no-insert-timestamp" ./configure \
-        --host=$host \
-        --build=$GCC_TRIPLET_BUILD || fail "Could not run ./configure for libusb"
-    make -j4 || fail "Could not build libusb"
-    ${host}-strip libusb/.libs/libusb-1.0.dll
-) || fail "libusb build failed"
-cp "$CACHEDIR/libusb/libusb/.libs/libusb-1.0.dll" $WINEPREFIX/drive_c/tmp/  || fail "Could not copy libusb to its destination"
-
 # copy already built DLLs
 cp "$DLL_TARGET_DIR/libsecp256k1-0.dll" $WINEPREFIX/drive_c/tmp/ || fail "Could not copy libsecp to its destination"
 cp "$DLL_TARGET_DIR/libzbar-0.dll" $WINEPREFIX/drive_c/tmp/ || fail "Could not copy libzbar to its destination"

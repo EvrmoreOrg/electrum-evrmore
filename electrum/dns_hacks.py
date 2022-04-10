@@ -30,7 +30,7 @@ def configure_dns_depending_on_proxy(is_proxy: bool) -> None:
             if _is_force_system_dns_for_host(host):
                 return socket._getaddrinfo(host, port, *args, **kwargs)
             return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (host, port))]
-        socket.getaddrinfo = getaddrinfo    
+        socket.getaddrinfo = getaddrinfo
     else:
         if sys.platform == 'win32':
             # On Windows, socket.getaddrinfo takes a mutex, and might hold it for up to 10 seconds
@@ -61,6 +61,10 @@ def _prepare_windows_dns_hack():
 
 def _is_force_system_dns_for_host(host: str) -> bool:
     return str(host) in ('localhost', 'localhost.',)
+
+def _is_force_system_dns_for_host(host: str) -> bool:
+    return str(host) in ('localhost', 'localhost.',)
+
 
 def _fast_getaddrinfo(host, *args, **kwargs):
     def needs_dns_resolving(host):

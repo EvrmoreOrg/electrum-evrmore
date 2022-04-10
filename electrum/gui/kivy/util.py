@@ -1,4 +1,4 @@
-from kivy.utils import get_color_from_hex
+from kivy.utils import get_color_from_hex, platform
 
 
 def address_colors(wallet, addr):
@@ -21,3 +21,16 @@ def address_colors(wallet, addr):
     elif wallet.is_billing_address(addr):
         colors = BLUE
     return (get_color_from_hex(color) for color in colors)
+
+
+def get_default_language() -> str:
+    if platform != 'android':
+        return 'en_UK'
+    # FIXME: CJK/Arabic/etc languages do not work at all with kivy due to font issues,
+    #        so it is easiest to just default to English... (see #2032)
+    return 'en_UK'
+    # # try getting the language of the Android OS
+    # from jnius import autoclass
+    # Locale = autoclass("java.util.Locale")
+    # lang = str(Locale.getDefault().toString())
+    # return lang if lang else 'en_UK'

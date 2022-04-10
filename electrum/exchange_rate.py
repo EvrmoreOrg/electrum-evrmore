@@ -10,13 +10,13 @@ import decimal
 from decimal import Decimal
 from typing import Sequence, Optional
 
-from aiorpcx.curio import timeout_after, TaskTimeout, TaskGroup
+from aiorpcx.curio import timeout_after, TaskTimeout
 import aiohttp
 
 from . import util
 from .ravencoin import COIN
 from .i18n import _
-from .util import (ThreadJob, make_dir, log_exceptions,
+from .util import (ThreadJob, make_dir, log_exceptions, OldTaskGroup,
                    make_aiohttp_session, resource_path)
 from .network import Network
 from .simple_config import SimpleConfig
@@ -78,10 +78,7 @@ class ExchangeBase(Logger):
             self.logger.info(f"getting fx quotes for {ccy}")
             self.quotes = await self.get_rates(ccy)
             self.logger.info("received fx quotes")
-        except asyncio.CancelledError:
-            # CancelledError must be passed-through for cancellation to work
-            raise
-        except aiohttp.ClientError as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             self.logger.info(f"failed fx quotes: {repr(e)}")
             self.quotes = {}
         except Exception as e:
@@ -112,7 +109,7 @@ class ExchangeBase(Logger):
             self.logger.info(f"requesting fx history for {ccy}")
             h = await self.request_history(ccy)
             self.logger.info(f"received fx history for {ccy}")
-        except aiohttp.ClientError as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             self.logger.info(f"failed fx history: {repr(e)}")
             return
         except Exception as e:
@@ -232,7 +229,7 @@ def get_exchanges_and_currencies():
 
     async def query_all_exchanges_for_their_ccys_over_network():
         async with timeout_after(10):
-            async with TaskGroup() as group:
+            async with OldTaskGroup() as group:
                 for name, klass in exchanges.items():
                     exchange = klass(None, None)
                     await group.spawn(get_currencies_safe(name, exchange))

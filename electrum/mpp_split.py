@@ -8,11 +8,9 @@ from .lnutil import NoPathFound
 PART_PENALTY = 1.0  # 1.0 results in avoiding splits
 MIN_PART_SIZE_MSAT = 10_000_000  # we don't want to split indefinitely
 EXHAUST_DECAY_FRACTION = 10  # fraction of the local balance that should be reserved if possible
-
 RELATIVE_SPLIT_SPREAD = 0.3  # deviation from the mean when splitting amounts into parts
 
 # these parameters affect the computational work in the probabilistic algorithm
-
 CANDIDATES_PER_LEVEL = 20
 MAX_PARTS = 5  # maximum number of parts for splitting
 
@@ -55,6 +53,10 @@ def number_nonzero_nodes(config: SplitConfig) -> int:
     # using a set comprehension
     return len({nodeid for (_, nodeid), amounts in config.items() if sum(amounts)})
 
+
+def total_config_amount(config: SplitConfig) -> int:
+    return sum([sum(c) for c in config.values()])
+
 def total_config_amount(config: SplitConfig) -> int:
     return sum([sum(c) for c in config.values()])
 
@@ -75,6 +77,18 @@ def remove_duplicates(configs: List[SplitConfig]) -> List[SplitConfig]:
         unique_configs.add(hashable_config)
     unique_configs = [{c[0]: list(c[1]) for c in config} for config in unique_configs]
     return unique_configs
+
+def remove_duplicates(configs: List[SplitConfig]) -> List[SplitConfig]:
+    unique_configs = set()
+    for config in configs:
+        # sort keys and values
+        config_sorted_values = {k: sorted(v) for k, v in config.items()}
+        config_sorted_keys = {k: config_sorted_values[k] for k in sorted(config_sorted_values.keys())}
+        hashable_config = tuple((c, tuple(sorted(config[c]))) for c in config_sorted_keys)
+        unique_configs.add(hashable_config)
+    unique_configs = [{c[0]: list(c[1]) for c in config} for config in unique_configs]
+    return unique_configs
+
 
 def remove_multiple_nodes(configs: List[SplitConfig]) -> List[SplitConfig]:
     return [config for config in configs if number_nonzero_nodes(config) == 1]
@@ -125,8 +139,10 @@ def suggest_splits(
 ) -> List[SplitConfigRating]:
     """Breaks amount_msat into smaller pieces and distributes them over the
     channels according to the funds they can send.
+
     Individual channels may be assigned multiple parts. The split configurations
     are returned in sorted order, from best to worst rating.
+
     Single part payments can be excluded, since they represent legacy payments.
     Split configurations that send via multiple nodes can be excluded as well.
     """
@@ -134,7 +150,7 @@ def suggest_splits(
     configs = []
     channels_order = list(channels_with_funds.keys())
 
-        # generate multiple configurations to get more configurations (there is randomness in this loop)
+    # generate multiple configurations to get more configurations (there is randomness in this loop)
     for _ in range(CANDIDATES_PER_LEVEL):
         # we want to have configurations with no splitting to many splittings
         for target_parts in range(1, MAX_PARTS):

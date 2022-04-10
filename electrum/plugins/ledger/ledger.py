@@ -789,6 +789,8 @@ class Ledger_KeyStore(Hardware_KeyStore):
                     inputIndex = inputIndex + 1
             else:
                 while inputIndex < len(inputs):
+                    self.handler.show_message(_("Signing transaction...")
+                                              + f" (phase2, {inputIndex}/{len(inputs)})")
                     client_ledger.startUntrustedTransaction(firstTransaction, inputIndex,
                                                             chipInputs, redeemScripts[inputIndex], version=tx.version)
                     # we don't set meaningful outputAddress, amount and fees
@@ -878,30 +880,33 @@ class LedgerPlugin(HW_PluginBase):
     minimum_library = (0, 1, 32)
     client = None
     DEVICE_IDS = [
-        (0x2581, 0x1807),  # HW.1 legacy btchip
-        (0x2581, 0x2b7c),  # HW.1 transitional production
-        (0x2581, 0x3b7c),  # HW.1 ledger production
-        (0x2581, 0x4b7c),  # HW.1 ledger test
-        (0x2c97, 0x0000),  # Blue
-        (0x2c97, 0x0011),  # Blue app-bitcoin >= 1.5.1
-        (0x2c97, 0x0015),  # Blue app-bitcoin >= 1.5.1
-        (0x2c97, 0x0001),  # Nano-S
-        (0x2c97, 0x1011),  # Nano-S app-bitcoin >= 1.5.1
-        (0x2c97, 0x1015),  # Nano-S app-bitcoin >= 1.5.1
-        (0x2c97, 0x0004),  # Nano-X
-        (0x2c97, 0x4011),  # Nano-X app-bitcoin >= 1.5.1
-        (0x2c97, 0x4015),  # Nano-X app-bitcoin >= 1.5.1
-        (0x2c97, 0x0005),  # RFU
-        (0x2c97, 0x0006),  # RFU
-        (0x2c97, 0x0007),  # RFU
-        (0x2c97, 0x0008),  # RFU
-        (0x2c97, 0x0009),  # RFU
-        (0x2c97, 0x000a)  # RFU
-    ]
+                   (0x2581, 0x1807), # HW.1 legacy btchip
+                   (0x2581, 0x2b7c), # HW.1 transitional production
+                   (0x2581, 0x3b7c), # HW.1 ledger production
+                   (0x2581, 0x4b7c), # HW.1 ledger test
+                   (0x2c97, 0x0000), # Blue
+                   (0x2c97, 0x0011), # Blue app-bitcoin >= 1.5.1
+                   (0x2c97, 0x0015), # Blue app-bitcoin >= 1.5.1
+                   (0x2c97, 0x0001), # Nano-S
+                   (0x2c97, 0x1011), # Nano-S app-bitcoin >= 1.5.1
+                   (0x2c97, 0x1015), # Nano-S app-bitcoin >= 1.5.1
+                   (0x2c97, 0x0004), # Nano-X
+                   (0x2c97, 0x4011), # Nano-X app-bitcoin >= 1.5.1
+                   (0x2c97, 0x4015), # Nano-X app-bitcoin >= 1.5.1
+                   (0x2c97, 0x0005), # Nano-S Plus
+                   (0x2c97, 0x5011), # Nano-S Plus app-bitcoin >= 1.5.1
+                   (0x2c97, 0x5015), # Nano-S Plus app-bitcoin >= 1.5.1
+                   (0x2c97, 0x0006), # RFU
+                   (0x2c97, 0x0007), # RFU
+                   (0x2c97, 0x0008), # RFU
+                   (0x2c97, 0x0009), # RFU
+                   (0x2c97, 0x000a)  # RFU
+                 ]
     VENDOR_IDS = (0x2c97,)
     LEDGER_MODEL_IDS = {
         0x10: "Ledger Nano S",
         0x40: "Ledger Nano X",
+        0x50: "Ledger Nano S Plus",
     }
     SUPPORTED_XTYPES = ('standard', 'p2wpkh-p2sh', 'p2wpkh', 'p2wsh-p2sh', 'p2wsh')
 
@@ -942,6 +947,8 @@ class LedgerPlugin(HW_PluginBase):
                 return True, "Ledger Nano S"
             if product_key == (0x2c97, 0x0004):
                 return True, "Ledger Nano X"
+            if product_key == (0x2c97, 0x0005):
+                return True, "Ledger Nano S Plus"
             return True, None
         # modern product_keys
         if product_key[0] == 0x2c97:

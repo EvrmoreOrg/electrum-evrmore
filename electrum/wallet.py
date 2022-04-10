@@ -46,17 +46,17 @@ import itertools
 import threading
 import enum
 
-from aiorpcx import TaskGroup, timeout_after, TaskTimeout, ignore_after
+from aiorpcx import timeout_after, TaskTimeout, ignore_after
 
 from .i18n import _
 from .bip32 import BIP32Node, convert_bip32_intpath_to_strpath, convert_bip32_path_to_list_of_uint32
 from .crypto import sha256
 from . import util
-from .util import (NotEnoughFunds, UserCancelled, profiler,
+from .util import (NotEnoughFunds, UserCancelled, profiler, OldTaskGroup,
                    format_satoshis, format_fee_satoshis, NoDynamicFeeEstimates,
-                   WalletFileException, BitcoinException, MultipleSpendMaxTxOutputs,
+                   WalletFileException, BitcoinException,
                    InvalidPassword, format_time, timestamp_to_datetime, Satoshis,
-                   Fiat, bfh, bh2u, TxMinedInfo, quantize_feerate, create_bip21_uri, OrderedDictWithIndex)
+                   Fiat, bfh, bh2u, TxMinedInfo, quantize_feerate, create_bip21_uri, OrderedDictWithIndex, parse_max_spend)
 from .simple_config import SimpleConfig, FEE_RATIO_HIGH_WARNING, FEERATE_WARNING_HIGH_FEE
 from .ravencoin import COIN, TYPE_ADDRESS
 from .ravencoin import is_address, address_to_script, is_minikey, relayfee, dust_threshold
@@ -134,7 +134,7 @@ async def _append_utxos_to_inputs(*, inputs: List[PartialTxInput], network: 'Net
 
     u = await network.listunspent_for_scripthash(scripthash)
     u1 = await network.listasset_for_scripthash(scripthash)
-    async with TaskGroup() as group:
+    async with OldTaskGroup() as group:
         for item in u:
             if len(inputs) >= imax:
                 break
@@ -158,7 +158,7 @@ async def sweep_preparations(privkeys, network: 'Network', imax=100):
 
     inputs = []  # type: List[PartialTxInput]
     keypairs = {}
-    async with TaskGroup() as group:
+    async with OldTaskGroup() as group:
         for sec in privkeys:
             txin_type, privkey, compressed = ravencoin.deserialize_privkey(sec)
             await group.spawn(find_utxos_for_privkey(txin_type, privkey, compressed))
@@ -591,10 +591,20 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         """Returns a map: pubkey -> (keystore, derivation_suffix)"""
         return {}
 
+    def is_lightning_funding_tx(self, txid: Optional[str]) -> bool:
+        if not self.lnworker or txid is None:
+            return False
+        return any([chan.funding_outpoint.txid == txid
+                    for chan in self.lnworker.channels.values()])
+
+    def is_swap_tx(self, tx: Transaction) -> bool:
+        return bool(self.lnworker.swap_manager.get_swap_by_tx(tx)) if self.lnworker else False
+
     def get_tx_info(self, tx: Transaction) -> TxWalletDetails:
         tx_wallet_delta = self.get_wallet_delta(tx)
         is_relevant = tx_wallet_delta.is_relevant
         is_any_input_ismine = tx_wallet_delta.is_any_input_ismine
+        is_swap = self.is_swap_tx(tx)
         fee = tx_wallet_delta.fee
         exp_n = None
         can_broadcast = False
@@ -632,7 +642,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                         size = tx.estimated_size()
                         fee_per_byte = fee / size
                         exp_n = self.config.fee_to_depth(fee_per_byte)
-                    can_bump = is_any_input_ismine and not tx.is_final()
+                    can_bump = (is_any_input_ismine or is_swap) and not tx.is_final()
                     can_dscancel = (is_any_input_ismine and not tx.is_final()
                                     and not all([self.is_mine(txout.address) for txout in tx.outputs()]))
                     try:
@@ -643,7 +653,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 else:
                     status = _('Local')
                     can_broadcast = self.network is not None
-                    can_bump = is_any_input_ismine and not tx.is_final()
+                    can_bump = (is_any_input_ismine or is_swap) and not tx.is_final()
             else:
                 status = _("Signed")
                 can_broadcast = self.network is not None
@@ -804,11 +814,11 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         self.save_db()
 
     def clear_invoices(self):
-        self.invoices = {}
+        self.invoices.clear()
         self.save_db()
 
     def clear_requests(self):
-        self.receive_requests = {}
+        self.receive_requests.clear()
         self.save_db()
 
     def get_invoices(self):
@@ -881,7 +891,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 value = RavenValue(txo.value)
             invoice_amounts[txo.scriptpubkey] += value
         relevant_txs = []
-        with self.transaction_lock:
+        with self.lock, self.transaction_lock:
             for invoice_scriptpubkey, invoice_amt in invoice_amounts.items():
                 scripthash = ravencoin.script_to_scripthash(invoice_scriptpubkey)
                 prevouts_and_values = self.db.get_prevouts_by_scripthash(scripthash)
@@ -1216,7 +1226,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                     and self.config.has_fee_mempool():
                 exp_n = self.config.fee_to_depth(fee_per_byte)
                 if exp_n is not None:
-                    extra.append('%.2f MB' % (exp_n / 1000000))
+                    extra.append(self.config.get_depth_mb_str(exp_n))
             if height == TX_HEIGHT_LOCAL:
                 status = 3
             elif height == TX_HEIGHT_UNCONF_PARENT:
@@ -1370,14 +1380,13 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         outputs = copy.deepcopy(outputs)
 
         # check outputs
-        i_max = None
+        i_max = []
+        i_max_sum = 0
         for i, o in enumerate(outputs):
-            if o.max:
-                if i_max is not None:
-                    raise MultipleSpendMaxTxOutputs()
-                i_max = i
-        if i_max and len([o for o in outputs if o.asset is None]) > 1:
-            raise MultipleSpendMaxTxOutputs()
+            weight = parse_max_spend(o.value)
+            if weight:
+                i_max_sum += weight
+                i_max.append((weight, i))
 
         if fee is None and self.config.fee_per_kb() is None:
             raise NoDynamicFeeEstimates()
@@ -1472,7 +1481,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             #       Given as the user is spending "max", and so might be abandoning the wallet,
             #       try to include all UTXOs, otherwise leftover might remain in the UTXO set
             #       forever. see #5433
-            # note: Actually it might be the case that not all UTXOs from the wallet are
+            # note: Actually, it might be the case that not all UTXOs from the wallet are
             #       being spent if the user manually selected UTXOs.
         #    sendable = sum(map(lambda c: c.value_sats(), [c for c in coins if c.value_sats().assets]), RavenValue())
         #   outputs[i_max].value = Satoshis(0)
@@ -1536,7 +1545,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         The idea here is that an attacker might send us a UTXO in a
         large low-fee unconfirmed tx that will ~never confirm. If we
         spend it as part of a tx ourselves, that too will not confirm
-        (unless we use a high fee but that might not be worth it for
+        (unless we use a high fee, but that might not be worth it for
         a small value UTXO).
         In particular, this test triggers for large "dusting transactions"
         that are used for advertising purposes by some entities.
@@ -1783,11 +1792,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         s = list(filter(lambda o: self.is_mine(o.address), outputs))
         # ... unless there is none
         if not s:
-            s = outputs
-            x_fee = run_hook('get_tx_extra_fee', self, tx)
-            if x_fee:
-                x_fee_address, x_fee_amount = x_fee
-                s = list(filter(lambda o: o.address != x_fee_address, s))
+            s = [out for out in outputs if self._is_rbf_allowed_to_touch_tx_output(out)]
         if not s:
             raise CannotBumpFee('No outputs at all??')
 
@@ -1834,11 +1839,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         # select non-ismine outputs
         s = [(idx, out) for (idx, out) in enumerate(outputs)
              if not self.is_mine(out.address)]
-        # exempt 2fa fee output if present
-        x_fee = run_hook('get_tx_extra_fee', self, tx)
-        if x_fee:
-            x_fee_address, x_fee_amount = x_fee
-            s = [(idx, out) for (idx, out) in s if out.address != x_fee_address]
+        s = [(idx, out) for (idx, out) in s if self._is_rbf_allowed_to_touch_tx_output(out)]
         if not s:
             raise CannotBumpFee("Cannot find payment output")
 
@@ -1872,6 +1873,15 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
         outputs = [out for (idx, out) in enumerate(outputs) if idx not in del_out_idxs]
         return PartialTransaction.from_io(inputs, outputs)
+
+    def _is_rbf_allowed_to_touch_tx_output(self, txout: TxOutput) -> bool:
+        # 2fa fee outputs if present, should not be removed or have their value decreased
+        if self.is_billing_address(txout.address):
+            return False
+        # submarine swap funding outputs must not be decreased
+        if self.lnworker and self.lnworker.swap_manager.is_lockup_address_for_a_swap(txout.address):
+            return False
+        return True
 
     def cpfp(self, tx: Transaction, fee: int) -> Optional[PartialTransaction]:
         txid = tx.txid()
@@ -1998,10 +2008,13 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         address = self.get_txin_address(txin)
         # note: we add input utxos regardless of is_mine
         self._add_input_utxo_info(txin, ignore_network_issues=ignore_network_issues, address=address)
-        if not self.is_mine(address):
+        is_mine = self.is_mine(address)
+        if not is_mine:
             is_mine = self._learn_derivation_path_for_address_from_txinout(txin, address)
-            if not is_mine:
-                return
+        if not is_mine:
+            if self.lnworker:
+                self.lnworker.swap_manager.add_txin_info(txin)
+            return
         # set script_type first, as later checks might rely on it:
         txin.script_type = self.get_txin_type(address)
 
@@ -2042,6 +2055,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             for k in self.get_keystores():
                 if k.can_sign_txin(txin):
                     return True
+        if self.is_swap_tx(tx):
+            return True
         return False
 
     def get_input_tx(self, tx_hash: str, *, ignore_network_issues=False) -> Optional[Transaction]:
@@ -2093,6 +2108,11 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         if self.is_watching_only():
             return
         if not isinstance(tx, PartialTransaction):
+            return
+        # note: swap signing does not require the password
+        swap = self.lnworker.swap_manager.get_swap_by_tx(tx) if self.lnworker else None
+        if swap:
+            self.lnworker.swap_manager.sign_tx(tx, swap)
             return
         # add info to a temporary tx copy; including xpubs
         # and full derivation paths as hw keystores might want them
@@ -2358,7 +2378,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         expiration = expiration or 0
         return OnchainInvoice(
             type=PR_TYPE_ONCHAIN,
-            outputs=[PartialTxOutput.from_address_and_value(address, amount_sat)],            message=message,
+            outputs=[PartialTxOutput.from_address_and_value(address, amount_sat)],
+            message=message,
             time=timestamp,
             amount_sat=amount_sat,
             exp=expiration,
@@ -2534,9 +2555,11 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
     def _update_password_for_keystore(self, old_pw: Optional[str], new_pw: Optional[str]) -> None:
         pass
 
-    def sign_message(self, address, message, password):
+    def sign_message(self, address: str, message: str, password) -> bytes:
         index = self.get_address_index(address)
-        return self.keystore.sign_message(index, message, password)
+        script_type = self.get_txin_type(address)
+        assert script_type != "address"
+        return self.keystore.sign_message(index, message, password, script_type=script_type)
 
     def decrypt_message(self, pubkey: str, message, password) -> bytes:
         addr = self.pubkeys_to_address([pubkey])
@@ -2849,7 +2872,7 @@ class Imported_Wallet(Simple_Wallet):
             transactions_to_remove -= transactions_new
             self.db.remove_addr_history(address)
             for tx_hash in transactions_to_remove:
-                self.remove_transaction(tx_hash)
+                self._remove_transaction(tx_hash)
         self.set_label(address, None)
         self.remove_payment_request(address)
         self.set_frozen_state_of_addresses([address], False)
@@ -3113,11 +3136,13 @@ class Deterministic_Wallet(Abstract_Wallet):
                 self._not_old_change_addresses.append(address)
             return address
 
-    def synchronize_sequence(self, for_change):
+    def synchronize_sequence(self, for_change: bool) -> int:
+        count = 0  # num new addresses we generated
         limit = self.gap_limit_for_change if for_change else self.gap_limit
         while True:
             num_addr = self.db.num_change_addresses() if for_change else self.db.num_receiving_addresses()
             if num_addr < limit:
+                count += 1
                 self.create_new_address(for_change)
                 continue
             if for_change:
@@ -3125,15 +3150,19 @@ class Deterministic_Wallet(Abstract_Wallet):
             else:
                 last_few_addresses = self.get_receiving_addresses(slice_start=-limit)
             if any(map(self.address_is_old, last_few_addresses)):
+                count += 1
                 self.create_new_address(for_change)
             else:
                 break
+        return count
 
     @AddressSynchronizer.with_local_height_cached
     def synchronize(self):
+        count = 0
         with self.lock:
-            self.synchronize_sequence(False)
-            self.synchronize_sequence(True)
+            count += self.synchronize_sequence(False)
+            count += self.synchronize_sequence(True)
+        return count
 
     def get_all_known_addresses_beyond_gap_limit(self):
         # note that we don't stop at first large gap

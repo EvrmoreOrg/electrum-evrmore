@@ -61,6 +61,7 @@ class UTXOList(MyTreeView):
     stretch_column = Columns.LABEL
 
     ROLE_PREVOUT_STR = Qt.UserRole + 1000
+    key_role = ROLE_PREVOUT_STR
 
     def __init__(self, parent):
         super().__init__(parent, self.create_menu,
@@ -69,7 +70,8 @@ class UTXOList(MyTreeView):
         self._utxo_dict = {}
         self.wallet = self.parent.wallet
 
-        self.setModel(QStandardItemModel(self))
+        self.std_model = QStandardItemModel(self)
+        self.setModel(self.std_model)
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.setSortingEnabled(True)
         self.update()
@@ -82,8 +84,26 @@ class UTXOList(MyTreeView):
         self.model().clear()
         self.update_headers(self.__class__.headers)
         for idx, utxo in enumerate(utxos):
-            self.insert_utxo(idx, utxo)
+            name = utxo.prevout.to_str()
+            self._utxo_dict[name] = utxo
+            address = utxo.address
+            height = utxo.block_height
+            name_short = utxo.prevout.txid.hex()[:16] + '...' + ":%d" % utxo.prevout.out_idx
+            amount = self.parent.format_amount(utxo.value_sats(), whitespaces=True)
+            labels = [name_short, address, '', amount, '%d'%height]
+            utxo_item = [QStandardItem(x) for x in labels]
+            self.set_editability(utxo_item)
+            utxo_item[self.Columns.OUTPOINT].setData(name, self.ROLE_CLIPBOARD_DATA)
+            utxo_item[self.Columns.OUTPOINT].setData(name, self.ROLE_PREVOUT_STR)
+            utxo_item[self.Columns.ADDRESS].setFont(QFont(MONOSPACE_FONT))
+            utxo_item[self.Columns.AMOUNT].setFont(QFont(MONOSPACE_FONT))
+            utxo_item[self.Columns.OUTPOINT].setFont(QFont(MONOSPACE_FONT))
+            self.model().insertRow(idx, utxo_item)
+            self.refresh_row(name, idx)
         self.filter()
+        self.update_coincontrol_bar()
+
+    def update_coincontrol_bar(self):
         # update coincontrol status bar
         if self._spend_set is not None:
             coins = [self._utxo_dict[x] for x in self._spend_set]
@@ -102,12 +122,10 @@ class UTXOList(MyTreeView):
         else:
             self.parent.set_coincontrol_msg(None)
 
-    def insert_utxo(self, idx, utxo: PartialTxInput):
+    def refresh_row(self, key, row):
+        utxo = self._utxo_dict[key]
+        utxo_item = [self.std_model.item(row, col) for col in self.Columns]
         address = utxo.address
-        height = utxo.block_height
-        name = utxo.prevout.to_str()
-        name_short = utxo.prevout.txid.hex()[:16] + '...' + ":%d" % utxo.prevout.out_idx
-        self._utxo_dict[name] = utxo
         label = self.wallet.get_label_for_txid(utxo.prevout.txid.hex()) or self.wallet.get_label(address)
 
         rvn_val = utxo.value_sats().rvn_value.value
@@ -130,7 +148,7 @@ class UTXOList(MyTreeView):
         utxo_item[self.Columns.AMOUNT].setFont(QFont(MONOSPACE_FONT))
         utxo_item[self.Columns.OUTPOINT].setFont(QFont(MONOSPACE_FONT))
         SELECTED_TO_SPEND_TOOLTIP = _('Coin selected to be spent')
-        if name in (self._spend_set or set()):
+        if key in (self._spend_set or set()):
             for col in utxo_item:
                 col.setBackground(ColorScheme.GREEN.as_color(True))
                 if col != self.Columns.OUTPOINT:
@@ -140,11 +158,11 @@ class UTXOList(MyTreeView):
             utxo_item[self.Columns.ADDRESS].setToolTip(_('Address is frozen'))
         if self.wallet.is_frozen_coin(utxo):
             utxo_item[self.Columns.OUTPOINT].setBackground(ColorScheme.BLUE.as_color(True))
-            utxo_item[self.Columns.OUTPOINT].setToolTip(f"{name}\n{_('Coin is frozen')}")
+            utxo_item[self.Columns.OUTPOINT].setToolTip(f"{key}\n{_('Coin is frozen')}")
         else:
-            tooltip = ("\n" + SELECTED_TO_SPEND_TOOLTIP) if name in (self._spend_set or set()) else ""
-            utxo_item[self.Columns.OUTPOINT].setToolTip(name + tooltip)
-        self.model().insertRow(idx, utxo_item)
+            tooltip = ("\n" + SELECTED_TO_SPEND_TOOLTIP) if key in (self._spend_set or set()) else ""
+            utxo_item[self.Columns.OUTPOINT].setBackground(ColorScheme.DEFAULT.as_color(True))
+            utxo_item[self.Columns.OUTPOINT].setToolTip(key + tooltip)
 
     def get_selected_outpoints(self) -> Optional[List[str]]:
         if not self.model():
@@ -164,7 +182,9 @@ class UTXOList(MyTreeView):
             self._spend_set = {utxo.prevout.to_str() for utxo in coins}
         else:
             self._spend_set = None
-        self.update()
+        self.refresh_all()
+        self.update_coincontrol_bar()
+        self.selectionModel().clearSelection()
 
     def get_spend_list(self) -> Optional[Sequence[PartialTxInput]]:
         if self._spend_set is None:

@@ -69,7 +69,6 @@ class ElectrumGui(BaseElectrumGui, Logger):
             gui_object=self,
         )
         w.run()
-    
     def stop(self) -> None:
         from kivy.app import App
         from kivy.clock import Clock

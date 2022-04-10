@@ -8,7 +8,6 @@ import json
 from collections import namedtuple, defaultdict
 from typing import NamedTuple, List, Tuple, Mapping, Optional, TYPE_CHECKING, Union, Dict, Set, Sequence
 import re
-import time
 import attr
 from aiorpcx import NetAddress
 
@@ -123,6 +122,56 @@ class ChannelConfig(StoredObject):
             raise Exception(f"{conf_name}. to_self_delay too high: {self.to_self_delay} > {MAXIMUM_REMOTE_TO_SELF_DELAY_ACCEPTED}")
         if self.max_htlc_value_in_flight_msat < min(1000 * funding_sat, 100_000_000):
             raise Exception(f"{conf_name}. max_htlc_value_in_flight_msat is too small: {self.max_htlc_value_in_flight_msat}")
+
+    @classmethod
+    def cross_validate_params(
+            cls,
+            *,
+            local_config: 'LocalConfig',
+            remote_config: 'RemoteConfig',
+            funding_sat: int,
+            is_local_initiator: bool,  # whether we are the funder
+            initial_feerate_per_kw: int,
+    ) -> None:
+        # first we validate the configs separately
+        local_config.validate_params(funding_sat=funding_sat)
+        remote_config.validate_params(funding_sat=funding_sat)
+        # now do tests that need access to both configs
+        if is_local_initiator:
+            funder, fundee = LOCAL, REMOTE
+            funder_config, fundee_config = local_config, remote_config
+        else:
+            funder, fundee = REMOTE, LOCAL
+            funder_config, fundee_config = remote_config, local_config
+        # if channel_reserve_satoshis is less than dust_limit_satoshis within the open_channel message:
+        #     MUST reject the channel.
+        if remote_config.reserve_sat < local_config.dust_limit_sat:
+            raise Exception("violated constraint: remote_config.reserve_sat < local_config.dust_limit_sat")
+        # if channel_reserve_satoshis from the open_channel message is less than dust_limit_satoshis:
+        #     MUST reject the channel.
+        if local_config.reserve_sat < remote_config.dust_limit_sat:
+            raise Exception("violated constraint: local_config.reserve_sat < remote_config.dust_limit_sat")
+        # The receiving node MUST fail the channel if:
+        #     the funder's amount for the initial commitment transaction is not
+        #     sufficient for full fee payment.
+        if funder_config.initial_msat < calc_fees_for_commitment_tx(
+                num_htlcs=0,
+                feerate=initial_feerate_per_kw,
+                is_local_initiator=is_local_initiator)[funder]:
+            raise Exception(
+                "the funder's amount for the initial commitment transaction "
+                "is not sufficient for full fee payment")
+        # The receiving node MUST fail the channel if:
+        #     both to_local and to_remote amounts for the initial commitment transaction are
+        #     less than or equal to channel_reserve_satoshis (see BOLT 3).
+        if (max(local_config.initial_msat, remote_config.initial_msat)
+                <= 1000 * max(local_config.reserve_sat, remote_config.reserve_sat)):
+            raise Exception(
+                "both to_local and to_remote amounts for the initial commitment "
+                "transaction are less than or equal to channel_reserve_satoshis")
+        from .simple_config import FEERATE_PER_KW_MIN_RELAY_LIGHTNING
+        if initial_feerate_per_kw < FEERATE_PER_KW_MIN_RELAY_LIGHTNING:
+            raise Exception(f"feerate lower than min relay fee. {initial_feerate_per_kw} sat/kw.")
 
 
     @classmethod
@@ -323,6 +372,7 @@ class HtlcLog(NamedTuple):
     error_bytes: Optional[bytes] = None
     failure_msg: Optional['OnionRoutingFailure'] = None
     sender_idx: Optional[int] = None
+    trampoline_fee_level: Optional[int] = None
 
     def formatted_tuple(self):
         route = self.route
@@ -351,7 +401,6 @@ class UnableToDeriveSecret(LightningError): pass
 class HandshakeFailed(LightningError): pass
 class ConnStringFormatError(LightningError): pass
 class RemoteMisbehaving(LightningError): pass
-class UpfrontShutdownScriptViolation(RemoteMisbehaving): pass
 
 class NotFoundChanAnnouncementForUpdate(Exception): pass
 class InvalidGossipMsg(Exception):
@@ -361,6 +410,16 @@ class PaymentFailure(UserFacingException): pass
 class NoPathFound(PaymentFailure):
     def __str__(self):
         return _('No path found')
+
+
+class LNProtocolError(Exception):
+    """Raised in peer methods to trigger an error message."""
+
+
+class LNProtocolWarning(Exception):
+    """Raised in peer methods to trigger a warning message."""
+
+
 
 # TODO make some of these values configurable?
 REDEEM_AFTER_DOUBLE_SPENT_DELAY = 30
@@ -509,7 +568,6 @@ def derive_blinded_privkey(basepoint_secret: bytes, per_commitment_secret: bytes
 def make_htlc_tx_output(amount_msat, local_feerate, revocationpubkey, local_delayedpubkey, success, to_self_delay):
     assert type(amount_msat) is int
     assert type(local_feerate) is int
-    
     script = make_commitment_output_to_local_witness_script(
         revocation_pubkey=revocationpubkey,
         to_self_delay=to_self_delay,
@@ -889,9 +947,8 @@ def make_commitment(
     return tx
 
 def make_commitment_output_to_local_witness_script(
-        revocation_pubkey: bytes, to_self_delay: int, delayed_pubkey: bytes
+        revocation_pubkey: bytes, to_self_delay: int, delayed_pubkey: bytes,
 ) -> bytes:
-    
     assert type(revocation_pubkey) is bytes
     assert type(to_self_delay) is int
     assert type(delayed_pubkey) is bytes
@@ -1031,6 +1088,12 @@ class LnFeatures(IntFlag):
     _ln_feature_contexts[OPTION_SHUTDOWN_ANYSEGWIT_REQ] = (LNFC.INIT | LNFC.NODE_ANN)
     _ln_feature_contexts[OPTION_SHUTDOWN_ANYSEGWIT_OPT] = (LNFC.INIT | LNFC.NODE_ANN)
 
+    OPTION_CHANNEL_TYPE_REQ = 1 << 44
+    OPTION_CHANNEL_TYPE_OPT = 1 << 45
+
+    _ln_feature_contexts[OPTION_CHANNEL_TYPE_REQ] = (LNFC.INIT | LNFC.NODE_ANN)
+    _ln_feature_contexts[OPTION_CHANNEL_TYPE_OPT] = (LNFC.INIT | LNFC.NODE_ANN)
+
     # temporary
     OPTION_TRAMPOLINE_ROUTING_REQ_ECLAIR = 1 << 50
     OPTION_TRAMPOLINE_ROUTING_OPT_ECLAIR = 1 << 51
@@ -1105,6 +1168,56 @@ class LnFeatures(IntFlag):
                 or get_ln_flag_pair_of_bit(flag) in our_flags)
 
 
+class ChannelType(IntFlag):
+    OPTION_LEGACY_CHANNEL = 0
+    OPTION_STATIC_REMOTEKEY = 1 << 12
+    OPTION_ANCHOR_OUTPUTS = 1 << 20
+    OPTION_ANCHORS_ZERO_FEE_HTLC_TX = 1 << 22
+
+    def discard_unknown_and_check(self):
+        """Discards unknown flags and checks flag combination."""
+        flags = list_enabled_bits(self)
+        known_channel_types = []
+        for flag in flags:
+            channel_type = ChannelType(1 << flag)
+            if channel_type.name:
+                known_channel_types.append(channel_type)
+        final_channel_type = known_channel_types[0]
+        for channel_type in known_channel_types[1:]:
+            final_channel_type |= channel_type
+
+        final_channel_type.check_combinations()
+        return final_channel_type
+
+    def check_combinations(self):
+        if self == ChannelType.OPTION_STATIC_REMOTEKEY:
+            pass
+        elif self == ChannelType.OPTION_ANCHOR_OUTPUTS | ChannelType.OPTION_STATIC_REMOTEKEY:
+            pass
+        elif self == ChannelType.OPTION_ANCHORS_ZERO_FEE_HTLC_TX | ChannelType.OPTION_STATIC_REMOTEKEY:
+            pass
+        else:
+            raise ValueError("Channel type is not a valid flag combination.")
+
+    def complies_with_features(self, features: LnFeatures) -> bool:
+        flags = list_enabled_bits(self)
+        complies = True
+        for flag in flags:
+            feature = LnFeatures(1 << flag)
+            complies &= features.supports(feature)
+        return complies
+
+    def to_bytes_minimal(self):
+        # MUST use the smallest bitmap possible to represent the channel type.
+        bit_length =self.value.bit_length()
+        byte_length = bit_length // 8 + int(bool(bit_length % 8))
+        return self.to_bytes(byte_length, byteorder='big')
+
+    @property
+    def name_minimal(self):
+        return self.name.replace('OPTION_', '')
+
+
 del LNFC  # name is ambiguous without context
 
 # features that are actually implemented and understood in our codebase:
@@ -1120,6 +1233,7 @@ LN_FEATURES_IMPLEMENTED = (
         | LnFeatures.BASIC_MPP_OPT | LnFeatures.BASIC_MPP_REQ
         | LnFeatures.OPTION_TRAMPOLINE_ROUTING_OPT | LnFeatures.OPTION_TRAMPOLINE_ROUTING_REQ
         | LnFeatures.OPTION_SHUTDOWN_ANYSEGWIT_OPT | LnFeatures.OPTION_SHUTDOWN_ANYSEGWIT_REQ
+        | LnFeatures.OPTION_CHANNEL_TYPE_OPT | LnFeatures.OPTION_CHANNEL_TYPE_REQ
 )
 
 

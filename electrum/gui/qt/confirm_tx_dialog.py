@@ -33,11 +33,10 @@ from electrum.i18n import _
 from electrum.util import NotEnoughFunds, NoDynamicFeeEstimates
 from electrum.plugin import run_hook
 from electrum.transaction import Transaction, PartialTransaction, RavenValue
-from electrum.simple_config import FEERATE_WARNING_HIGH_FEE, FEE_RATIO_HIGH_WARNING
 from electrum.wallet import InternalAddressCorruption
 
 from .util import (WindowModalDialog, ColorScheme, HelpLabel, Buttons, CancelButton,
-                   BlockingWaitingDialog, PasswordLineEdit)
+                   BlockingWaitingDialog, PasswordLineEdit, WWLabel)
 
 from .fee_slider import FeeSlider, FeeComboBox
 
@@ -137,8 +136,7 @@ class ConfirmTxDialog(TxEditor, WindowModalDialog):
         vbox.addLayout(grid)
 
         msg = (_('The amount to be received by the recipient.') + ' '
-                + _('Fees are paid by the sender.'))
-
+               + _('Fees are paid by the sender.'))
         self.amount_label = QLabel('')
         self.amount_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         grid.addWidget(HelpLabel(_("Amount to be sent") + ": ", msg), 0, 0)
@@ -166,8 +164,7 @@ class ConfirmTxDialog(TxEditor, WindowModalDialog):
         grid.addWidget(self.fee_slider, 5, 1)
         grid.addWidget(self.fee_combo, 5, 2)
 
-        self.message_label = QLabel(self.default_message())
-        self.message_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.message_label = WWLabel(self.default_message())
         grid.addWidget(self.message_label, 6, 0, 1, -1)
         self.pw_label = QLabel(_('Password'))
         self.pw_label.setVisible(self.password_required)

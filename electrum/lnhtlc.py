@@ -205,7 +205,6 @@ class HTLCManager:
 
         # no need to keep local update raw msgs anymore, they have just been ACKed.
         self.log[LOCAL]['unacked_updates'].pop(self.log[REMOTE]['ctn'], None)
-    
     @with_lock
     def _update_maybe_active_htlc_ids(self) -> None:
         # - Loosely, we want a set that contains the htlcs that are
@@ -271,7 +270,7 @@ class HTLCManager:
         """We need to be able to replay unacknowledged updates we sent to the remote
         in case of disconnections. Hence, raw update and commitment_signed messages
         are stored temporarily (until they are acked)."""
-        # self.log['unacked_local_updates2'][ctn_idx] is a list of raw messages
+        # self.log[LOCAL]['unacked_updates'][ctn_idx] is a list of raw messages
         # containing some number of updates and then a single commitment_signed
         if is_commitment_signed:
             ctn_idx = self.ctn_latest(REMOTE)
@@ -280,12 +279,13 @@ class HTLCManager:
         l = self.log[LOCAL]['unacked_updates'].get(ctn_idx, [])
         l.append(raw_update_msg.hex())
         self.log[LOCAL]['unacked_updates'][ctn_idx] = l
-    
+
     @with_lock
     def get_unacked_local_updates(self) -> Dict[int, Sequence[bytes]]:
-        #return self.log['unacked_local_updates2']
-        return {ctn: [bfh(msg) for msg in messages]                
+        #return self.log[LOCAL]['unacked_updates']
+        return {ctn: [bfh(msg) for msg in messages]
                 for ctn, messages in self.log[LOCAL]['unacked_updates'].items()}
+
     ##### Queries re HTLCs:
 
     def get_htlc_by_id(self, htlc_proposer: HTLCOwner, htlc_id: int) -> UpdateAddHtlc:
@@ -378,7 +378,6 @@ class HTLCManager:
             htlc_proposer: HTLCOwner,
             htlc_id: int,
     ) -> bool:
-        htlc_id = int(htlc_id)
         if htlc_id >= self.get_next_htlc_id(htlc_proposer):
             return False
         if htlc_id in self.log[htlc_proposer]['settles']:

@@ -565,7 +565,7 @@ class HistoryModel(CustomModel, Logger):
             HistoryColumns.TXID: 'TXID',
         }[section]
 
-    def flags(self, idx):
+    def flags(self, idx: QModelIndex) -> int:
         extra_flags = Qt.NoItemFlags  # type: Qt.ItemFlag
         if idx.column() in self.view.editable_columns:
             extra_flags |= Qt.ItemIsEditable
@@ -950,11 +950,13 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
             assert False
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
-        idx = self.indexAt(event.pos())
+        org_idx: QModelIndex = self.indexAt(event.pos())
+        idx = self.proxy.mapToSource(org_idx)
         if not idx.isValid():
+            # can happen e.g. before list is populated for the first time
             return
-        tx_item = self.tx_item_from_proxy_row(idx.row())  # type: HistoryNodeData
-        if self.hm.flags(self.model().mapToSource(idx)) & Qt.ItemIsEditable:
+        tx_item = idx.internalPointer().get_data()
+        if self.hm.flags(idx) & Qt.ItemIsEditable:
             super().mouseDoubleClickEvent(event)
         else:
             if tx_item.lightning:

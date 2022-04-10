@@ -21,7 +21,7 @@ def sql(func):
 
 
 class SqlDB(Logger):
-    
+
     def __init__(self, asyncio_loop: asyncio.BaseEventLoop, path, commit_interval=None):
         Logger.__init__(self)
         self.asyncio_loop = asyncio_loop

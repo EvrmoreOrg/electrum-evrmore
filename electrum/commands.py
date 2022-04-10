@@ -41,7 +41,7 @@ from typing import Optional, TYPE_CHECKING, Dict, List
 
 from .import util, ecc
 from .util import (bfh, bh2u, format_satoshis, json_decode, json_normalize,
-                   is_hash256_str, is_hex_str, to_bytes)
+                   is_hash256_str, is_hex_str, to_bytes, parse_max_spend)
 from . import ravencoin
 from .ravencoin import is_address,  hash_160, COIN
 from .bip32 import BIP32Node
@@ -78,7 +78,7 @@ class NotSynchronizedException(Exception):
 
 
 def satoshis_or_max(amount):
-    return satoshis(amount) if amount != '!' else '!'
+    return satoshis(amount) if not parse_max_spend(amount) else amount
 
 def satoshis(amount):
     # satoshi conversion must not be performed by the parser
@@ -952,12 +952,11 @@ class Commands:
         wallet.add_payment_request(req)
         return wallet.export_request(req)
 
-    #@command('wnl')
-    #async def add_lightning_request(self, amount, memo='', expiration=3600, wallet: Abstract_Wallet = None):
-    #    amount_sat = int(satoshis(amount))
-    #    key = await wallet.lnworker._add_request_coro(amount_sat, memo, expiration)
-    #    wallet.save_db()
-    #    return wallet.get_formatted_request(key)
+    @command('wnl')
+    async def add_lightning_request(self, amount, memo='', expiration=3600, wallet: Abstract_Wallet = None):
+        amount_sat = int(satoshis(amount))
+        key = wallet.lnworker.add_request(amount_sat, memo, expiration)
+        return wallet.get_formatted_request(key)
 
     @command('w')
     async def addtransaction(self, tx, wallet: Abstract_Wallet = None):
@@ -1425,7 +1424,7 @@ arg_types = {
     'inputs': json_loads,
     'outputs': json_loads,
     'fee': lambda x: str(Decimal(x)) if x is not None else None,
-    'amount': lambda x: str(Decimal(x)) if x != '!' else '!',
+    'amount': lambda x: str(Decimal(x)) if not parse_max_spend(x) else x,
     'locktime': int,
     'addtransaction': eval_bool,
     'fee_method': str,
@@ -1452,7 +1451,7 @@ def set_default_subparser(self, name, args=None):
     """see http://stackoverflow.com/questions/5176691/argparse-how-to-specify-a-default-subcommand"""
     subparser_found = False
     for arg in sys.argv[1:]:
-        if arg in ['-h', '--help']:  # global help if no subparser
+        if arg in ['-h', '--help', '--version']:  # global help/version if no subparser
             break
     else:
         for x in self._subparsers._actions:
@@ -1528,6 +1527,7 @@ def get_parser():
     # create main parser
     parser = argparse.ArgumentParser(
         epilog="Run 'electrum help <command>' to see the help for a command")
+    parser.add_argument("--version", dest="cmd", action='store_const', const='version', help="Return the version of Electrum.")
     add_global_options(parser)
     add_wallet_option(parser)
     subparsers = parser.add_subparsers(dest='cmd', metavar='<command>')

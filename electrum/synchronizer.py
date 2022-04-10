@@ -28,12 +28,12 @@ from typing import Dict, List, TYPE_CHECKING, Tuple, Union
 from collections import defaultdict
 import logging
 
-from aiorpcx import TaskGroup, run_in_thread, RPCError
+from aiorpcx import run_in_thread, RPCError
 
 from . import util
 from .assets import pull_meta_from_create_or_reissue_script, BadAssetScript
 from .transaction import Transaction, PartialTransaction, AssetMeta, RavenValue, TxOutpoint
-from .util import bh2u, make_aiohttp_session, NetworkJobOnDefaultServer, random_shuffled_copy, bfh
+from .util import bh2u, make_aiohttp_session, NetworkJobOnDefaultServer, random_shuffled_copy, bfh, OldTaskGroup
 from .ravencoin import address_to_scripthash, is_address
 from .logging import Logger
 from .interface import GracefulDisconnect, NetworkTimeout
@@ -92,7 +92,6 @@ class SynchronizerBase(NetworkJobOnDefaultServer):
 
     def __init__(self, network: 'Network'):
         self.asyncio_loop = network.asyncio_loop
-        self._reset_request_counters()
 
         NetworkJobOnDefaultServer.__init__(self, network)
 
@@ -102,7 +101,6 @@ class SynchronizerBase(NetworkJobOnDefaultServer):
         self.requested_assets = set()
         self.scripthash_to_address = {}
         self._processed_some_notifications = False  # so that we don't miss them
-        self._reset_request_counters()
         # Queues
         self.add_queue = asyncio.Queue()
         self.asset_add_queue = asyncio.Queue()
@@ -124,10 +122,6 @@ class SynchronizerBase(NetworkJobOnDefaultServer):
             # we are being cancelled now
             self.session.unsubscribe(self.status_queue)
             self.session.unsubscribe(self.asset_status_queue)
-
-    def _reset_request_counters(self):
-        self._requests_sent = 0
-        self._requests_answered = 0
 
     def add(self, addr):
         asyncio.run_coroutine_threadsafe(self._add_address(addr), self.asyncio_loop)
@@ -415,7 +409,7 @@ class Synchronizer(SynchronizerBase):
             self.requested_tx[tx_hash] = tx_height
 
         if not transaction_hashes: return
-        async with TaskGroup() as group:
+        async with OldTaskGroup() as group:
             for tx_hash in transaction_hashes:
                 await group.spawn(
                     self._get_transaction(tx_hash, allow_server_not_finding_tx=allow_server_not_finding_tx))
@@ -462,13 +456,17 @@ class Synchronizer(SynchronizerBase):
         # main loop
         while True:
             await asyncio.sleep(0.1)
-            await run_in_thread(self.wallet.synchronize)
-            up_to_date = self.is_up_to_date()
+            # note: we only generate new HD addresses if the existing ones
+            #       have history that are mined and SPV-verified. This inherently couples
+            #       the Sychronizer and the Verifier.
+            hist_done = self.is_up_to_date()
+            spv_done = self.wallet.verifier.is_up_to_date() if self.wallet.verifier else True
+            num_new_addrs = await run_in_thread(self.wallet.synchronize)
+            up_to_date = hist_done and spv_done and num_new_addrs == 0
+            # see if status changed
             if (up_to_date != self.wallet.is_up_to_date()
                     or up_to_date and self._processed_some_notifications):
                 self._processed_some_notifications = False
-                if up_to_date:
-                    self._reset_request_counters()
                 self.wallet.set_up_to_date(up_to_date)
                 util.trigger_callback('wallet_updated', self.wallet)
 

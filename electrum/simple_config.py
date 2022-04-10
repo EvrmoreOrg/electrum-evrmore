@@ -21,7 +21,8 @@ from .logging import get_logger, Logger
 
 
 FEE_ETA_TARGETS = [25, 10, 5, 2]
-FEE_DEPTH_TARGETS = [10000000, 5000000, 2000000, 1000000, 500000, 200000, 100000]
+FEE_DEPTH_TARGETS = [10_000_000, 5_000_000, 2_000_000, 1_000_000,
+                     800_000, 600_000, 400_000, 250_000, 100_000]
 FEE_LN_ETA_TARGET = 2  # note: make sure the network is asking for estimates for this target
 
 # satoshi per kbyte
@@ -39,7 +40,6 @@ FEERATE_REGTEST_HARDCODED = 180000  # for eclair compat
 # This would be FEERATE_DEFAULT_RELAY / 4 if not for rounding errors,
 # see https://github.com/ElementsProject/lightning/commit/2e687b9b352c9092b5e8bd4a688916ac50b44af0
 FEERATE_PER_KW_MIN_RELAY_LIGHTNING = 253
-
 
 FEE_RATIO_HIGH_WARNING = 0.05  # warn user if fee/amount for on-chain tx is higher than this
 
@@ -279,7 +279,7 @@ class SimpleConfig(Logger):
                 raise
 
     def get_backup_dir(self):
-        # this is used to save a backup everytime a channel is created
+        # this is used to save wallet file backups (without active lightning channels)
         # on Android, the export backup button uses android_backup_dir()
         if 'ANDROID_DATA' in os.environ:
             return None
@@ -298,12 +298,7 @@ class SimpleConfig(Logger):
             if path and os.path.exists(path):
                 return path
 
-        # default path
-        util.assert_datadir_available(self.path)
-        dirpath = os.path.join(self.path, "wallets")
-        make_dir(dirpath, allow_symlink=False)
-
-        new_path = os.path.join(self.path, "wallets", "default_wallet")
+        new_path = self.get_fallback_wallet_path()
 
         # default path in pre 1.9 versions
         old_path = os.path.join(self.path, "electrum.dat")
@@ -311,6 +306,13 @@ class SimpleConfig(Logger):
             os.rename(old_path, new_path)
 
         return new_path
+
+    def get_fallback_wallet_path(self):
+        util.assert_datadir_available(self.path)
+        dirpath = os.path.join(self.path, "wallets")
+        make_dir(dirpath, allow_symlink=False)
+        path = os.path.join(self.path, "wallets", "default_wallet")
+        return path
 
     def remove_from_recently_open(self, filename):
         recent = self.get('recently_open', [])
@@ -398,9 +400,11 @@ class SimpleConfig(Logger):
                 break
         else:
             return 0
-        # add one sat/byte as currently that is
-        # the max precision of the histogram
-        # (well, in case of ElectrumX at least. not for electrs)
+        # add one sat/byte as currently that is the max precision of the histogram
+        # note: precision depends on server.
+        #       old ElectrumX <1.16 has 1 s/b prec, >=1.16 has 0.1 s/b prec.
+        #       electrs seems to use untruncated double-precision floating points.
+        #       # TODO decrease this to 0.1 s/b next time we bump the required protocol version
         fee += 1
         # convert to sat/kbyte
         return int(fee * 1000)
@@ -434,11 +438,17 @@ class SimpleConfig(Logger):
             min_target = -1
         return min_target
 
+    def get_depth_mb_str(self, depth: int) -> str:
+        # e.g. 500_000 -> "0.50 MB"
+        depth_mb = "{:.2f}".format(depth / 1_000_000)  # maybe .rstrip("0") ?
+        return f"{depth_mb} MB"
+
     def depth_tooltip(self, depth: Optional[int]) -> str:
         """Returns text tooltip for given mempool depth (in vbytes)."""
         if depth is None:
             return "unknown from tip"
-        return "%.1f MB from tip" % (depth/1_000_000)
+        depth_mb = self.get_depth_mb_str(depth)
+        return _("{} from tip").format(depth_mb)
 
     def eta_tooltip(self, x):
         if x < 0:

@@ -164,7 +164,7 @@ def create_sweeptx_for_their_revoked_htlc(
     # check that htlc_tx is a htlc
     if htlc_tx.outputs()[0].address != htlc_address:
         return
-    gen_tx = lambda: create_sweeptx_that_spends_htlctx_that_spends_htlc_in_ctx(        
+    gen_tx = lambda: create_sweeptx_that_spends_htlctx_that_spends_htlc_in_ctx(
         sweep_address=sweep_address,
         htlc_tx=htlc_tx,
         htlctx_witness_script=bfh(witness_script),

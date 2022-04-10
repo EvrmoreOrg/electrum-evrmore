@@ -37,7 +37,7 @@ from .invoices import Invoice, OnchainInvoice
 from .keystore import bip44_derivation
 from .transaction import Transaction, TxOutpoint, tx_from_any, PartialTransaction, PartialTxOutput, AssetMeta, RavenValue
 from .logging import Logger
-from .lnutil import LOCAL, REMOTE, FeeUpdate, UpdateAddHtlc, LocalConfig, RemoteConfig, Keypair, OnlyPubkeyKeypair, RevocationStore
+from .lnutil import LOCAL, REMOTE, FeeUpdate, UpdateAddHtlc, LocalConfig, RemoteConfig, ChannelType
 from .lnutil import ImportedChannelBackupStorage, OnchainChannelBackupStorage
 from .lnutil import ChannelConstraints, Outpoint, ShachainElement
 from .json_db import StoredDict, JsonDB, locked, modifier
@@ -56,9 +56,7 @@ NEW_SEED_VERSION = 11       # electrum versions >= 2.0
 #FINAL_SEED_VERSION = 41     # electrum >= 2.7 will set this to prevent
                             # old versions from overwriting new format
 
-RAVENCOIN_SEED_VERSION = 43  # Rewrites wallet to support assets
-
-FINAL_SEED_VERSION = 44
+FINAL_SEED_VERSION = 44  # Rewrites wallet to support assets
 
 class TxFeesValue(NamedTuple):
     fee: Optional[int] = None
@@ -667,7 +665,6 @@ class WalletDB(JsonDB):
     def _convert_version_30(self):
         if not self._is_upgrade_method_needed(29, 29):
             return
-
         PR_TYPE_ONCHAIN = 0
         PR_TYPE_LN = 2
         requests = self.data.get('payment_requests', {})
@@ -691,8 +688,7 @@ class WalletDB(JsonDB):
     def _convert_version_31(self):
         if not self._is_upgrade_method_needed(30, 30):
             return
-
-        PR_TYPE_ONCHAIN = 0        
+        PR_TYPE_ONCHAIN = 0
         requests = self.data.get('payment_requests', {})
         invoices = self.data.get('invoices', {})
         for d in [invoices, requests]:
@@ -885,6 +881,45 @@ class WalletDB(JsonDB):
                 if item['type'] == PR_TYPE_ONCHAIN:
                     item['outputs'] = [(_type, addr, (val or 0))
                                        for _type, addr, val in item['outputs']]
+        self.data['seed_version'] = 44
+
+    def _convert_version_42(self):
+        # in OnchainInvoice['outputs'], convert values from None to 0
+        if not self._is_upgrade_method_needed(41, 41):
+            return
+        PR_TYPE_ONCHAIN = 0
+        requests = self.data.get('payment_requests', {})
+        invoices = self.data.get('invoices', {})
+        for d in [invoices, requests]:
+            for key, item in list(d.items()):
+                if item['type'] == PR_TYPE_ONCHAIN:
+                    item['outputs'] = [(_type, addr, (val or 0))
+                                       for _type, addr, val in item['outputs']]
+        self.data['seed_version'] = 42
+
+    def _convert_version_43(self):
+        if not self._is_upgrade_method_needed(42, 42):
+            return
+        channels = self.data.pop('channels', {})
+        for k, c in channels.items():
+            log = c['log']
+            c['fail_htlc_reasons'] = log.pop('fail_htlc_reasons', {})
+            c['unfulfilled_htlcs'] = log.pop('unfulfilled_htlcs', {})
+            log["1"]['unacked_updates'] = log.pop('unacked_local_updates2', {})
+        self.data['channels'] = channels
+        self.data['seed_version'] = 43
+
+    def _convert_version_44(self):
+        if not self._is_upgrade_method_needed(43, 43):
+            return
+        channels = self.data.get('channels', {})
+        for key, item in channels.items():
+            if bool(item.get('static_remotekey_enabled')):
+                channel_type = ChannelType.OPTION_STATIC_REMOTEKEY
+            else:
+                channel_type = ChannelType(0)
+            item.pop('static_remotekey_enabled', None)
+            item['channel_type'] = channel_type
         self.data['seed_version'] = 44
 
     def _convert_imported(self):
@@ -1484,6 +1519,8 @@ class WalletDB(JsonDB):
             v = ChannelConstraints(**v)
         elif key == 'funding_outpoint':
             v = Outpoint(**v)
+        elif key == 'channel_type':
+            v = ChannelType(v)
         return v
 
     def _should_convert_to_stored_dict(self, key) -> bool:

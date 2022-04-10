@@ -10,7 +10,6 @@ from kivy.uix.label import Label
 from kivy.uix.widget import Widget
 from kivy.clock import Clock
 
-from electrum.simple_config import FEERATE_WARNING_HIGH_FEE, FEE_RATIO_HIGH_WARNING
 from electrum.gui.kivy.i18n import _
 from electrum.plugin import run_hook
 from electrum.util import NotEnoughFunds
@@ -93,6 +92,7 @@ Builder.load_string('''
                 id: final_cb
                 opacity: int(root.show_final)
                 disabled: not root.show_final
+                on_release: root.update_tx()
         Label:
             text: root.warning
             text_size: self.width, None

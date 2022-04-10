@@ -355,7 +355,6 @@ class ChannelDB(SqlDB):
         with self.lock:
             unshuffled = set(self._nodes.keys()) - node_ids
         return random.sample(list(unshuffled), min(200, len(unshuffled)))
-        
     def get_last_good_address(self, node_id: bytes) -> Optional[LNPeerAddr]:
         """Returns latest address we successfully connected to, for given node."""
         addr_to_ts = self._addresses.get(node_id)

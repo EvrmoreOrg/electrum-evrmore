@@ -31,7 +31,7 @@ from typing import NamedTuple, Sequence, Optional, List, TYPE_CHECKING
 from PyQt5.QtGui import QFontMetrics, QFont
 
 from electrum import ravencoin, assets
-from electrum.util import bfh, maybe_extract_bolt11_invoice, BITCOIN_BIP21_URI_SCHEME, Satoshis
+from electrum.util import bfh, maybe_extract_bolt11_invoice, BITCOIN_BIP21_URI_SCHEME, Satoshis, parse_max_spend
 from electrum.transaction import PartialTxOutput, RavenValue
 from electrum.ravencoin import opcodes, construct_script
 from electrum.logging import Logger
@@ -137,8 +137,8 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
         x = x.strip()
         if not x:
             raise Exception("Amount is empty")
-        if x == '!':
-            return '!'
+        if parse_max_spend(x):
+            return x
         p = pow(10, self.amount_edit.decimal_point())
         try:
             return int(p * Decimal(x))

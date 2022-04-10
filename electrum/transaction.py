@@ -363,6 +363,12 @@ class TxOutpoint(NamedTuple):
         return TxOutpoint(txid=bfh(hash_str),
                           out_idx=int(idx_str))
 
+    def __str__(self) -> str:
+        return f"""TxOutpoint("{self.to_str()}")"""
+
+    def __repr__(self):
+        return f"<{str(self)}>"
+
     def to_str(self) -> str:
         return f"{self.txid.hex()}:{self.out_idx}"
 
@@ -450,7 +456,9 @@ class TxInput:
             d['witness'] = self.witness.hex()
         return d
 
-    def witness_elements(self) -> Sequence[bytes]:
+    def witness_elements(self)-> Sequence[bytes]:
+        if not self.witness:
+            return []
         vds = BCDataStream()
         vds.write(self.witness)
         n = vds.read_compact_size()
@@ -620,6 +628,21 @@ class OPPushDataGeneric:
     def check_data_len(cls, datalen: int) -> bool:
         # Opcodes below OP_PUSHDATA4 all just push data onto stack, and are equivalent.
         return opcodes.OP_PUSHDATA4 >= datalen >= 0
+
+    @classmethod
+    def is_instance(cls, item):
+        # accept objects that are instances of this class
+        # or other classes that are subclasses
+        return isinstance(item, cls) \
+               or (isinstance(item, type) and issubclass(item, cls))
+
+class OPGeneric:
+    def __init__(self, matcher: Callable=None):
+        if matcher is not None:
+            self.matcher = matcher
+
+    def match(self, op) -> bool:
+        return self.matcher(op)
 
     @classmethod
     def is_instance(cls, item):
@@ -1051,6 +1074,8 @@ class Transaction:
         if not txin.is_segwit():
             return construct_witness([])
 
+        if estimate_size and txin.witness_sizehint is not None:
+            return '00' * txin.witness_sizehint
         if _type in ('address', 'unknown') and estimate_size:
             _type = cls.guess_txintype_from_address(txin.address)
         pubkeys, sig_list = cls.get_siglist(txin, estimate_size=estimate_size)
@@ -1574,8 +1599,10 @@ class PartialTxInput(TxInput, PSBTSection):
         self._trusted_address = None  # type: Optional[str]
         self.block_height = None  # type: Optional[int]  # height at which the TXO is mined; None means unknown
         self.spent_height = None  # type: Optional[int]  # height at which the TXO got spent
+        self.spent_txid = None  # type: Optional[str]  # txid of the spender
         self._is_p2sh_segwit = None  # type: Optional[bool]  # None means unknown
         self._is_native_segwit = None  # type: Optional[bool]  # None means unknown
+        self.witness_sizehint = None  # type: Optional[int]  # byte size of serialized complete witness, for tx size est
 
     @property
     def _trusted_value_sats(self):
@@ -2167,7 +2194,7 @@ class PartialTransaction(Transaction):
 
     @classmethod
     def from_io(cls, inputs: Sequence[PartialTxInput], outputs: Sequence[PartialTxOutput], *, wallet = None,
-                locktime: int = None, version: int = None, for_swap = False):
+                locktime: int = None, version: int = None, BIP69_sort: bool = True, for_swap = False):
         self = cls()
         self._inputs = list(inputs)
         self._outputs = list(outputs)
@@ -2177,7 +2204,8 @@ class PartialTransaction(Transaction):
         if version is not None:
             self.version = version
         self.for_swap = for_swap
-        self.BIP69_sort()
+        if BIP69_sort:
+            self.BIP69_sort()
         return self
 
     def _serialize_psbt(self, fd) -> None:
@@ -2432,6 +2460,8 @@ class PartialTransaction(Transaction):
     def sign_txin(self, txin_index, privkey_bytes, *, bip143_shared_txdigest_fields=None) -> str:
         txin = self.inputs()[txin_index]
         txin.validate_data(for_signing=True)
+        sighash = txin.sighash if txin.sighash is not None else SIGHASH.ALL
+        sighash_type = sighash.to_bytes(length=1, byteorder="big").hex()
         pre_hash = sha256d(bfh(self.serialize_preimage(txin_index,
                                                        bip143_shared_txdigest_fields=bip143_shared_txdigest_fields)))
         privkey = ecc.ECPrivkey(privkey_bytes)
@@ -2500,10 +2530,7 @@ class PartialTransaction(Transaction):
                     continue
                 pubkey_hex = public_key.get_public_key_hex(compressed=True)
                 if pubkey_hex in pubkeys:
-                    try:
-                        public_key.verify_message_hash(sig_string, pre_hash)
-                    except Exception:
-                        _logger.exception('')
+                    if not public_key.verify_message_hash(sig_string, pre_hash):
                         continue
                     _logger.info(f"adding sig: txin_idx={i}, signing_pubkey={pubkey_hex}, sig={sig}")
                     self.add_signature_to_txin(txin_idx=i, signing_pubkey=pubkey_hex, sig=sig)

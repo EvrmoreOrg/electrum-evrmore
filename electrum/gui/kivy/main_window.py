@@ -18,7 +18,7 @@ from electrum.plugin import run_hook
 from electrum import util
 from electrum.util import (profiler, InvalidPassword, send_exception_to_crash_reporter,
                            format_satoshis, format_satoshis_plain, format_fee_satoshis,
-                           maybe_extract_bolt11_invoice)
+                           maybe_extract_bolt11_invoice, parse_max_spend)
 from electrum.invoices import PR_PAID, PR_FAILED
 from electrum import blockchain
 from electrum.network import Network, TxBroadcastError, BestEffortRequestFailed
@@ -28,6 +28,7 @@ from electrum.bitcoin import COIN
 
 from electrum.gui import messages
 from .i18n import _
+from .util import get_default_language
 from . import KIVY_GUI_PATH
 
 from kivy.app import App
@@ -403,7 +404,7 @@ class ElectrumWindow(App, Logger):
         Logger.__init__(self)
 
         self.electrum_config = config = kwargs.get('config', None)  # type: SimpleConfig
-        self.language = config.get('language', 'en')
+        self.language = config.get('language', get_default_language())
         self.network = network = kwargs.get('network', None)  # type: Network
         if self.network:
             self.num_blocks = self.network.get_local_height()
@@ -927,7 +928,7 @@ class ElectrumWindow(App, Logger):
             self.num_blocks = self.network.get_local_height()
             server_height = self.network.get_server_height()
             server_lag = self.num_blocks - server_height
-            if not self.wallet.up_to_date or server_height == 0:
+            if not self.wallet.is_up_to_date() or server_height == 0:
                 num_sent, num_answered = self.wallet.get_history_sync_state_details()
                 status = ("{} [size=18dp]({}/{})[/size]"
                           .format(_("Synchronizing..."), num_answered, num_sent))
@@ -951,7 +952,7 @@ class ElectrumWindow(App, Logger):
     def update_wallet_synchronizing_progress(self, *dt):
         if not self.wallet:
             return
-        if not self.wallet.up_to_date:
+        if not self.wallet.is_up_to_date():
             self._trigger_update_status()
 
     def get_max_amount(self):
@@ -989,8 +990,8 @@ class ElectrumWindow(App, Logger):
     def format_amount_and_units(self, x) -> str:
         if x is None:
             return 'none'
-        if x == '!':
-            return 'max'
+        if parse_max_spend(x):
+            return f'max({x})'
         # FIXME this is using format_satoshis_plain instead of config.format_amount
         #       as we sometimes convert the returned string back to numbers,
         #       via self.get_amount()... the need for converting back should be removed
@@ -1010,7 +1011,7 @@ class ElectrumWindow(App, Logger):
     #@profiler
     def update_wallet(self, *dt):
         self._trigger_update_status()
-        if self.wallet and (self.wallet.up_to_date or not self.network or not self.network.is_connected()):
+        if self.wallet and (self.wallet.is_up_to_date() or not self.network or not self.network.is_connected()):
             self.update_tabs()
 
     def notify(self, message):
@@ -1373,9 +1374,14 @@ class ElectrumWindow(App, Logger):
             if not grant_results or not grant_results[0]:
                 self.show_error(_("Cannot save backup without STORAGE permission"))
                 return
+            try:
+                backup_dir = util.android_backup_dir()
+            except OSError as e:
+                self.logger.exception("Cannot save backup")
+                self.show_error(f"Cannot save backup: {e!r}")
+                return
             # note: Clock.schedule_once is a hack so that we get called on a non-daemon thread
             #       (needed for WalletDB.write)
-            backup_dir = util.android_backup_dir()
             Clock.schedule_once(lambda dt: self._save_backup(backup_dir))
         request_permissions([Permission.WRITE_EXTERNAL_STORAGE], cb)
 

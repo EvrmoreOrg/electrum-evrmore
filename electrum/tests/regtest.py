@@ -7,9 +7,10 @@ class TestLightning(unittest.TestCase):
 
     @staticmethod
     def run_shell(args, timeout=30):
-        process = subprocess.Popen(['electrum/tests/regtest/regtest.sh'] + args, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
-        for line in iter(process.stdout.readline, b''):
-            sys.stdout.write(line.decode(sys.stdout.encoding))
+        process = subprocess.Popen(['electrum/tests/regtest/regtest.sh'] + args, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, universal_newlines=True)
+        for line in iter(process.stdout.readline, ''):
+            sys.stdout.write(line)
+            sys.stdout.flush()
         process.wait(timeout=timeout)
         process.stdout.close()
         assert process.returncode == 0
@@ -33,8 +34,18 @@ class TestLightning(unittest.TestCase):
             self.run_shell(['stop', agent])
 
 
+class TestUnixSockets(TestLightning):
+    agents = []
+
+    def test_unixsockets(self):
+        self.run_shell(['unixsockets'])
+
+
 class TestLightningAB(TestLightning):
     agents = ['alice', 'bob']
+
+    def test_collaborative_close(self):
+        self.run_shell(['collaborative_close'])
 
     def test_backup(self):
         self.run_shell(['backup'])

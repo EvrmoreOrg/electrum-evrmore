@@ -170,6 +170,7 @@ class JsonDB(Logger):
         """Serializes the DB as a string.
         'human_readable': makes the json indented and sorted, but this is ~2x slower
         """
+
         return json.dumps(
             self.data,
             indent=4 if human_readable else None,

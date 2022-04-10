@@ -154,12 +154,11 @@ class ElectrumGui(BaseElectrumGui, Logger):
         self.network_updated_signal_obj = QNetworkUpdatedSignalObject()
         self._num_wizards_in_progress = 0
         self._num_wizards_lock = threading.Lock()
-        self.dark_icon = self.config.get("dark_icon", False)
+        self.dark_icon = self.config.get("dark_icon", True)
         self.tray = None
         self._init_tray()
         self.app.new_window_signal.connect(self.start_new_window)
         self.app.quit_signal.connect(self.app.quit, Qt.QueuedConnection)
-        self.set_dark_theme_if_needed()
         # maybe set dark theme
         self._default_qtstylesheet = self.app.styleSheet()
         self.reload_app_stylesheet()
@@ -168,14 +167,11 @@ class ElectrumGui(BaseElectrumGui, Logger):
 
     def _init_tray(self):
         self.tray = QSystemTrayIcon(self.tray_icon(), None)
-        self.tray.setToolTip('Electrum')
+        self.tray.setToolTip('Electrum Ravencoin')
         self.tray.activated.connect(self.tray_activated)
         self.build_tray_menu()
         self.tray.show()
-
-    def set_dark_theme_if_needed(self):
-        use_dark_theme = self.config.get('qt_gui_color_theme', 'dark') == 'dark'
-        
+    
     def reload_app_stylesheet(self):
         """Set the Qt stylesheet and custom colors according to the user-selected
         light/dark theme.
@@ -186,7 +182,7 @@ class ElectrumGui(BaseElectrumGui, Logger):
              - in Coins tab, the color for "frozen" UTXOs, or
              - in TxDialog, the receiving/change address colors
         """
-        use_dark_theme = self.config.get('qt_gui_color_theme', 'default') == 'dark'
+        use_dark_theme = self.config.get('qt_gui_color_theme', 'dark') == 'dark'
         if use_dark_theme:
             try:
                 import qdarkstyle

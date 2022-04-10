@@ -238,8 +238,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.utxo_tab = self.create_utxo_tab()
         self.console_tab = self.create_console_tab()
         self.contacts_tab = self.create_contacts_tab()
-        self.messages_tab = self.create_messages_tab()
-        #self.swap_tab = self.create_swap_tab()
+        # self.messages_tab = self.create_messages_tab()
+        # self.swap_tab = self.create_swap_tab()
         # self.channels_tab = self.create_channels_tab()
 
         self.header_tracker = HeaderTracker()
@@ -265,7 +265,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             if self.config.get('show_{}_tab'.format(name), default):
                 tabs.addTab(tab, icon, description.replace("&", ""))
 
-        add_optional_tab(tabs, self.messages_tab, read_QIcon("tab_message.png"), _("Messages"), "messages")
+        #add_optional_tab(tabs, self.messages_tab, read_QIcon("tab_message.png"), _("Messages"), "messages")
         add_optional_tab(tabs, self.addresses_tab, read_QIcon("tab_addresses.png"), _("&Addresses"), "addresses")
         # add_optional_tab(tabs, self.channels_tab, read_QIcon("lightning.png"), _("Channels"), "channels")
         add_optional_tab(tabs, self.utxo_tab, read_QIcon("tab_coins.png"), _("Co&ins"), "utxo")
@@ -354,10 +354,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self._update_check_thread.checked.connect(on_version_received)
             self._update_check_thread.start()
 
-            self._dev_notification_thread = None
-            if config.get('get_dev_notifications', True):
-                self._dev_notification_thread = UpdateDevMessagesThread(self)
-                self._dev_notification_thread.start()
+            #self._dev_notification_thread = None
+            #if config.get('get_dev_notifications', True):
+            #    self._dev_notification_thread = UpdateDevMessagesThread(self)
+            #    self._dev_notification_thread.start()
 
     def run_coroutine_from_thread(self, coro, on_result=None):
         if self._cleaned_up:
@@ -846,7 +846,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             tab.menu_action = view_menu.addAction(item_name, lambda: self.toggle_tab(tab))
 
         view_menu = menubar.addMenu(_("&View"))
-        add_toggle_action(view_menu, self.messages_tab, True)
+        # add_toggle_action(view_menu, self.messages_tab)
         add_toggle_action(view_menu, self.addresses_tab)
         add_toggle_action(view_menu, self.utxo_tab)
         # add_toggle_action(view_menu, self.channels_tab)
@@ -1012,7 +1012,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         elif not self.wallet.is_up_to_date():
             # this updates "synchronizing" progress
             self.update_status()
-        self.request_list.refresh_status()
 
         # resolve aliases
         # FIXME this is a blocking network call that has a timeout of 5 sec
@@ -1698,6 +1697,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         run_hook('create_send_tab', grid)
         return w
 
+    # TODO: FIX THIS
     def create_messages_tab(self):
         from .messages_list import MessageList
         self.message_list = l = MessageList(self)

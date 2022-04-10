@@ -303,7 +303,6 @@ class Synchronizer(SynchronizerBase):
             self._stale_metadata[asset] = await self.taskgroup.spawn(disconnect_if_still_stale)
 
         else:
-
             # Verify information
             async def request_and_verify_metadata_against(height: int, tx_hash: str, idx: int, meta: Dict):
                 self._requests_sent += 1
@@ -318,7 +317,11 @@ class Synchronizer(SynchronizerBase):
                 tx = Transaction(raw_tx)
                 if tx_hash != tx.txid():
                     raise SynchronizerFailure(f"received tx does not match expected txid ({tx_hash} != {tx.txid()})")
-                await self.wallet.verifier.request_and_verfiy_proof(tx_hash, height)
+                
+                if height != -1:
+                    # Don't verify if mempool
+                    await self.wallet.verifier.request_and_verfiy_proof(tx_hash, height)
+                
                 try:
                     vout = tx.outputs()[idx]
                 except IndexError:
@@ -387,7 +390,6 @@ class Synchronizer(SynchronizerBase):
             data = result['ipfs'] if ipfs else None
             circulation = result['sats_in_circulation']
 
-            assert height != -1
             assert txid_o, asset
             meta = AssetMeta(asset, circulation, ownr, reis, divs, ipfs, data, height, s_type, txid_o, txid_prev_o)
 

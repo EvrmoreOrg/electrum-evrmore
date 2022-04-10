@@ -222,7 +222,7 @@ class AddressList(MyTreeView):
         label = self.wallet.get_label(address)
         num = self.wallet.get_address_history_len(address)
         c, u, x = self.wallet.get_addr_balance(address)
-        balance = c + u + x
+        balance = c.rvn_value + u.rvn_value + x.rvn_value
         balance_text = self.parent.format_amount(balance, whitespaces=True)
         # create item
         fx = self.parent.fx

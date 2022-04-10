@@ -1379,14 +1379,15 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         # prevent side-effect with '!'
         outputs = copy.deepcopy(outputs)
 
-        # check outputs
-        i_max = []
-        i_max_sum = 0
+         # check outputs
+        i_max = None
         for i, o in enumerate(outputs):
-            weight = parse_max_spend(o.value)
-            if weight:
-                i_max_sum += weight
-                i_max.append((weight, i))
+            if o.max:
+                if i_max is not None:
+                    raise Exception('Multi spend max')
+                i_max = i
+        if i_max and len([o for o in outputs if o.asset is None]) > 1:
+            raise Exception('Multi spend max')
 
         if fee is None and self.config.fee_per_kb() is None:
             raise NoDynamicFeeEstimates()

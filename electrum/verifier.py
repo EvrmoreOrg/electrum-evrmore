@@ -32,6 +32,7 @@ from .ravencoin import hash_decode, hash_encode
 from .transaction import Transaction
 from .blockchain import hash_header
 from .interface import GracefulDisconnect
+from .network import UntrustedServerReturnedError
 from . import constants
 
 if TYPE_CHECKING:
@@ -86,7 +87,7 @@ class SPV(NetworkJobOnDefaultServer):
             # if it's in the checkpoint region, we still might not have the header
             header = self.blockchain.read_header(tx_height)
             if header is None:
-                if tx_height < constants.net.max_checkpoint():
+                if tx_height < constants.net.max_dgw_checkpoint():
                     # FIXME these requests are not counted (self._requests_sent += 1)
                     await self.taskgroup.spawn(self.interface.request_chunk(tx_height, None, can_return_early=True))
                 continue
@@ -95,7 +96,7 @@ class SPV(NetworkJobOnDefaultServer):
             self.requested_merkle.add(tx_hash)
             await self.taskgroup.spawn(self._request_and_verify_single_proof, tx_hash, tx_height)
 
-    async def _request_and_verify_single_proof(self, tx_hash, tx_height):
+    async def request_and_verfiy_proof(self, tx_hash, tx_height):
         try:
             self._requests_sent += 1
             async with self._network_request_semaphore:

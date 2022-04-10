@@ -808,6 +808,8 @@ def format_satoshis(
         return 'unknown'
     if parse_max_spend(x):
         return f'max({x})'
+    if isinstance(x, Satoshis):
+        x = x.value
     assert isinstance(x, (int, float, Decimal)), f"{x!r} should be a number"
     # lose redundant precision
     x = Decimal(x).quantize(Decimal(10) ** (-precision))

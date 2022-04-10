@@ -92,6 +92,9 @@ class UpdateDevMessagesThread(QThread, Logger):
 
 
 class MessageList(MyTreeView):
+
+    # TODO: This needs to be fixed up
+
     class Columns(IntEnum):
         HEIGHT = 0
         FROM = 1

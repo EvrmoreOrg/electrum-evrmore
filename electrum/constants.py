@@ -75,8 +75,8 @@ class AbstractNet:
     GENESIS = None
     CHECKPOINTS = None
     DGW_CHECKPOINTS = None
-    DGW_CHECKPOINTS_SPACING = 2016
-    DGW_CHECKPOINTS_START = 168 * DGW_CHECKPOINTS_SPACING  #338_688
+    DGW_CHECKPOINTS_SPACING = 0
+    DGW_CHECKPOINTS_START = 0
 
     NET_NAME: str
     TESTNET: bool
@@ -118,6 +118,8 @@ class RavencoinMainnet(AbstractNet):
     DEFAULT_SERVERS = read_json('servers.json', {})
     CHECKPOINTS = read_json('checkpoints.json', [])
     DGW_CHECKPOINTS = read_json('checkpoints_dgw.json', [])
+    DGW_CHECKPOINTS_SPACING = 2016
+    DGW_CHECKPOINTS_START = 168 * DGW_CHECKPOINTS_SPACING  #338_688
 
     XPRV_HEADERS = {
         'standard': 0x0488ade4,  # xprv
@@ -180,7 +182,9 @@ class RavencoinTestnet(AbstractNet):
     DEFAULT_PORTS = {'t': '51001', 's': '51002'}
     DEFAULT_SERVERS = read_json('servers_testnet.json', {})
     CHECKPOINTS = []
-    DGW_CHECKPOINTS = []
+    DGW_CHECKPOINTS = read_json('checkpoints_dgw_testnet.json', [])
+    DGW_CHECKPOINTS_SPACING = 2016
+    DGW_CHECKPOINTS_START = 0
 
     XPRV_HEADERS = {
         'standard': 0x04358394,  # tprv

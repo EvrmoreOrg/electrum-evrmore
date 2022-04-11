@@ -218,7 +218,7 @@ def read_blockchains(config: 'SimpleConfig'):
         prev_hash = (64 - len(prev_hash)) * "0" + prev_hash  # left-pad with zeroes
         first_hash = (64 - len(first_hash)) * "0" + first_hash
         # forks below the max checkpoint are not allowed
-        if forkpoint <= constants.net.max_checkpoint():
+        if forkpoint <= constants.net.max_dgw_checkpoint() + 2016:
             delete_chain(filename, "deleting fork below max checkpoint")
             return
         # find parent (sorting by forkpoint guarantees it's already instantiated)

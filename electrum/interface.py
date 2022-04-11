@@ -748,7 +748,7 @@ class Interface(Logger):
             header = blockchain.deserialize_header(bfh(raw_header['hex']), height)
             self.tip_header = header
             self.tip = height
-            if self.tip < constants.net.max_checkpoint():
+            if self.tip < constants.net.max_dgw_checkpoint() + 2016:
                 raise GracefulDisconnect('server tip below max checkpoint')
             self._mark_ready()
             await self._process_header_at_tip()
@@ -787,7 +787,7 @@ class Interface(Logger):
                 could_connect, num_headers = await self.request_chunk(height, next_height)
 
                 if not could_connect:
-                    if height <= constants.net.max_checkpoint():
+                    if height <= constants.net.max_dgw_checkpoint() + 2016:
                         raise GracefulDisconnect('server chain conflicts with checkpoints or genesis')
                     last, height = await self.step(height)
                     continue

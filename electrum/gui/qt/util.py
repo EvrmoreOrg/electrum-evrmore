@@ -69,68 +69,6 @@ TRANSACTION_FILE_EXTENSION_FILTER_SEPARATE = (f"{TRANSACTION_FILE_EXTENSION_FILT
                                               f"All files (*)")
 
 
-class HeaderTracker(QLabel):
-    def __init__(self):
-        super().__init__()
-
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_timer)
-        self.start = time.time()
-        self.headers_start = -1
-        self.local_height = -1
-        self.server_height = -1
-        self.last_eta = '...'
-
-        self.loading_chars = u'\U0001f311\U0001f312\U0001f313\U0001f314\U0001f315\U0001f316\U0001f317\U0001f318'
-        self.loading_pointer = 0
-        self.current_char = self.loading_chars[self.loading_pointer]
-
-        self.begin()
-
-    def calculate_stats(self, local_height, server_height):
-
-        if self.headers_start < 0:
-            self.headers_start = local_height
-
-        sec_delta = time.time() - self.start
-        headers_left = server_height - local_height
-        header_delta = local_height - self.headers_start
-
-        eta = self.last_eta
-
-        if headers_left != 0 and sec_delta != 0 and header_delta != 0:
-            secs = sec_delta / header_delta * headers_left
-            eta = str(datetime.timedelta(seconds=round(secs)))
-
-        self.last_eta = eta
-
-        self.local_height = local_height
-        self.server_height = server_height
-
-        self.update()
-
-    def update(self):
-        if self.local_height == -1 or self.server_height == -1:
-            self.setText(_('Synchronizing Headers (Waiting for connection...)'))
-        else:
-            self.setText(_('Synchronizing Headers {} {}/{} | Estimated Time Until Completion: {} | '
-                       'Headers Are Used To Verify Information').format(
-                self.current_char, self.local_height, self.server_height, self.last_eta))
-
-    def update_timer(self):
-        self.current_char = c = self.loading_chars[self.loading_pointer]
-
-        self.loading_pointer += 1
-        self.loading_pointer %= len(self.loading_chars)
-
-        self.update()
-
-    def begin(self):
-        self.timer.start(100)
-
-    def finished(self):
-        self.timer.stop()
-
 
 class EnterButton(QPushButton):
     def __init__(self, text, func):

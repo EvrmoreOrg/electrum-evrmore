@@ -258,6 +258,8 @@ _CHAINWORK_CACHE = {
     "0000000000000000000000000000000000000000000000000000000000000000": 0,  # virtual block at height -1
 }  # type: Dict[str, int]
 
+if len(constants.net.DGW_CHECKPOINTS) > 0:
+    _CHAINWORK_CACHE[constants.net.DGW_CHECKPOINTS[-1][1][0]] = 0  # set start of cache to 0 work
 
 def init_headers_file_for_best_chain():
     b = get_best_chain()
@@ -557,7 +559,7 @@ class Blockchain(Logger):
         self.write(parent_data, 0)
         parent.write(my_data, (forkpoint - parent.forkpoint) * POST_KAWPOW_HEADER_SIZE)
         # swap parameters
-        self.parent, parent.parent = parent.parent, self  # type: Optional[Blockchain], Optional[Blockchain]
+        self.parent, parent.parent = parent.parent, self
         self.forkpoint, parent.forkpoint = parent.forkpoint, self.forkpoint
         self._forkpoint_hash, parent._forkpoint_hash = parent._forkpoint_hash, hash_raw_header(
             bh2u(parent_data[:POST_KAWPOW_HEADER_SIZE]))
@@ -832,12 +834,20 @@ class Blockchain(Logger):
     # TODO: Take a better look at this for DWG
     @with_lock
     def get_chainwork(self, height=None) -> int:
+
         if height is None:
             height = max(0, self.height())
         if constants.net.TESTNET:
             # On testnet/regtest, difficulty works somewhat different.
             # It's out of scope to properly implement that.
             return height
+
+        # With DGW checkpoints, we cannot determine the work on the blocks between
+        # Since we cannot fork below the checkpoints, lets just set chainwork under them
+        # to 0
+        if height < constants.net.max_dgw_checkpoint() + 2016:
+            return 0
+
         # We want to calculate chainwork from 0.
         # Lets use bitcoin chunks for arbitrary checkpoints
         last_retarget = height // 2016 * 2016 - 1

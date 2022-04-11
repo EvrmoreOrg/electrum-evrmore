@@ -305,7 +305,13 @@ class AddressSynchronizer(Logger):
             # When this method exits, there must NOT be any conflict, so
             # either keep this txn and remove all conflicting (along with dependencies)
             #     or drop this txn
-            conflicting_txns = self.get_conflicting_transactions(tx_hash, tx)
+            
+            no_verify = self.verifier.blockchain.config.get('noverify')
+            if no_verify:
+                print(f'Skipping conflicting txs for tx {tx_hash}')
+                conflicting_txns = {}
+            else:
+                conflicting_txns = self.get_conflicting_transactions(tx_hash, tx)
             if conflicting_txns:
                 existing_mempool_txn = any(
                     self.get_tx_height(tx_hash2).height in (TX_HEIGHT_UNCONFIRMED, TX_HEIGHT_UNCONF_PARENT)

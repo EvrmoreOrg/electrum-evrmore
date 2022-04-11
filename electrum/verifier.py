@@ -131,24 +131,33 @@ class SPV(NetworkJobOnDefaultServer):
         return header, pos
 
     async def _request_and_verify_single_proof(self, tx_hash, tx_height):
-        try:
-            header, pos = await self.request_and_verfiy_proof(tx_hash, tx_height)
-        except UntrustedServerReturnedError as e:
-            if not isinstance(e.original_exception, aiorpcx.jsonrpc.RPCError):
-                raise
-            self.logger.info(f'tx {tx_hash} not at height {tx_height}')
-            self.wallet.remove_unverified_tx(tx_hash, tx_height)
-            self.requested_merkle.discard(tx_hash)
-            return
+        no_verify = self.blockchain.config.get('noverify')
+        if no_verify:
+            self.logger.error(f'Skipping merkle verification for {tx_hash}')
+            timestamp = 0
+            header_hash = bytes(32).hex()
+            pos = 0
+        else:
+            try:
+                header, pos = await self.request_and_verfiy_proof(tx_hash, tx_height)
+            except UntrustedServerReturnedError as e:
+                if not isinstance(e.original_exception, aiorpcx.jsonrpc.RPCError):
+                    raise
+                self.logger.info(f'tx {tx_hash} not at height {tx_height}')
+                self.wallet.remove_unverified_tx(tx_hash, tx_height)
+                self.requested_merkle.discard(tx_hash)
+                return
 
-        # we passed all the tests
-        self.merkle_roots[tx_hash] = header.get('merkle_root')
-        self.logger.info(f"verified {tx_hash}")
+            # we passed all the tests
+            self.merkle_roots[tx_hash] = header.get('merkle_root')
+            self.logger.info(f"verified {tx_hash}")
+
+            header_hash = hash_header(header)
+            timestamp = header.get('timestamp')
+            
         self.requested_merkle.discard(tx_hash)
-
-        header_hash = hash_header(header)
         tx_info = TxMinedInfo(height=tx_height,
-                              timestamp=header.get('timestamp'),
+                              timestamp=timestamp,
                               txpos=pos,
                               header_hash=header_hash)
         self.wallet.add_verified_tx(tx_hash, tx_info)

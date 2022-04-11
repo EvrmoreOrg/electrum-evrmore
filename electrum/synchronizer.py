@@ -324,7 +324,10 @@ class Synchronizer(SynchronizerBase):
                     #print(f'requesting chunk from height for assets {height}')
                     await self.taskgroup.spawn(self.interface.request_chunk(height, None, can_return_early=True))
 
-                if height != -1:
+                no_verify = self.interface.blockchain.config.get('noverify')
+                if no_verify:
+                    self.logger.error(f'Skipping verification for asset {asset}')
+                if height != -1 and not no_verify:
                     # Don't verify if mempool
                     try:
                         await self.wallet.verifier.request_and_verfiy_proof(tx_hash, height)

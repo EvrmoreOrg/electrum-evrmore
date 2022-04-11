@@ -746,7 +746,6 @@ def get_script_type_from_output_script(_bytes: bytes) -> Optional[str]:
         return 'p2wsh'
     if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2PK):
         return 'p2pk'
-    print('Check all and none')
     return None
 
 
@@ -1855,7 +1854,6 @@ class PartialTxInput(TxInput, PSBTSection):
     def set_script_type(self) -> None:
         if self.scriptpubkey is None:
             return
-        print(f'Setting type for {self.prevout} {self.scriptpubkey}')
         type = get_script_type_from_output_script(self.scriptpubkey)
         inner_type = None
         if type is not None:

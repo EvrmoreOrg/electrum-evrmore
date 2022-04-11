@@ -55,27 +55,15 @@ function DoCodeSignMaybe { # ARGS: infoName fileOrDirName
         # no cert -> we won't codesign
         return
     fi
+    if [ -d "$file" ]; then
+        deep="--deep"
+    fi
     if [ -z "$infoName" ] || [ -z "$file" ] || [ ! -e "$file" ]; then
         fail "Argument error to internal function DoCodeSignMaybe()"
     fi
-    hardened_arg="--timestamp --entitlements=${CONTRIB_OSX}/entitlements.plist -o runtime"
+    hardened_arg="--entitlements=${CONTRIB_OSX}/entitlements.plist -o runtime"
 
     info "Code signing ${infoName}..."
-    if [ -d "$file" ]; then
-        #https://github.com/nuxeo/nuxeo-drive/blob/c87b627361d73590d810bfde68d33e2b30c2530f/tools/osx/deploy_ci_agent.sh#L108-L133
-
-        find "${file}/Contents/MacOS" -type f -exec codesign -f -v -s "$CODESIGN_CERT" $hardened_arg {} \;
-        
-        find "${file}/Contents/Resources" -type f -name "*.dylib" -exec codesign -f -v -s "$CODESIGN_CERT" $hardened_arg {} \;
-        
-        codesign -f -v -s "$CODESIGN_CERT" $hardened_arg "${file}";
-
-        echo ">>> [sign] Verifying code signature"
-        codesign --display --verbose "${file}"
-        codesign --verbose=4 --deep --strict "${file}"
-        #fspctl --assess --verbose "${file}"
-        return
-    fi
     codesign -f -v $deep -s "$CODESIGN_CERT" $hardened_arg "$file" || fail "Could not code sign ${infoName}"
 }
 

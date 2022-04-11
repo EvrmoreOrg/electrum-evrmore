@@ -704,11 +704,22 @@ def match_script_against_template(script, template) -> bool:
             script = [x for x in script_GetOp(script)]
         except MalformedBitcoinScript:
             return False
+
+    # Chop off assets
+    op_rvn_asset = len(script)
+    for i in range(len(script)):
+        # print(f'Checking OPCODE {script_item[0]} {int(opcodes.OP_RVN_ASSET)}')
+        if script[i][0] == int(opcodes.OP_RVN_ASSET): # Don't check past op RVN asset
+            op_rvn_asset = i
+            break
+    script = script[:op_rvn_asset]
+    
     if len(script) != len(template):
         return False
     for i in range(len(script)):
         template_item = template[i]
         script_item = script[i]
+       
         if OPPushDataGeneric.is_instance(template_item) and template_item.check_data_len(script_item[0]):
             continue
         if OPGeneric.is_instance(template_item) and template_item.match(script_item[0]):
@@ -735,6 +746,7 @@ def get_script_type_from_output_script(_bytes: bytes) -> Optional[str]:
         return 'p2wsh'
     if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2PK):
         return 'p2pk'
+    print('Check all and none')
     return None
 
 
@@ -756,7 +768,7 @@ def is_output_script_p2pk(_bytes: bytes) -> bool:
     return False
 
 
-def is_asset_output_script_malformed(_bytes: bytes) -> bool:
+def is_asset_output_script_malformed_or_non_standard(_bytes: bytes) -> bool:
     try:
         raw_decoded = [x for x in script_GetOp(_bytes)]
     except MalformedBitcoinScript:
@@ -780,6 +792,7 @@ def is_asset_output_script_malformed(_bytes: bytes) -> bool:
         assert len(asset_name) == asset_name_len
         if script_type != b'o':
             asset_portion.read_int64()
+            # We store reissues & restricted assets
             if script_type == b'q':
                 if asset_portion.read_bytes(3)[2] == 1:
                     asset_portion.read_bytes(34)
@@ -788,8 +801,10 @@ def is_asset_output_script_malformed(_bytes: bytes) -> bool:
                 if asset_portion.can_read_more():
                     asset_portion.read_bytes(34)
             elif script_type == b't':
-                if asset_portion.can_read_more():
-                    asset_portion.read_bytes(34)
+                pass
+                # We cannot know what the ipfs message is
+                # if asset_portion.can_read_more():
+                #    asset_portion.read_bytes(34)
             else:
                 return True
         if asset_portion.can_read_more():
@@ -1153,7 +1168,7 @@ class Transaction:
             redeem_script = ravencoin.p2wsh_nested_script(witness_script)
             script = construct_script([redeem_script])
         else:
-            raise UnknownTxinType(f'cannot construct scriptSig for txin_type: {_type}')
+            raise UnknownTxinType(f'cannot construct scriptSig for txin_type: {_type} {txin.scriptpubkey}')
 
         return script
 
@@ -1840,6 +1855,7 @@ class PartialTxInput(TxInput, PSBTSection):
     def set_script_type(self) -> None:
         if self.scriptpubkey is None:
             return
+        print(f'Setting type for {self.prevout} {self.scriptpubkey}')
         type = get_script_type_from_output_script(self.scriptpubkey)
         inner_type = None
         if type is not None:

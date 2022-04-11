@@ -34,7 +34,7 @@ from .assets import pull_meta_from_create_or_reissue_script
 from .ravencoin import COINBASE_MATURITY
 from .util import profiler, bfh, TxMinedInfo, UnrelatedTransactionException, with_lock, OldTaskGroup
 from .transaction import Transaction, TxOutput, TxInput, PartialTxInput, TxOutpoint, PartialTransaction, AssetMeta, \
-    RavenValue, is_output_script_p2pk, is_asset_output_script_malformed
+    RavenValue, is_output_script_p2pk, is_asset_output_script_malformed_or_non_standard
 from .synchronizer import Synchronizer
 from .verifier import SPV
 
@@ -371,7 +371,7 @@ class AddressSynchronizer(Logger):
                                 self.db.add_asset_reissue_point(asset, ser, txo.scriptpubkey.hex())
                         except:
                             pass
-                        if is_asset_output_script_malformed(txo.scriptpubkey):
+                        if is_asset_output_script_malformed_or_non_standard(txo.scriptpubkey):
                             self.db.add_nonstandard_outpoint(ser, txo.scriptpubkey.hex())
 
                     if is_output_script_p2pk(txo.scriptpubkey):

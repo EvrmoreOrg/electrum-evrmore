@@ -322,7 +322,7 @@ class Synchronizer(SynchronizerBase):
                 header = self.interface.blockchain.read_header(height)
                 if header is None:
                     #print(f'requesting chunk from height for assets {height}')
-                    await self.interface.request_chunk(height, None, can_return_early=True)
+                    await self.taskgroup.spawn(self.interface.request_chunk(height, None, can_return_early=True))
 
                 if height != -1:
                     # Don't verify if mempool

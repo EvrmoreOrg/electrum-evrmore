@@ -472,7 +472,7 @@ class Blockchain(Logger):
     @with_lock
     def save_chunk(self, start_height: int, chunk: bytes):
         assert start_height >= 0, start_height
-        chunk_within_checkpoint_region = start_height < nDGWActivationBlock
+        chunk_within_checkpoint_region = start_height < constants.net.max_dgw_checkpoint() + 2016
         # chunks in checkpoint region are the responsibility of the 'main chain'
         if chunk_within_checkpoint_region and self.parent is not None:
             main_chain = get_best_chain()

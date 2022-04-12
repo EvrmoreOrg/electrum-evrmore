@@ -401,7 +401,7 @@ class HistoryModel(CustomModel, Logger):
             capital_gain = tx_item.get('capital_gain')
 
             if value.rvn_value != 0:
-                asset_name = None
+                asset_name = 'RVN'
                 amount = value.rvn_value
                 balance = tx_item['balance'].rvn_value
                 node_data = HistoryNodeData(

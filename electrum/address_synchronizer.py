@@ -668,7 +668,7 @@ class AddressSynchronizer(Logger):
 
     def add_verified_asset_meta(self, asset: str, meta: AssetMeta):
         with self.lock:
-            self.unverified_asset_meta.pop(asset, meta)
+            self.unverified_asset_meta.pop(asset)
             self.db.add_asset_meta(asset, meta)
         util.trigger_callback('asset_meta')
 

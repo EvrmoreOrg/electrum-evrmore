@@ -59,6 +59,7 @@ class SPV(NetworkJobOnDefaultServer):
         super()._reset()
         self.merkle_roots = {}  # txid -> merkle root (once it has been verified)
         self.requested_merkle = set()  # txid set of pending requests
+        self.requested_assets = set()  # asset string set of pending requests
 
     async def _run_tasks(self, *, taskgroup):
         await super()._run_tasks(taskgroup=taskgroup)
@@ -109,7 +110,7 @@ class SPV(NetworkJobOnDefaultServer):
             try:
                 async with self._network_request_semaphore:
                     raw_tx = await self.interface.get_transaction(tx_hash)
-            except aiorpcx.RPCError as e:
+            except aiorpcx.jsonrpc.RPCError as e:
                 # most likely, "No such mempool or blockchain transaction"
                 raise
             finally:
@@ -165,8 +166,13 @@ class SPV(NetworkJobOnDefaultServer):
                 prev_txid = prev_source['tx_hash']
                 prev_idx = prev_source['tx_pos']
                 txid_prev_o = TxOutpoint(bfh(prev_txid), prev_idx)
-                await request_and_verify_metadata_against(asset, prev_height, prev_txid, prev_idx,
+                try:
+                    await request_and_verify_metadata_against(asset, prev_height, prev_txid, prev_idx,
                                                           {'divisions': result['divisions']})
+                except Exception:
+                    self.requested_assets.discard(asset)
+                    return
+
                 d = dict()
                 d['reissuable'] = result['reissuable']
                 d['has_ipfs'] = result['has_ipfs']
@@ -177,7 +183,11 @@ class SPV(NetworkJobOnDefaultServer):
                 txid = source['tx_hash']
                 idx = source['tx_pos']
                 txid_o = TxOutpoint(bfh(txid), idx)
-                s_type = await request_and_verify_metadata_against(asset, height, txid, idx, d)
+                try:
+                    s_type = await request_and_verify_metadata_against(asset, height, txid, idx, d)
+                except Exception:
+                    self.requested_assets.discard(asset)
+                    return
             else:
                 prev_height = None
                 height = source['height']
@@ -191,7 +201,11 @@ class SPV(NetworkJobOnDefaultServer):
                 d['sats_in_circulation'] = result['sats_in_circulation']
                 if d['has_ipfs']:
                     d['ipfs'] = result['ipfs']
-                s_type = await request_and_verify_metadata_against(asset, height, txid, idx, d)
+                try:
+                    s_type = await request_and_verify_metadata_against(asset, height, txid, idx, d)
+                except Exception:
+                    self.requested_assets.discard(asset)
+                    return
 
             divs = result['divisions']
             reis = False if result['reissuable'] == 0 else True
@@ -201,11 +215,16 @@ class SPV(NetworkJobOnDefaultServer):
 
             assert txid_o, asset
             meta = AssetMeta(asset, circulation, ownr, reis, divs, ipfs, data, height, prev_height, s_type, txid_o, txid_prev_o)
+            self.requested_assets.discard(asset)
             self.wallet.add_verified_asset_meta(asset, meta)
 
         for asset, asset_meta in unverified.items():
             largest_height = asset_meta['source']['height']
             prev_height = asset_meta['source_prev']['height'] if 'source_prev' in asset_meta else None
+            
+            # do not request merkle branch if we already requested it
+            if asset in self.requested_assets:
+                continue
             # or before headers are available
             if not (0 < largest_height <= local_height):
                 continue
@@ -229,6 +248,7 @@ class SPV(NetworkJobOnDefaultServer):
 
             # request now
             self.logger.info(f'requested asset {asset}')
+            self.requested_assets.add(asset)
             await self.taskgroup.spawn(parse_and_verify(asset, asset_meta))
 
 

@@ -1504,7 +1504,7 @@ class WalletDB(JsonDB):
             items = v.items()
             if len(items) != 0:
                 _, t = list(items)[0]
-                if len(t) != 11:
+                if len(t) != 12:
                     return dict()
             v = dict((k, AssetMeta(name, amt, ownr, reis, div, ipfs, data, height, prev_height, t,
                                    TxOutpoint.from_str('{}:{}'.format(s[0], s[1])),

@@ -26,10 +26,11 @@ from typing import Sequence, Optional, TYPE_CHECKING
 
 import aiorpcx
 
-from .util import bh2u, TxMinedInfo, NetworkJobOnDefaultServer
+from .assets import pull_meta_from_create_or_reissue_script, BadAssetScript
+from .util import bh2u, TxMinedInfo, NetworkJobOnDefaultServer, bfh
 from .crypto import sha256d
 from .ravencoin import hash_decode, hash_encode
-from .transaction import Transaction
+from .transaction import Transaction, TxOutpoint, AssetMeta
 from .blockchain import hash_header
 from .interface import GracefulDisconnect
 from .network import UntrustedServerReturnedError
@@ -44,6 +45,7 @@ class MerkleVerificationFailure(Exception): pass
 class MissingBlockHeader(MerkleVerificationFailure): pass
 class MerkleRootMismatch(MerkleVerificationFailure): pass
 class InnerNodeOfSpvProofIsValidTx(MerkleVerificationFailure): pass
+class AssetVerification(MerkleVerificationFailure): pass
 
 
 class SPV(NetworkJobOnDefaultServer):
@@ -71,6 +73,7 @@ class SPV(NetworkJobOnDefaultServer):
         while True:
             await self._maybe_undo_verifications()
             await self._request_proofs()
+            await self._request_asset_proofs()
             await asyncio.sleep(0.1)
 
     async def _request_proofs(self):
@@ -96,6 +99,138 @@ class SPV(NetworkJobOnDefaultServer):
             self.logger.info(f'requested merkle {tx_hash}')
             self.requested_merkle.add(tx_hash)
             await self.taskgroup.spawn(self._request_and_verify_single_proof, tx_hash, tx_height)
+
+    async def _request_asset_proofs(self):
+        local_height = self.blockchain.height()
+        unverified = self.wallet.get_unverified_asset_metas()
+
+        async def request_and_verify_metadata_against(asset, height: int, tx_hash: str, idx: int, meta: dict):
+            self._requests_sent += 1
+            try:
+                async with self._network_request_semaphore:
+                    raw_tx = await self.interface.get_transaction(tx_hash)
+            except aiorpcx.RPCError as e:
+                # most likely, "No such mempool or blockchain transaction"
+                raise
+            finally:
+                self._requests_answered += 1
+            tx = Transaction(raw_tx)
+            if tx_hash != tx.txid():
+                raise MerkleVerificationFailure(f"received tx does not match expected txid for ({tx_hash} != {tx.txid()})")
+            
+            no_verify = self.interface.blockchain.config.get('noverify')
+            if no_verify:
+                self.logger.error(f'Skipping verification for asset {asset}')
+            if not no_verify:
+                try:
+                    await self.wallet.verifier.request_and_verfiy_proof(tx_hash, height)
+                except UntrustedServerReturnedError as e:
+                    if not isinstance(e.original_exception, aiorpcx.jsonrpc.RPCError):
+                        raise
+                    self.logger.info(f'tx {tx_hash} not at height {height}')
+                    return
+            try:
+                vout = tx.outputs()[idx]
+            except IndexError:
+                raise AssetVerification(f"Non-existant vout {idx}")
+            script = vout.scriptpubkey
+            try:
+                data = pull_meta_from_create_or_reissue_script(script)
+            except (BadAssetScript, IndexError) as e:
+                print(e)
+                raise AssetVerification(f"Bad asset script {script})")
+            if data['name'] != asset:
+                raise AssetVerification(f"Not our asset! {asset} vs {data['name']}")
+            for key, value in meta.items():
+                if data['type'] == 'r' and key == 'sats_in_circulation':
+                    if data[key] > value:
+                        raise AssetVerification(f"Reissued amount is greater than the total amount: {value}, {data['name']}")
+                elif data[key] != value:
+                    raise AssetVerification(f"Metadata mismatch: {value} vs {data[key]}")
+            return data['type']
+
+        async def parse_and_verify(asset, result):
+            ownr = asset[-1] == '!'
+            height = -1
+            txid_prev_o = None
+            txid_o = None
+
+            prev_source = result.get('source_prev', None)
+            source = result['source']
+            og = self.wallet.get_asset_meta(asset)
+            if og and og.height > source['height']:
+                raise AssetVerification(f"Server is trying to send old asset data")
+            if prev_source:
+                prev_height = prev_source['height']
+                prev_txid = prev_source['tx_hash']
+                prev_idx = prev_source['tx_pos']
+                txid_prev_o = TxOutpoint(bfh(prev_txid), prev_idx)
+                await request_and_verify_metadata_against(asset, prev_height, prev_txid, prev_idx,
+                                                          {'divisions': result['divisions']})
+                d = dict()
+                d['reissuable'] = result['reissuable']
+                d['has_ipfs'] = result['has_ipfs']
+                d['sats_in_circulation'] = result['sats_in_circulation']
+                if d['has_ipfs']:
+                    d['ipfs'] = result['ipfs']
+                height = source['height']
+                txid = source['tx_hash']
+                idx = source['tx_pos']
+                txid_o = TxOutpoint(bfh(txid), idx)
+                s_type = await request_and_verify_metadata_against(asset, height, txid, idx, d)
+            else:
+                prev_height = None
+                height = source['height']
+                txid = source['tx_hash']
+                idx = source['tx_pos']
+                txid_o = TxOutpoint(bfh(txid), idx)
+                d = dict()
+                d['divisions'] = result['divisions']
+                d['reissuable'] = result['reissuable']
+                d['has_ipfs'] = result['has_ipfs']
+                d['sats_in_circulation'] = result['sats_in_circulation']
+                if d['has_ipfs']:
+                    d['ipfs'] = result['ipfs']
+                s_type = await request_and_verify_metadata_against(asset, height, txid, idx, d)
+
+            divs = result['divisions']
+            reis = False if result['reissuable'] == 0 else True
+            ipfs = False if result['has_ipfs'] == 0 else True
+            data = result['ipfs'] if ipfs else None
+            circulation = result['sats_in_circulation']
+
+            assert txid_o, asset
+            meta = AssetMeta(asset, circulation, ownr, reis, divs, ipfs, data, height, prev_height, s_type, txid_o, txid_prev_o)
+            self.wallet.add_verified_asset_meta(asset, meta)
+
+        for asset, asset_meta in unverified.items():
+            largest_height = asset_meta['source']['height']
+            prev_height = asset_meta['source_prev']['height'] if 'source_prev' in asset_meta else None
+            # or before headers are available
+            if not (0 < largest_height <= local_height):
+                continue
+            # if it's in the checkpoint region, we still might not have the header
+            header = self.blockchain.read_header(largest_height)
+            if header is None:
+                if largest_height < constants.net.max_dgw_checkpoint():
+                    # FIXME these requests are not counted (self._requests_sent += 1)
+                    await self.taskgroup.spawn(self.interface.request_chunk(largest_height, None, can_return_early=True))
+                    # await self.interface.request_chunk(tx_height, None, can_return_early=True)
+                continue
+
+            if prev_height:
+                prev_header = self.blockchain.read_header(prev_height)
+                if prev_header is None:
+                    if prev_height < constants.net.max_dgw_checkpoint():
+                        # FIXME these requests are not counted (self._requests_sent += 1)
+                        await self.taskgroup.spawn(self.interface.request_chunk(prev_height, None, can_return_early=True))
+                        # await self.interface.request_chunk(tx_height, None, can_return_early=True)
+                    continue
+
+            # request now
+            self.logger.info(f'requested asset {asset}')
+            await self.taskgroup.spawn(parse_and_verify(asset, asset_meta))
+
 
     async def request_and_verfiy_proof(self, tx_hash, tx_height):
         try:

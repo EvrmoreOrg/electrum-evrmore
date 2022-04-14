@@ -391,6 +391,7 @@ class AssetMeta(NamedTuple):
     has_ipfs: bool
     ipfs_str: Optional[str]
     height: int
+    prev_height: Optional[int]
     source_type: str  #q, r, o
     source_outpoint: TxOutpoint
     source_prev_outpoint: Optional[TxOutpoint]

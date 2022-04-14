@@ -773,7 +773,7 @@ class AssetReissueWorkspace(QWidget):
                             reis = False if m['reissuable'] == 0 else True
                             data = m.get('ipfs', None)
                             circulation = m['sats_in_circulation']
-                        self.current_asset_meta = AssetMeta(asset, circulation, False, reis, divs, bool(data), data, -1, '', None, None)
+                        self.current_asset_meta = AssetMeta(asset, circulation, False, reis, divs, bool(data), data, -1, None, '', None, None)
 
                         r = reis
 

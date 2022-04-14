@@ -56,7 +56,7 @@ NEW_SEED_VERSION = 11       # electrum versions >= 2.0
 #FINAL_SEED_VERSION = 41     # electrum >= 2.7 will set this to prevent
                             # old versions from overwriting new format
 
-FINAL_SEED_VERSION = 44  # Rewrites wallet to support assets
+FINAL_SEED_VERSION = 45  # Rewrites wallet to support assets
 
 class TxFeesValue(NamedTuple):
     fee: Optional[int] = None
@@ -194,6 +194,7 @@ class WalletDB(JsonDB):
         self._convert_version_42()
         self._convert_version_43()
         self._convert_version_44()
+        self._convert_version_45()
 
         self.put('seed_version', FINAL_SEED_VERSION)  # just to be sure
         self._after_upgrade_tasks()
@@ -922,6 +923,13 @@ class WalletDB(JsonDB):
             item['channel_type'] = channel_type
         self.data['seed_version'] = 44
 
+    def _convert_version_45(self):
+        if not self._is_upgrade_method_needed(44, 44):
+            return
+        # reset and redownload asset meta
+        self.data.pop('asset_meta', {})
+        self.data['seed_version'] = 45
+
     def _convert_imported(self):
         if not self._is_upgrade_method_needed(0, 13):
             return
@@ -1498,10 +1506,10 @@ class WalletDB(JsonDB):
                 _, t = list(items)[0]
                 if len(t) != 11:
                     return dict()
-            v = dict((k, AssetMeta(name, amt, ownr, reis, div, ipfs, data, height, t,
+            v = dict((k, AssetMeta(name, amt, ownr, reis, div, ipfs, data, height, prev_height, t,
                                    TxOutpoint.from_str('{}:{}'.format(s[0], s[1])),
                                    TxOutpoint.from_str('{}:{}'.format(s_p[0], s_p[1])) if s_p else None))
-                     for k, (name, amt, ownr, reis, div, ipfs, data, height, t, s, s_p) in items)
+                     for k, (name, amt, ownr, reis, div, ipfs, data, height, prev_height, t, s, s_p) in items)
                      
         # convert keys to HTLCOwner
         if key == 'log' or (path and path[-1] in ['locked_in', 'fails', 'settles']):

@@ -31,7 +31,6 @@ import logging
 from aiorpcx import run_in_thread, RPCError
 
 from . import util
-from .assets import pull_meta_from_create_or_reissue_script, BadAssetScript
 from .transaction import Transaction, PartialTransaction, AssetMeta, RavenValue, TxOutpoint
 from .util import bh2u, make_aiohttp_session, NetworkJobOnDefaultServer, random_shuffled_copy, bfh, OldTaskGroup
 from .ravencoin import address_to_scripthash, is_address
@@ -303,110 +302,8 @@ class Synchronizer(SynchronizerBase):
             self._stale_metadata[asset] = await self.taskgroup.spawn(disconnect_if_still_stale)
 
         else:
-            # Verify information
-            async def request_and_verify_metadata_against(height: int, tx_hash: str, idx: int, meta: Dict):
-                self._requests_sent += 1
-                try:
-                    async with self._network_request_semaphore:
-                        raw_tx = await self.interface.get_transaction(tx_hash)
-                except RPCError as e:
-                    # most likely, "No such mempool or blockchain transaction"
-                    raise
-                finally:
-                    self._requests_answered += 1
-                tx = Transaction(raw_tx)
-                if tx_hash != tx.txid():
-                    raise SynchronizerFailure(f"received tx does not match expected txid ({tx_hash} != {tx.txid()})")
-                
-                # if it's in the checkpoint region, we still might not have the header
-                header = self.interface.blockchain.read_header(height)
-                if header is None:
-                    #print(f'requesting chunk from height for assets {height}')
-                    await self.taskgroup.spawn(self.interface.request_chunk(height, None, can_return_early=True))
-
-                no_verify = self.interface.blockchain.config.get('noverify')
-                if no_verify:
-                    self.logger.error(f'Skipping verification for asset {asset}')
-                if height != -1 and not no_verify:
-                    # Don't verify if mempool
-                    try:
-                        await self.wallet.verifier.request_and_verfiy_proof(tx_hash, height)
-                    except GracefulDisconnect as e:
-                        raise SynchronizerFailure(f'Verify proof failure for asset')
-                
-                try:
-                    vout = tx.outputs()[idx]
-                except IndexError:
-                    raise SynchronizerFailure(f"Non-existant vout {idx}")
-                script = vout.scriptpubkey
-                try:
-                    data = pull_meta_from_create_or_reissue_script(script)
-                except (BadAssetScript, IndexError) as e:
-                    print(e)
-                    raise SynchronizerFailure(f"Bad asset script {script})")
-                if data['name'] != asset:
-                    raise SynchronizerFailure(f"Not our asset! {asset} vs {data['name']}")
-                for key, value in meta.items():
-                    if data['type'] == 'r' and key == 'sats_in_circulation':
-                        if data[key] > value:
-                            raise SynchronizerFailure(f"Reissued amount is greater than the total amount: {value}, {data['name']}")
-                    elif data[key] != value:
-                        raise SynchronizerFailure(f"Metadata mismatch: {value} vs {data[key]}")
-                return data['type']
-
-            ownr = asset[-1] == '!'
-            height = -1
-            txid_prev_o = None
-            txid_o = None
-
-            prev_source = result.get('source_prev', None)
-            source = result['source']
-            og = self.wallet.get_asset_meta(asset)
-            if og and og.height > source['height']:
-                raise SynchronizerFailure(f"Server is trying to send old asset data")
-            if prev_source:
-                prev_height = prev_source['height']
-                prev_txid = prev_source['tx_hash']
-                prev_idx = prev_source['tx_pos']
-                txid_prev_o = TxOutpoint(bfh(prev_txid), prev_idx)
-                await request_and_verify_metadata_against(prev_height, prev_txid, prev_idx,
-                                                          {'divisions': result['divisions']})
-                d = dict()
-                d['reissuable'] = result['reissuable']
-                d['has_ipfs'] = result['has_ipfs']
-                d['sats_in_circulation'] = result['sats_in_circulation']
-                if d['has_ipfs']:
-                    d['ipfs'] = result['ipfs']
-                height = source['height']
-                txid = source['tx_hash']
-                idx = source['tx_pos']
-                txid_o = TxOutpoint(bfh(txid), idx)
-                s_type = await request_and_verify_metadata_against(height, txid, idx, d)
-            else:
-                height = source['height']
-                txid = source['tx_hash']
-                idx = source['tx_pos']
-                txid_o = TxOutpoint(bfh(txid), idx)
-                d = dict()
-                d['divisions'] = result['divisions']
-                d['reissuable'] = result['reissuable']
-                d['has_ipfs'] = result['has_ipfs']
-                d['sats_in_circulation'] = result['sats_in_circulation']
-                if d['has_ipfs']:
-                    d['ipfs'] = result['ipfs']
-                s_type = await request_and_verify_metadata_against(height, txid, idx, d)
-
-            divs = result['divisions']
-            reis = False if result['reissuable'] == 0 else True
-            ipfs = False if result['has_ipfs'] == 0 else True
-            data = result['ipfs'] if ipfs else None
-            circulation = result['sats_in_circulation']
-
-            assert txid_o, asset
-            meta = AssetMeta(asset, circulation, ownr, reis, divs, ipfs, data, height, s_type, txid_o, txid_prev_o)
-
             self._stale_histories.pop(asset, asyncio.Future()).cancel()
-            self.wallet.recieve_asset_callback(asset, meta)
+            self.wallet.recieve_asset_callback(asset, result)
 
         self.requested_asset_metas.discard((asset, status))
 

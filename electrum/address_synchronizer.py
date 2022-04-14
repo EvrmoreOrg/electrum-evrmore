@@ -91,6 +91,7 @@ class AddressSynchronizer(Logger):
         self.future_tx = {}  # type: Dict[str, int]  # txid -> wanted height
         # Txs the server claims are mined but still pending verification:
         self.unverified_tx = defaultdict(int)  # type: Dict[str, int]  # txid -> height. Access with self.lock.
+        self.unverified_asset_meta = dict()
         # Txs the server claims are in the mempool:
         self.unconfirmed_tx = defaultdict(int)  # type: Dict[str, int]  # txid -> height. Access with self.lock.
         # true when synchronized
@@ -458,9 +459,9 @@ class AddressSynchronizer(Logger):
     def get_nonstandard_outpoints(self) -> Dict[str, str]:
         return self.db.get_nonstandard_outpoints()
 
-    def recieve_asset_callback(self, asset: str, meta: AssetMeta):
-        self.db.add_asset_meta(asset, meta)
-        util.trigger_callback('asset_meta')
+    def recieve_asset_callback(self, asset: str, meta: Dict):
+        with self.lock:
+            self.unverified_asset_meta[asset] = meta
 
     def receive_tx_callback(self, tx_hash: str, tx: Transaction, tx_height: int) -> None:
         self.add_unverified_or_unconfirmed_tx(tx_hash, tx_height)
@@ -665,10 +666,20 @@ class AddressSynchronizer(Logger):
         tx_mined_status = self.get_tx_height(tx_hash)
         util.trigger_callback('verified', self, tx_hash, tx_mined_status)
 
+    def add_verified_asset_meta(self, asset: str, meta: AssetMeta):
+        with self.lock:
+            self.unverified_asset_meta.pop(asset, meta)
+            self.db.add_asset_meta(asset, meta)
+        util.trigger_callback('asset_meta')
+
     def get_unverified_txs(self) -> Dict[str, int]:
         '''Returns a map from tx hash to transaction height'''
         with self.lock:
             return dict(self.unverified_tx)  # copy
+
+    def get_unverified_asset_metas(self) -> Dict[str, Dict]:
+        with self.lock:
+            return dict(self.unverified_asset_meta)
 
     def undo_verifications(self, blockchain: Blockchain, above_height: int) -> Set[str]:
         '''Used by the verifier when a reorg has happened'''

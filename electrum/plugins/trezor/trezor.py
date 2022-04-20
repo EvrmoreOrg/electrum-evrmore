@@ -358,6 +358,11 @@ class TrezorPlugin(HW_PluginBase):
     @runs_in_hwd_thread
     def sign_transaction(self, keystore, tx: PartialTransaction, prev_tx):
         prev_tx = {bfh(txhash): self.electrum_tx_to_txtype(tx) for txhash, tx in prev_tx.items()}
+        for txhash in prev_tx.keys():
+            if len(txhash) != 32:
+                self.logger.error('One of our previous txs is invalid!')
+                self.logger.error(prev_tx)
+                raise Exception('Prevhash not 32 bytes')
         client = self.get_client(keystore)
         inputs = self.tx_inputs(tx, for_sig=True, keystore=keystore)
         outputs = self.tx_outputs(tx, keystore=keystore)

@@ -789,8 +789,6 @@ class Ledger_KeyStore(Hardware_KeyStore):
                     inputIndex = inputIndex + 1
             else:
                 while inputIndex < len(inputs):
-                    self.handler.show_message(_("Signing transaction...")
-                                              + f" (phase2, {inputIndex}/{len(inputs)})")
                     client_ledger.startUntrustedTransaction(firstTransaction, inputIndex,
                                                             chipInputs, redeemScripts[inputIndex], version=tx.version)
                     # we don't set meaningful outputAddress, amount and fees

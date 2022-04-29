@@ -606,6 +606,8 @@ class DeviceMgr(ThreadJob):
                 soft_device_id = client.get_soft_device_id()
                 model_name = client.device_model_name()
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 self.logger.error(f'failed to create client for {plugin.name} at {device.path}: {repr(e)}')
                 if include_failing_clients:
                     infos.append(DeviceInfo(device=device, exception=e, plugin_name=plugin.name))

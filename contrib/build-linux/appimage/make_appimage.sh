@@ -18,7 +18,7 @@ PYTHON_VERSION=3.9.11
 PKG2APPIMAGE_COMMIT="eb8f3acdd9f11ab19b78f5cb15daa772367daf15"
 
 
-VERSION=`git describe --tags --dirty --always`
+VERSION=0.4.6
 APPIMAGE="$DISTDIR/electrum-ravencoin-$VERSION-x86_64.AppImage"
 
 . "$CONTRIB"/build_tools_util.sh

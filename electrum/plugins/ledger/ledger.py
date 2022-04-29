@@ -71,12 +71,25 @@ def test_pin_unlocked(func):
 
     return catch_exception
 
+class ModifiedBTChip(btchip):
+    def __init__(self, dongle):
+        self.dongle = dongle
+        self.needKeyCache = False
+        try:
+            firmware = self.getFirmwareVersion()['version']
+            self.multiOutputSupported = tuple(map(int, (firmware.split(".")))) >= (1, 1, 4)
+            if self.multiOutputSupported:
+                self.scriptBlockLength = 50
+            else:
+                self.scriptBlockLength = 255
+        except Exception:
+            pass
 
 class Ledger_Client(HardwareClientBase):
     def __init__(self, hidDevice, *, product_key: Tuple[int, int],
                  plugin: HW_PluginBase):
         HardwareClientBase.__init__(self, plugin=plugin)
-        self.dongleObject = btchip(hidDevice)
+        self.dongleObject = ModifiedBTChip(hidDevice)
         self.preflightDone = False
         self._product_key = product_key
         self._soft_device_id = None
@@ -238,7 +251,7 @@ class Ledger_Client(HardwareClientBase):
             try:
                 self.perform_hw1_preflight()
             except BTChipException as e:
-                if (e.sw == 0x6d00 or e.sw == 0x6700):
+                if (e.sw == 0x6d00 or e.sw == 0x6700 or e.sw == 0x6702):
                     raise UserFacingException(_("Device not in ravencoin mode")) from e
                 raise e
             self.preflightDone = True

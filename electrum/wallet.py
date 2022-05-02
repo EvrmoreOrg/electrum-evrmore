@@ -1369,7 +1369,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             rbf=False,
             coinbase_outputs=None,
             freeze_locktime=None,
-            for_swap=False) -> PartialTransaction:
+            for_swap=False,
+            force_same_change_addr=False) -> PartialTransaction:
 
         if not coins:  # any bitcoin tx must have at least 1 input by consensus
             raise NotEnoughFunds()
@@ -1450,7 +1451,11 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             old_change_addrs = []
         # change address. if empty, coin_chooser will set it
         change_addrs = self.get_change_addresses_for_new_transaction(change_addr or old_change_addrs,
-                                                                     extra_addresses=extra_addresses)
+                                                                     extra_addresses=extra_addresses if not force_same_change_addr else 0)
+
+        # Enforce same change addr if needed, plus 1 for RVN change
+        while len(change_addrs) < extra_addresses + 1:
+            change_addrs.append(change_addrs[0])
 
         if i_max is not None and not outputs[i_max].asset:
             # We want to spend all RVN, leave enough to spend the fee

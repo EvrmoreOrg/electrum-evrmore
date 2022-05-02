@@ -2040,13 +2040,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if not show_non_reissuable_warning():
             return
 
-        norm, new, change_addr = self.reissue_workspace.get_output()
+        norm, new, owner_change_addr = self.reissue_workspace.get_output()
 
         self.pay_onchain_dialog(
-            self.get_coins(asset=self.reissue_workspace.get_owner()),
+            list(set(self.get_coins(asset=self.reissue_workspace.get_owner()))),
             norm,
             coinbase_outputs=new,
-            # change_addr=change_addr
+            change_addr=owner_change_addr if (self.wallet.keystore and self.wallet.keystore.get_type_text()[:2] == 'hw') else None
         )
 
         self.reissue_workspace.reset_workspace()
@@ -2118,13 +2118,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if not show_non_reissuable_warning():
             return
 
-        norm, new, change_addr = self.create_workspace.get_output()
+        norm, new, owner_change_addr = self.create_workspace.get_output()
 
         self.pay_onchain_dialog(
-            self.get_coins(asset=self.create_workspace.get_owner()),
+            list(set(self.get_coins(asset=self.create_workspace.get_owner()))),
             norm,
             coinbase_outputs=new,
-            #change_addr=change_addr
+            change_addr=owner_change_addr if (self.wallet.keystore and self.wallet.keystore.get_type_text()[:2] == 'hw') else None
         )
 
         self.create_workspace.reset_workspace()
@@ -2445,7 +2445,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             coinbase_outputs=coinbase_outputs,
             change_addr=change_addr,
             freeze_locktime=freeze_locktime,
-            for_swap=for_swap)
+            for_swap=for_swap,
+            force_same_change_addr=(self.wallet.keystore and self.wallet.keystore.get_type_text()[:2] == 'hw'),
+            )
 
         output_value = \
             sum([RavenValue(0, {x.asset: x.value}) if x.asset else RavenValue(x.value) for x in outputs +

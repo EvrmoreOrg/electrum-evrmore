@@ -716,7 +716,7 @@ class AssetCreateWorkspace(QWidget):
                 )
             )
 
-        return norm, new, self.change_addrs[2]
+        return norm, new, self.change_addrs[0]
 
 
 class AssetReissueWorkspace(QWidget):
@@ -1321,4 +1321,4 @@ class AssetReissueWorkspace(QWidget):
                 value=Satoshis(amt),
                 asset=asset)
         ]
-        return norm, new, self.change_addrs[2]
+        return norm, new, self.change_addrs[0]

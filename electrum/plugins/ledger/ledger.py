@@ -546,9 +546,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
     @runs_in_hwd_thread
     @test_pin_unlocked
     @set_and_unset_signing
-    def sign_message(self, sequence, message, password):
-        self.give_error("Signing messages is currently unavailable for ledger devices.")
-        return b''
+    def sign_message(self, sequence, message, password, script_type):
         message = message.encode('utf8')
         message_hash = hashlib.sha256(message).hexdigest().upper()
         # prompt for the PIN before displaying the dialog if necessary
@@ -665,8 +663,8 @@ class Ledger_KeyStore(Hardware_KeyStore):
 
         txOutput = var_int(len(tx.outputs()))
         for o in tx.outputs():
-            if o.asset:
-                self.give_error(_("Sending assets with ledger is currently not supported."))
+            #if o.asset:
+            #    self.give_error(_("Sending assets with ledger is currently not supported."))
             txOutput += int_to_hex(0 if o.asset else o.value.value, 8)
             script = o.scriptpubkey.hex()
             txOutput += var_int(len(script) // 2)

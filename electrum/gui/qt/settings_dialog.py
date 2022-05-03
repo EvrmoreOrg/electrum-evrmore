@@ -562,6 +562,7 @@ class SettingsDialog(WindowModalDialog):
         tx_widgets.append((unconf_cb, None))
         tx_widgets.append((multiple_cb, None))
         tx_widgets.append((outrounding_cb, None))
+        tx_widgets.append((tx_custom_message, None))
         if len(choosers) > 1:
             tx_widgets.append((chooser_label, chooser_combo))
         tx_widgets.append((block_ex_label, block_ex_hbox_w))

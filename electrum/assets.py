@@ -97,9 +97,9 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
             'name': name.decode('ascii'),
             'sats_in_circulation': int.from_bytes(sats, 'little'),
             'divisions': divs,
-            'reissuable': reis,
-            'has_ipfs': has_i,
-            'ipfs': base_encode(ifps, base=58) if ifps else None,
+            'reissuable': False if reis == 0 else True,
+            'has_ipfs': False if has_i == 0 else True,
+            'ipfs': base_encode(ifps, base=58) if has_i != 0 else None,
             'type': 'q'
         }
     elif type == b'r':
@@ -115,8 +115,8 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
             'name': name.decode('ascii'),
             'sats_in_circulation': int.from_bytes(sats, 'little'),
             'divisions': divs,
-            'reissuable': reis,
-            'has_ipfs': 0 if not ifps else 1,
+            'reissuable': False if reis == 0 else True,
+            'has_ipfs': False if not ifps else True,
             'ipfs': base_encode(ifps, base=58) if ifps else None,
             'type': 'r'
         }
@@ -127,8 +127,8 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
             'name': name.decode('ascii'),
             'sats_in_circulation': 100_000_000,
             'divisions': 0,
-            'reissuable': 0,
-            'has_ipfs': 0,
+            'reissuable': False,
+            'has_ipfs': False,
             'ipfs': None,
             'type': 'o'
         }

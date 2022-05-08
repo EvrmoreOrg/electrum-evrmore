@@ -1,7 +1,7 @@
-ELECTRUM_VERSION = '0.4.6'     # version of the client package
+ELECTRUM_VERSION = '0.4.7'     # version of the client package
 APK_VERSION = '4.2.1.0'        # read by buildozer.spec
 
-PROTOCOL_VERSION = '1.9'     # protocol version requested
+PROTOCOL_VERSION = '1.10'     # protocol version requested
 
 # The hash of the mnemonic seed must begin with this
 SEED_PREFIX        = '01'      # Standard wallet

@@ -56,7 +56,7 @@ NEW_SEED_VERSION = 11       # electrum versions >= 2.0
 #FINAL_SEED_VERSION = 41     # electrum >= 2.7 will set this to prevent
                             # old versions from overwriting new format
 
-FINAL_SEED_VERSION = 45  # Rewrites wallet to support assets
+FINAL_SEED_VERSION = 46  # Rewrites wallet to support assets
 
 class TxFeesValue(NamedTuple):
     fee: Optional[int] = None
@@ -195,6 +195,7 @@ class WalletDB(JsonDB):
         self._convert_version_43()
         self._convert_version_44()
         self._convert_version_45()
+        self._convert_version_46()
 
         self.put('seed_version', FINAL_SEED_VERSION)  # just to be sure
         self._after_upgrade_tasks()
@@ -930,6 +931,13 @@ class WalletDB(JsonDB):
         self.data.pop('asset_meta', {})
         self.data['seed_version'] = 45
 
+    def _convert_version_46(self):
+        if not self._is_upgrade_method_needed(45, 45):
+            return
+        # reset and redownload asset meta
+        self.data.pop('asset_meta', {})
+        self.data['seed_version'] = 46
+
     def _convert_imported(self):
         if not self._is_upgrade_method_needed(0, 13):
             return
@@ -1504,12 +1512,13 @@ class WalletDB(JsonDB):
             items = v.items()
             if len(items) != 0:
                 _, t = list(items)[0]
-                if len(t) != 12:
+                if len(t) != 14:
                     return dict()
-            v = dict((k, AssetMeta(name, amt, ownr, reis, div, ipfs, data, height, prev_height, t,
+            v = dict((k, AssetMeta(name, amt, ownr, reis, div, ipfs, data, height, div_height, ipfs_height, t,
                                    TxOutpoint.from_str('{}:{}'.format(s[0], s[1])),
-                                   TxOutpoint.from_str('{}:{}'.format(s_p[0], s_p[1])) if s_p else None))
-                     for k, (name, amt, ownr, reis, div, ipfs, data, height, prev_height, t, s, s_p) in items)
+                                   TxOutpoint.from_str('{}:{}'.format(s_d[0], s_d[1])) if s_d else None,
+                                   TxOutpoint.from_str('{}:{}'.format(s_i[0], s_i[1])) if s_i else None))
+                     for k, (name, amt, ownr, reis, div, ipfs, data, height, div_height, ipfs_height, t, s, s_d, s_i) in items)
                      
         # convert keys to HTLCOwner
         if key == 'log' or (path and path[-1] in ['locked_in', 'fails', 'settles']):

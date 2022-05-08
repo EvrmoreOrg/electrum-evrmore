@@ -126,10 +126,8 @@ class SPV(NetworkJobOnDefaultServer):
                 try:
                     await self.wallet.verifier.request_and_verfiy_proof(tx_hash, height)
                 except UntrustedServerReturnedError as e:
-                    if not isinstance(e.original_exception, aiorpcx.jsonrpc.RPCError):
-                        raise
                     self.logger.info(f'tx {tx_hash} not at height {height}')
-                    return
+                    raise
             try:
                 vout = tx.outputs()[idx]
             except IndexError:
@@ -153,68 +151,72 @@ class SPV(NetworkJobOnDefaultServer):
         async def parse_and_verify(asset, result):
             ownr = asset[-1] == '!'
             height = -1
-            txid_prev_o = None
+            txid_o_div = None
+            txid_o_ipfs = None
             txid_o = None
 
-            prev_source = result.get('source_prev', None)
+            div_height = None
+            ipfs_height = None
+            
+            div_source = result.get('source_divisions', None)
+            ipfs_source = result.get('source_ipfs', None)
             source = result['source']
             og = self.wallet.get_asset_meta(asset)
             if og and og.height > source['height']:
                 raise AssetVerification(f"Server is trying to send old asset data")
-            if prev_source:
-                prev_height = prev_source['height']
-                prev_txid = prev_source['tx_hash']
-                prev_idx = prev_source['tx_pos']
-                txid_prev_o = TxOutpoint(bfh(prev_txid), prev_idx)
+
+            if div_source:
+                div_height = div_source['height']
+                prev_txid = div_source['tx_hash']
+                prev_idx = div_source['tx_pos']
+                txid_o_div = TxOutpoint(bfh(prev_txid), prev_idx)
                 try:
-                    await request_and_verify_metadata_against(asset, prev_height, prev_txid, prev_idx,
+                    await request_and_verify_metadata_against(asset, div_height, prev_txid, prev_idx,
                                                           {'divisions': result['divisions']})
-                except Exception:
+                except Exception as e:
+                    self.logger.info(f'Failed to verify metadata for {asset}')
                     self.requested_assets.discard(asset)
-                    return
-
-                d = dict()
-                d['reissuable'] = result['reissuable']
-                d['has_ipfs'] = result['has_ipfs']
-                d['sats_in_circulation'] = result['sats_in_circulation']
-                if d['has_ipfs']:
-                    d['ipfs'] = result['ipfs']
-                height = source['height']
-                txid = source['tx_hash']
-                idx = source['tx_pos']
-                txid_o = TxOutpoint(bfh(txid), idx)
+                    raise GracefulDisconnect(e) from e
+            
+            if ipfs_source:
+                ipfs_height = ipfs_source['height']
+                prev_txid = ipfs_source['tx_hash']
+                prev_idx = ipfs_source['tx_pos']
+                txid_o_ipfs = TxOutpoint(bfh(prev_txid), prev_idx)
                 try:
-                    s_type = await request_and_verify_metadata_against(asset, height, txid, idx, d)
-                except Exception:
+                    await request_and_verify_metadata_against(asset, ipfs_height, prev_txid, prev_idx,
+                                                          {'ipfs': result['ipfs']})
+                except Exception as e:
+                    self.logger.info(f'Failed to verify metadata for {asset}')
                     self.requested_assets.discard(asset)
-                    return
-            else:
-                prev_height = None
-                height = source['height']
-                txid = source['tx_hash']
-                idx = source['tx_pos']
-                txid_o = TxOutpoint(bfh(txid), idx)
-                d = dict()
-                d['divisions'] = result['divisions']
-                d['reissuable'] = result['reissuable']
-                d['has_ipfs'] = result['has_ipfs']
-                d['sats_in_circulation'] = result['sats_in_circulation']
-                if d['has_ipfs']:
-                    d['ipfs'] = result['ipfs']
-                try:
-                    s_type = await request_and_verify_metadata_against(asset, height, txid, idx, d)
-                except Exception:
-                    self.requested_assets.discard(asset)
-                    return
-
+                    raise GracefulDisconnect(e) from e
+            
+            d = dict()
+            d['reissuable'] = result['reissuable']
+            d['has_ipfs'] = result['has_ipfs'] and not ipfs_source
+            d['sats_in_circulation'] = result['sats_in_circulation']
+            if d['has_ipfs']:
+                d['ipfs'] = result['ipfs']
+            d['divisions'] = result['divisions'] if not div_source else 0xff
+            height = source['height']
+            txid = source['tx_hash']
+            idx = source['tx_pos']
+            txid_o = TxOutpoint(bfh(txid), idx)
+            try:
+                s_type = await request_and_verify_metadata_against(asset, height, txid, idx, d)
+            except Exception as e:
+                self.logger.info(f'Failed to verify metadata for {asset}')
+                self.requested_assets.discard(asset)
+                raise GracefulDisconnect(e) from e
+             
             divs = result['divisions']
-            reis = False if result['reissuable'] == 0 else True
-            ipfs = False if result['has_ipfs'] == 0 else True
-            data = result['ipfs'] if ipfs else None
+            reis = result['reissuable']
+            ipfs = result['has_ipfs']
+            data = result.get('ipfs', None)
             circulation = result['sats_in_circulation']
 
             assert txid_o, asset
-            meta = AssetMeta(asset, circulation, ownr, reis, divs, ipfs, data, height, prev_height, s_type, txid_o, txid_prev_o)
+            meta = AssetMeta(asset, circulation, ownr, reis, divs, ipfs, data, height, div_height, ipfs_height, s_type, txid_o, txid_o_div, txid_o_ipfs)
             self.requested_assets.discard(asset)
             self.wallet.add_verified_asset_meta(asset, meta)
 

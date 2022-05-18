@@ -32,7 +32,6 @@ from PyQt5.QtCore import Qt, QItemSelectionModel, QModelIndex
 
 from electrum.i18n import _
 from electrum.util import format_time
-from electrum.invoices import PR_TYPE_ONCHAIN, PR_TYPE_LN, LNInvoice, OnchainInvoice
 from electrum.plugin import run_hook
 from electrum.invoices import Invoice
 
@@ -75,7 +74,6 @@ class RequestList(MyTreeView):
         self.setSortingEnabled(True)
         self.selectionModel().currentRowChanged.connect(self.item_changed)
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.update()
 
     def select_key(self, key):
         for i in range(self.model().rowCount()):
@@ -87,7 +85,8 @@ class RequestList(MyTreeView):
 
     def item_changed(self, idx: Optional[QModelIndex]):
         if idx is None:
-            self.parent.receive_payreq_e.setText('')
+            self.parent.receive_URI_e.setText('')
+            self.parent.receive_lightning_e.setText('')
             self.parent.receive_address_e.setText('')
             return
         if not idx.isValid():
@@ -99,14 +98,7 @@ class RequestList(MyTreeView):
         if req is None:
             self.update()
             return
-        if req.is_lightning():
-            self.parent.receive_payreq_e.setText(req.invoice)  # TODO maybe prepend "lightning:" ??
-            self.parent.receive_address_e.setText(req.invoice)
-        else:
-            self.parent.receive_payreq_e.setText(self.parent.wallet.get_request_URI(req))
-            self.parent.receive_address_e.setText(req.get_address())
-        self.parent.receive_payreq_e.repaint()  # macOS hack (similar to #4777)
-        self.parent.receive_address_e.repaint()  # macOS hack (similar to #4777)
+        self.parent.show_receive_request(req)
 
     def clearSelection(self):
         super().clearSelection()
@@ -126,7 +118,6 @@ class RequestList(MyTreeView):
     # TODO: Implement for assets
     def update(self):
         # not calling maybe_defer_update() as it interferes with conditional-visibility
-        self.parent.update_receive_address_styling()
         self.proxy.setDynamicSortFilter(False)  # temp. disable re-sorting after every change
         self.std_model.clear()
         self.update_headers(self.__class__.headers)
@@ -134,27 +125,18 @@ class RequestList(MyTreeView):
             key = self.wallet.get_key_for_receive_request(req)
             status = self.parent.wallet.get_request_status(key)
             status_str = req.get_status_str(status)
-            request_type = req.type
-            timestamp = req.time
-            amount = req.get_amount_sat().rvn_value
-            message = req.message
+            timestamp = req.get_time()
+            amount = req.get_amount_sat()
+            message = req.get_message()
             date = format_time(timestamp)
             amount_str = self.parent.format_amount(amount) if amount else ""
             labels = [date, message, amount_str, status_str]
-            if req.is_lightning():
-                icon = read_QIcon("lightning.png")
-                tooltip = 'lightning request'
-            else:
-                icon = read_QIcon("ravencoin.png")
-                tooltip = 'onchain request'
             items = [QStandardItem(e) for e in labels]
             self.set_editability(items)
-            items[self.Columns.DATE].setData(request_type, ROLE_REQUEST_TYPE)
+            #items[self.Columns.DATE].setData(request_type, ROLE_REQUEST_TYPE)
             items[self.Columns.DATE].setData(key, ROLE_KEY)
             items[self.Columns.DATE].setData(timestamp, ROLE_SORT_ORDER)
-            items[self.Columns.DATE].setIcon(icon)
             items[self.Columns.STATUS].setIcon(read_QIcon(pr_icons.get(status)))
-            items[self.Columns.DATE].setToolTip(tooltip)
             self.std_model.insertRow(self.std_model.rowCount(), items)
         self.filter()
         self.proxy.setDynamicSortFilter(True)
@@ -189,13 +171,13 @@ class RequestList(MyTreeView):
             self.update()
             return
         menu = QMenu(self)
-        self.add_copy_menu(menu, idx)
-        if req.is_lightning():
-            menu.addAction(_("Copy Request"), lambda: self.parent.do_copy(req.invoice, title='Lightning Request'))
-        else:
+        if req.get_address():
+            menu.addAction(_("Copy Address"), lambda: self.parent.do_copy(req.get_address(), title='Bitcoin Address'))
             URI = self.wallet.get_request_URI(req)
-            menu.addAction(_("Copy Request"), lambda: self.parent.do_copy(URI, title='ravencoin URI'))
-            menu.addAction(_("Copy Address"), lambda: self.parent.do_copy(req.get_address(), title='ravencoin Address'))
+            menu.addAction(_("Copy URI"), lambda: self.parent.do_copy(URI, title='Bitcoin URI'))
+        if req.is_lightning():
+            menu.addAction(_("Copy Lightning Request"), lambda: self.parent.do_copy(req.lightning_invoice, title='Lightning Request'))
+        self.add_copy_menu(menu, idx)
         #if 'view_url' in req:
         #    menu.addAction(_("View in web browser"), lambda: webopen(req['view_url']))
         menu.addAction(_("Delete"), lambda: self.parent.delete_requests([key]))

@@ -30,11 +30,15 @@ import traceback
 import threading
 from typing import Optional, TYPE_CHECKING, List
 
+from electrum import GuiImportError
 
 try:
     import PyQt5
-except Exception:
-    sys.exit("Error: Could not import PyQt5 on Linux systems, you may try 'sudo apt-get install python3-pyqt5'")
+    import PyQt5.QtGui
+except Exception as e:
+    raise GuiImportError(
+        "Error: Could not import PyQt5 on Linux systems, "
+        "you may try 'sudo apt-get install python3-pyqt5'") from e
 
 from PyQt5.QtGui import QGuiApplication
 from PyQt5.QtWidgets import (QApplication, QSystemTrayIcon, QWidget, QMenu,
@@ -109,6 +113,11 @@ class OpenFileEventFilter(QObject):
 class QElectrumApplication(QApplication):
     new_window_signal = pyqtSignal(str, object)
     quit_signal = pyqtSignal()
+    refresh_tabs_signal = pyqtSignal()
+    refresh_amount_edits_signal = pyqtSignal()
+    update_status_signal = pyqtSignal()
+    update_fiat_signal = pyqtSignal()
+    alias_received_signal = pyqtSignal()
 
 
 class QNetworkUpdatedSignalObject(QObject):
@@ -487,3 +496,13 @@ class ElectrumGui(BaseElectrumGui, Logger):
     def stop(self):
         self.logger.info('closing GUI')
         self.app.quit_signal.emit()
+
+    @classmethod
+    def version_info(cls):
+        ret = {
+            "qt.version": QtCore.QT_VERSION_STR,
+            "pyqt.version": QtCore.PYQT_VERSION_STR,
+        }
+        if hasattr(PyQt5, "__path__"):
+            ret["pyqt.path"] = ", ".join(PyQt5.__path__ or [])
+        return ret

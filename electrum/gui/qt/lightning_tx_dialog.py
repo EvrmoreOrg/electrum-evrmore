@@ -31,7 +31,6 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QVBoxLayout, QLabel, QGridLayout
 
 from electrum.i18n import _
-from electrum.invoices import LNInvoice
 
 from .util import WindowModalDialog, ButtonsLineEdit, ColorScheme, Buttons, CloseButton, MONOSPACE_FONT
 from .qrtextedit import ShowQRTextEdit
@@ -46,6 +45,7 @@ class LightningTxDialog(WindowModalDialog):
     def __init__(self, parent: 'ElectrumWindow', tx_item: dict):
         WindowModalDialog.__init__(self, parent, _("Lightning Payment"))
         self.parent = parent
+        self.config = parent.config
         self.is_sent = bool(tx_item['direction'] == 'sent')
         self.label = tx_item['label']
         self.timestamp = tx_item['timestamp']
@@ -55,8 +55,8 @@ class LightningTxDialog(WindowModalDialog):
         invoice = (self.parent.wallet.get_invoice(self.payment_hash)
                    or self.parent.wallet.get_request(self.payment_hash))
         if invoice:
-            assert isinstance(invoice, LNInvoice), f"{self.invoice!r}"
-            self.invoice = invoice.invoice
+            assert invoice.is_lightning(), f"{self.invoice!r}"
+            self.invoice = invoice.lightning_invoice
         else:
             self.invoice = ''
 
@@ -73,14 +73,10 @@ class LightningTxDialog(WindowModalDialog):
         time_str = datetime.datetime.fromtimestamp(self.timestamp).isoformat(' ')[:-3]
         vbox.addWidget(QLabel(_("Date") + ": " + time_str))
 
-        qr_icon = "qrcode_white.png" if ColorScheme.dark_scheme else "qrcode.png"
-
         vbox.addWidget(QLabel(_("Payment hash") + ":"))
         self.hash_e = ButtonsLineEdit(self.payment_hash)
         self.hash_e.addCopyButton(self.parent.app)
-        self.hash_e.addButton(qr_icon,
-                              self.show_qr(self.hash_e, _("Payment hash")),
-                              _("Show QR Code"))
+        self.hash_e.add_qr_show_button(config=self.config, title=_("Payment hash"))
         self.hash_e.setReadOnly(True)
         self.hash_e.setFont(QFont(MONOSPACE_FONT))
         vbox.addWidget(self.hash_e)
@@ -88,15 +84,13 @@ class LightningTxDialog(WindowModalDialog):
         vbox.addWidget(QLabel(_("Preimage") + ":"))
         self.preimage_e = ButtonsLineEdit(self.preimage)
         self.preimage_e.addCopyButton(self.parent.app)
-        self.preimage_e.addButton(qr_icon,
-                                  self.show_qr(self.preimage_e, _("Preimage")),
-                                  _("Show QR Code"))
+        self.preimage_e.add_qr_show_button(config=self.config, title=_("Preimage"))
         self.preimage_e.setReadOnly(True)
         self.preimage_e.setFont(QFont(MONOSPACE_FONT))
         vbox.addWidget(self.preimage_e)
 
         vbox.addWidget(QLabel(_("Lightning Invoice") + ":"))
-        self.invoice_e = ShowQRTextEdit(self.invoice, config=parent.config)
+        self.invoice_e = ShowQRTextEdit(self.invoice, config=self.config)
         self.invoice_e.setMaximumHeight(150)
         self.invoice_e.addCopyButton(self.parent.app)
         vbox.addWidget(self.invoice_e)

@@ -38,6 +38,7 @@ from functools import wraps, partial
 from itertools import repeat
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING, Dict, List
+import os
 
 from .import util, ecc
 from .util import (bfh, bh2u, format_satoshis, json_decode, json_normalize,
@@ -58,11 +59,13 @@ from .lnutil import SENT, RECEIVED
 from .lnutil import LnFeatures
 from .lnutil import extract_nodeid
 from .lnpeer import channel_id_from_funding_tx
-from .plugin import run_hook
+from .plugin import run_hook, DeviceMgr
 from .version import ELECTRUM_VERSION
 from .simple_config import SimpleConfig
-from .invoices import LNInvoice
+from .invoices import Invoice
 from . import submarine_swaps
+from . import GuiImportError
+from . import crypto
 
 
 if TYPE_CHECKING:
@@ -185,7 +188,7 @@ class Commands:
                 kwargs.pop('wallet')
 
         coro = f(*args, **kwargs)
-        fut = asyncio.run_coroutine_threadsafe(coro, asyncio.get_event_loop())
+        fut = asyncio.run_coroutine_threadsafe(coro, util.get_asyncio_loop())
         result = fut.result()
 
         if self._callback:
@@ -581,8 +584,44 @@ class Commands:
     @command('')
     async def version(self):
         """Return the version of Electrum."""
-        from .version import ELECTRUM_VERSION
         return ELECTRUM_VERSION
+
+    @command('')
+    async def version_info(self):
+        """Return information about dependencies, such as their version and path."""
+        ret = {
+            "electrum.version": ELECTRUM_VERSION,
+            "electrum.path": os.path.dirname(os.path.realpath(__file__)),
+        }
+        # add currently running GUI
+        if self.daemon and self.daemon.gui_object:
+            ret.update(self.daemon.gui_object.version_info())
+        # always add Qt GUI, so we get info even when running this from CLI
+        try:
+            from .gui.qt import ElectrumGui as QtElectrumGui
+            ret.update(QtElectrumGui.version_info())
+        except GuiImportError:
+            pass
+        # Add shared libs (.so/.dll), and non-pure-python dependencies.
+        # Such deps can be installed in various ways - often via the Linux distro's pkg manager,
+        # instead of using pip, hence it is useful to list them for debugging.
+        from . import ecc_fast
+        ret.update(ecc_fast.version_info())
+        from . import qrscanner
+        ret.update(qrscanner.version_info())
+        ret.update(DeviceMgr.version_info())
+        ret.update(crypto.version_info())
+        # add some special cases
+        import aiohttp
+        ret["aiohttp.version"] = aiohttp.__version__
+        import aiorpcx
+        ret["aiorpcx.version"] = aiorpcx._version_str
+        import certifi
+        ret["certifi.version"] = certifi.__version__
+        import dns
+        ret["dnspython.version"] = dns.__version__
+
+        return ret
 
     @command('w')
     async def getmpk(self, wallet: Abstract_Wallet = None):
@@ -948,15 +987,9 @@ class Commands:
                 return False
         amount = satoshis(amount)
         expiration = int(expiration) if expiration else None
-        req = wallet.make_payment_request(addr, amount, memo, expiration)
-        wallet.add_payment_request(req)
+        key = wallet.create_request(amount, memo, expiration, addr, True)
+        req = wallet.get_request(key)
         return wallet.export_request(req)
-
-    @command('wnl')
-    async def add_lightning_request(self, amount, memo='', expiration=3600, wallet: Abstract_Wallet = None):
-        amount_sat = int(satoshis(amount))
-        key = wallet.lnworker.add_request(amount_sat, memo, expiration)
-        return wallet.get_formatted_request(key)
 
     @command('w')
     async def addtransaction(self, tx, wallet: Abstract_Wallet = None):
@@ -1101,22 +1134,59 @@ class Commands:
 
     @command('')
     async def decode_invoice(self, invoice: str):
-        invoice = LNInvoice.from_bech32(invoice)
+        invoice = Invoice.from_bech32(invoice)
         return invoice.to_debug_json()
 
     #@command('wnl')
-    #async def lnpay(self, invoice, attempts=1, timeout=30, wallet: Abstract_Wallet = None):
+    #async def lnpay(self, invoice, timeout=120, wallet: Abstract_Wallet = None):
     #    lnworker = wallet.lnworker
     #    lnaddr = lnworker._check_invoice(invoice)
     #    payment_hash = lnaddr.paymenthash
-    #    wallet.save_invoice(LNInvoice.from_bech32(invoice))
-    #    success, log = await lnworker.pay_invoice(invoice, attempts=attempts)
+    #    wallet.save_invoice(Invoice.from_bech32(invoice))
+    #    success, log = await lnworker.pay_invoice(invoice)
     #    return {
     #        'payment_hash': payment_hash.hex(),
     #        'success': success,
     #        'preimage': lnworker.get_preimage(payment_hash).hex() if success else None,
     #        'log': [x.formatted_tuple() for x in log]
     #    }
+
+    @command('wl')
+    async def nodeid(self, wallet: Abstract_Wallet = None):
+        listen_addr = self.config.get('lightning_listen')
+        return bh2u(wallet.lnworker.node_keypair.pubkey) + (('@' + listen_addr) if listen_addr else '')
+
+    @command('wl')
+    async def list_channels(self, wallet: Abstract_Wallet = None):
+        # FIXME: we need to be online to display capacity of backups
+        from .lnutil import LOCAL, REMOTE, format_short_channel_id
+        channels = list(wallet.lnworker.channels.items())
+        backups = list(wallet.lnworker.channel_backups.items())
+        return [
+            {
+                'type': 'CHANNEL',
+                'short_channel_id': format_short_channel_id(chan.short_channel_id) if chan.short_channel_id else None,
+                'channel_id': chan.channel_id.hex(),
+                'channel_point': chan.funding_outpoint.to_str(),
+                'state': chan.get_state().name,
+                'peer_state': chan.peer_state.name,
+                'remote_pubkey': bh2u(chan.node_id),
+                'local_balance': chan.balance(LOCAL)//1000,
+                'remote_balance': chan.balance(REMOTE)//1000,
+                'local_reserve': chan.config[REMOTE].reserve_sat, # their config has our reserve
+                'remote_reserve': chan.config[LOCAL].reserve_sat,
+                'local_unsettled_sent': chan.balance_tied_up_in_htlcs_by_direction(LOCAL, direction=SENT) // 1000,
+                'remote_unsettled_sent': chan.balance_tied_up_in_htlcs_by_direction(REMOTE, direction=SENT) // 1000,
+            } for channel_id, chan in channels
+        ] + [
+            {
+                'type': 'BACKUP',
+                'short_channel_id': format_short_channel_id(chan.short_channel_id) if chan.short_channel_id else None,
+                'channel_id': chan.channel_id.hex(),
+                'channel_point': chan.funding_outpoint.to_str(),
+                'state': chan.get_state().name,
+            } for channel_id, chan in backups
+        ]
 
     #@command('w')
     #async def nodeid(self, wallet: Abstract_Wallet = None):
@@ -1385,7 +1455,6 @@ command_options = {
     'domain':      ("-D", "List of addresses"),
     'memo':        ("-m", "Description of the request"),
     'expiration':  (None, "Time in seconds"),
-    'attempts':    (None, "Number of payment attempts"),
     'timeout':     (None, "Timeout in seconds"),
     'force':       (None, "Create new address beyond gap limit, if no more addresses are available."),
     'pending':     (None, "Show only pending requests."),
@@ -1432,7 +1501,6 @@ arg_types = {
     'encrypt_file': eval_bool,
     'rbf': eval_bool,
     'timeout': float,
-    'attempts': int,
 }
 
 config_variables = {
@@ -1520,6 +1588,8 @@ def add_global_options(parser):
     # group.add_argument("--regtest", action="store_true", dest="regtest", default=False, help="Use Regtest")
     # group.add_argument("--simnet", action="store_true", dest="simnet", default=False, help="Use Simnet")
     group.add_argument("-o", "--offline", action="store_true", dest="offline", default=False, help="Run offline")
+    group.add_argument("--rpcuser", dest="rpcuser", default=argparse.SUPPRESS, help="RPC user")
+    group.add_argument("--rpcpassword", dest="rpcpassword", default=argparse.SUPPRESS, help="RPC password")
 
 def add_wallet_option(parser):
     parser.add_argument("-w", "--wallet", dest="wallet_path", help="wallet path")
@@ -1549,6 +1619,10 @@ def get_parser():
     # daemon
     parser_daemon = subparsers.add_parser('daemon', help="Run Daemon")
     parser_daemon.add_argument("-d", "--detached", action="store_true", dest="detach", default=False, help="run daemon in detached mode")
+    # FIXME: all these options are rpc-server-side. The CLI client-side cannot use e.g. --rpcport,
+    #        instead it reads it from the daemon lockfile.
+    parser_daemon.add_argument("--rpchost", dest="rpchost", default=argparse.SUPPRESS, help="RPC host")
+    parser_daemon.add_argument("--rpcport", dest="rpcport", type=int, default=argparse.SUPPRESS, help="RPC port")
     parser_daemon.add_argument("--rpcsock", dest="rpcsock", default=None, help="what socket type to which to bind RPC daemon", choices=['unix', 'tcp', 'auto'])
     parser_daemon.add_argument("--rpcsockpath", dest="rpcsockpath", help="where to place RPC file socket")
     add_network_options(parser_daemon)

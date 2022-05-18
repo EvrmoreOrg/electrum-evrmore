@@ -1083,6 +1083,7 @@ def parse_URI(uri: str, on_pr: Callable = None, *, loop=None) -> dict:
     """Raises InvalidBitcoinURI on malformed URI."""
     from . import ravencoin
     from .ravencoin import COIN, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC
+    from .lnaddr import lndecode
 
     if not isinstance(uri, str):
         raise InvalidBitcoinURI(f"expected string, not {repr(uri)}")
@@ -1145,6 +1146,17 @@ def parse_URI(uri: str, on_pr: Callable = None, *, loop=None) -> dict:
             out['sig'] = bh2u(ravencoin.base_decode(out['sig'], base=58))
         except Exception as e:
             raise InvalidBitcoinURI(f"failed to parse 'sig' field: {repr(e)}") from e
+    if 'lightning' in out:
+        try:
+            lnaddr = lndecode(out['lightning'])
+            amount_sat = out.get('amount')
+            if amount:
+                assert int(lnaddr.get_amount_sat()) == amount_sat
+            address = out.get('address')
+            if address:
+                assert lnaddr.get_fallback_address() == address
+        except Exception as e:
+            raise InvalidBitcoinURI(f"Inconsistent lightning field: {repr(e)}") from e
 
     r = out.get('r')
     sig = out.get('sig')
@@ -1160,8 +1172,7 @@ def parse_URI(uri: str, on_pr: Callable = None, *, loop=None) -> dict:
                 request = await pr.get_payment_request(r)
             if on_pr:
                 on_pr(request)
-
-        loop = loop or asyncio.get_event_loop()
+        loop = loop or get_asyncio_loop()
         asyncio.run_coroutine_threadsafe(get_payment_request(), loop)
 
     return out
@@ -1458,7 +1469,6 @@ class NetworkJobOnDefaultServer(Logger, ABC):
 
     def __init__(self, network: 'Network'):
         Logger.__init__(self)
-        asyncio.set_event_loop(network.asyncio_loop)
         self.network = network
         self.interface = None  # type: Interface
         self._restart_lock = asyncio.Lock()
@@ -1523,9 +1533,41 @@ class NetworkJobOnDefaultServer(Logger, ABC):
         return s
 
 
+_asyncio_event_loop = None  # type: Optional[asyncio.AbstractEventLoop]
+def get_asyncio_loop() -> asyncio.AbstractEventLoop:
+    """Returns the global asyncio event loop we use."""
+    if _asyncio_event_loop is None:
+        raise Exception("event loop not created yet")
+    return _asyncio_event_loop
+
+
 def create_and_start_event_loop() -> Tuple[asyncio.AbstractEventLoop,
                                            asyncio.Future,
                                            threading.Thread]:
+    global _asyncio_event_loop
+    if _asyncio_event_loop is not None:
+        raise Exception("there is already a running event loop")
+
+    # asyncio.get_event_loop() became deprecated in python3.10. (see https://github.com/python/cpython/issues/83710)
+    # We set a custom event loop policy purely to be compatible with code that
+    # relies on asyncio.get_event_loop().
+    # - in python 3.8-3.9, asyncio.Event.__init__, asyncio.Lock.__init__,
+    #   and similar, calls get_event_loop. see https://github.com/python/cpython/pull/23420
+    class MyEventLoopPolicy(asyncio.DefaultEventLoopPolicy):
+        def get_event_loop(self):
+            # In case electrum is being used as a library, there might be other
+            # event loops in use besides ours. To minimise interfering with those,
+            # if there is a loop running in the current thread, return that:
+            running_loop = get_running_loop()
+            if running_loop is not None:
+                return running_loop
+            # Otherwise, return our global loop:
+            return get_asyncio_loop()
+    asyncio.set_event_loop_policy(MyEventLoopPolicy())
+
+    loop = asyncio.new_event_loop()
+    _asyncio_event_loop = loop
+
     def on_exception(loop, context):
         """Suppress spurious messages it appears we cannot control."""
         SUPPRESS_MESSAGE_REGEX = re.compile('SSL handshake|Fatal read error on|'
@@ -1535,13 +1577,21 @@ def create_and_start_event_loop() -> Tuple[asyncio.AbstractEventLoop,
             return
         loop.default_exception_handler(context)
 
-    loop = asyncio.get_event_loop()
+    def run_event_loop():
+        try:
+            loop.run_until_complete(stopping_fut)
+        finally:
+            # clean-up
+            global _asyncio_event_loop
+            _asyncio_event_loop = None
+
     loop.set_exception_handler(on_exception)
     # loop.set_debug(1)
     stopping_fut = loop.create_future()
-    loop_thread = threading.Thread(target=loop.run_until_complete,
-                                   args=(stopping_fut,),
-                                   name='EventLoop')
+    loop_thread = threading.Thread(
+        target=run_event_loop,
+        name='EventLoop',
+    )
     loop_thread.start()
     return loop, stopping_fut, loop_thread
 
@@ -1636,8 +1686,21 @@ def is_ip_address(x: Union[str, bytes]) -> bool:
         return False
 
 
-def is_private_netaddress(host: str) -> bool:
+def is_localhost(host: str) -> bool:
     if str(host) in ('localhost', 'localhost.',):
+        return True
+    if host[0] == '[' and host[-1] == ']':  # IPv6
+        host = host[1:-1]
+    try:
+        ip_addr = ipaddress.ip_address(host)  # type: Union[IPv4Address, IPv6Address]
+        return ip_addr.is_loopback
+    except ValueError:
+        pass  # not an IP
+    return False
+
+
+def is_private_netaddress(host: str) -> bool:
+    if is_localhost(host):
         return True
     if host[0] == '[' and host[-1] == ']':  # IPv6
         host = host[1:-1]
@@ -1705,7 +1768,7 @@ class CallbackManager:
         on the event loop.
         """
         if self.asyncio_loop is None:
-            self.asyncio_loop = asyncio.get_event_loop()
+            self.asyncio_loop = get_asyncio_loop()
             assert self.asyncio_loop.is_running(), "event loop not running"
         with self.callback_lock:
             callbacks = self.callbacks[event][:]
@@ -1789,7 +1852,7 @@ class NetworkRetryManager(Generic[_NetAddrType]):
 class MySocksProxy(aiorpcx.SOCKSProxy):
 
     async def open_connection(self, host=None, port=None, **kwargs):
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         reader = asyncio.StreamReader(loop=loop)
         protocol = asyncio.StreamReaderProtocol(reader, loop=loop)
         transport, _ = await self.create_connection(
@@ -1901,6 +1964,7 @@ class nullcontext:
 
 
 def get_running_loop() -> Optional[asyncio.AbstractEventLoop]:
+    """Returns the asyncio event loop that is *running in this thread*, if any."""
     try:
         return asyncio.get_running_loop()
     except RuntimeError:

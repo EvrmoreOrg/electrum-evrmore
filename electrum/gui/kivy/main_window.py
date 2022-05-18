@@ -19,7 +19,7 @@ from electrum import util
 from electrum.util import (profiler, InvalidPassword, send_exception_to_crash_reporter,
                            format_satoshis, format_satoshis_plain, format_fee_satoshis,
                            maybe_extract_bolt11_invoice, parse_max_spend)
-from electrum.invoices import PR_PAID, PR_FAILED
+from electrum.invoices import PR_PAID, PR_FAILED, Invoice
 from electrum import blockchain
 from electrum.network import Network, TxBroadcastError, BestEffortRequestFailed
 from electrum.interface import PREFERRED_NETWORK_PROTOCOL, ServerAddr
@@ -395,7 +395,7 @@ class ElectrumWindow(App, Logger):
         self.is_exit = False
         self.wallet = None  # type: Optional[Abstract_Wallet]
         self.pause_time = 0
-        self.asyncio_loop = asyncio.get_event_loop()
+        self.asyncio_loop = util.get_asyncio_loop()
         self.password = None
         self._use_single_password = False
         self.resume_dialog = None
@@ -421,7 +421,7 @@ class ElectrumWindow(App, Logger):
         self.gui_object = kwargs.get('gui_object', None)  # type: ElectrumGui
         self.daemon = self.gui_object.daemon
         self.fx = self.daemon.fx
-        self.use_rbf = config.get('use_rbf', True)
+        self.use_rbf = config.get('use_rbf', False)
         self.use_gossip = config.get('use_gossip', False)
         self.use_unconfirmed = not config.get('confirmed_only', False)
 
@@ -448,8 +448,7 @@ class ElectrumWindow(App, Logger):
             self.show_error(_('No wallet loaded.'))
             return
         if pr.verify(self.wallet.contacts):
-            key = pr.get_id()
-            invoice = self.wallet.get_invoice(key)  # FIXME wrong key...
+            invoice = Invoice.from_bip70_payreq(pr, height=0)
             if invoice and self.wallet.get_invoice_status(invoice) == PR_PAID:
                 self.show_error("invoice already paid")
                 self.send_screen.do_clear()
@@ -506,17 +505,17 @@ class ElectrumWindow(App, Logger):
         tab = self.tabs.ids[name + '_tab']
         panel.switch_to(tab)
 
-    def show_request(self, is_lightning, key):
+    def show_request(self, key):
         from .uix.dialogs.request_dialog import RequestDialog
         self.request_popup = RequestDialog('Request', key)
         self.request_popup.open()
 
-    def show_invoice(self, is_lightning, key):
+    def show_invoice(self, key):
         from .uix.dialogs.invoice_dialog import InvoiceDialog
         invoice = self.wallet.get_invoice(key)
         if not invoice:
             return
-        data = invoice.invoice if is_lightning else key
+        data = invoice.lightning_invoice if invoice.is_lightning() else key
         self.invoice_popup = InvoiceDialog('Invoice', data, key)
         self.invoice_popup.open()
 
@@ -1462,7 +1461,7 @@ class ElectrumWindow(App, Logger):
             else:
                 msg = _(
                     "Warning: this wallet type does not support channel recovery from seed. "
-                    "You will need to backup your wallet everytime you create a new wallet. "
+                    "You will need to backup your wallet everytime you create a new channel. "
                     "Create lightning keys?")
             d = Question(msg, self._enable_lightning, title=_('Enable Lightning?'))
             d.open()

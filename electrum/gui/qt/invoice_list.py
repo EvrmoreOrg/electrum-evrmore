@@ -33,7 +33,7 @@ from PyQt5.QtWidgets import QMenu, QVBoxLayout, QTreeWidget, QTreeWidgetItem, QH
 
 from electrum.i18n import _
 from electrum.util import format_time
-from electrum.invoices import Invoice, PR_UNPAID, PR_PAID, PR_INFLIGHT, PR_FAILED, PR_TYPE_ONCHAIN, PR_TYPE_LN
+from electrum.invoices import Invoice, PR_UNPAID, PR_PAID, PR_INFLIGHT, PR_FAILED, PR_SCHEDULED
 from electrum.lnutil import HtlcLog
 
 from .util import MyTreeView, read_QIcon, MySortModel, pr_icons
@@ -75,7 +75,6 @@ class InvoiceList(MyTreeView):
         self.setModel(self.proxy)
         self.setSortingEnabled(True)
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.update()
 
     def refresh_row(self, key, row):
         invoice = self.parent.wallet.invoices.get(key)
@@ -124,7 +123,7 @@ class InvoiceList(MyTreeView):
             items[self.Columns.DATE].setIcon(read_QIcon(icon_name))
             items[self.Columns.STATUS].setIcon(read_QIcon(pr_icons.get(status)))
             items[self.Columns.DATE].setData(key, role=ROLE_REQUEST_ID)
-            items[self.Columns.DATE].setData(item.type, role=ROLE_REQUEST_TYPE)
+            #items[self.Columns.DATE].setData(item.type, role=ROLE_REQUEST_TYPE)
             items[self.Columns.DATE].setData(timestamp, role=ROLE_SORT_ORDER)
             self.std_model.insertRow(idx, items)
         self.filter()
@@ -144,7 +143,7 @@ class InvoiceList(MyTreeView):
         if len(items)>1:
             keys = [item.data(ROLE_REQUEST_ID) for item in items]
             invoices = [wallet.invoices.get(key) for key in keys]
-            can_batch_pay = all([i.type == PR_TYPE_ONCHAIN and wallet.get_invoice_status(i) == PR_UNPAID for i in invoices])
+            can_batch_pay = all([not i.is_lightning() and wallet.get_invoice_status(i) == PR_UNPAID for i in invoices])
             menu = QMenu(self)
             if can_batch_pay:
                 menu.addAction(_("Batch pay invoices") + "...", lambda: self.parent.pay_multiple_invoices(invoices))
@@ -169,6 +168,8 @@ class InvoiceList(MyTreeView):
         status = wallet.get_invoice_status(invoice)
         if status == PR_UNPAID:
             menu.addAction(_("Pay") + "...", lambda: self.parent.do_pay_invoice(invoice))
+        if status == PR_SCHEDULED:
+            menu.addAction(_("Cancel") + "...", lambda: self.parent.cancel_scheduled_invoice(key))
         if status == PR_FAILED:
             menu.addAction(_("Retry"), lambda: self.parent.do_pay_invoice(invoice))
         if self.parent.wallet.lnworker:

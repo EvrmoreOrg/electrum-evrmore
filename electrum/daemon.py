@@ -51,6 +51,7 @@ from .commands import known_commands, Commands
 from .simple_config import SimpleConfig
 from .exchange_rate import FxThread
 from .logging import get_logger, Logger
+from . import GuiImportError
 
 if TYPE_CHECKING:
     from electrum import gui
@@ -66,7 +67,7 @@ def get_rpcsock_defaultpath(config: SimpleConfig):
     return os.path.join(config.path, 'daemon_rpc_socket')
 
 def get_rpcsock_default_type(config: SimpleConfig):
-    if config.get('rpchost') and config.get('rpcport'):
+    if config.get('rpcport'):
         return 'tcp'
     # Use unix domain sockets when available,
     # with the extra paranoia that in case windows "implements" them,
@@ -123,7 +124,7 @@ def request(config: SimpleConfig, endpoint, args=(), timeout=60):
         rpc_user, rpc_password = get_rpc_credentials(config)
         server_url = 'http://%s:%d' % (host, port)
         auth = aiohttp.BasicAuth(login=rpc_user, password=rpc_password)
-        loop = asyncio.get_event_loop()
+        loop = util.get_asyncio_loop()
         async def request_coroutine():
             if socktype == 'unix':
                 connector = aiohttp.UnixConnector(path=path)
@@ -465,7 +466,7 @@ class Daemon(Logger):
         if 'wallet_path' in config.cmdline_options:
             self.logger.warning("Ignoring parameter 'wallet_path' for daemon. "
                                 "Use the load_wallet command instead.")
-        self.asyncio_loop = asyncio.get_event_loop()
+        self.asyncio_loop = util.get_asyncio_loop()
         self.network = None
         if not config.get('offline'):
             self.network = Network(config, daemon=self)
@@ -621,7 +622,10 @@ class Daemon(Logger):
             gui_name = 'qt'
         self.logger.info(f'launching GUI: {gui_name}')
         try:
-            gui = __import__('electrum.gui.' + gui_name, fromlist=['electrum'])
+            try:
+                gui = __import__('electrum.gui.' + gui_name, fromlist=['electrum'])
+            except GuiImportError as e:
+                sys.exit(str(e))
             self.gui_object = gui.ElectrumGui(config=config, daemon=self, plugins=plugins)
             if not self._stop_entered:
                 self.gui_object.main()

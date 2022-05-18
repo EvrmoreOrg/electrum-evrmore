@@ -363,7 +363,7 @@ class Interface(Logger):
     LOGGING_SHORTCUT = 'i'
 
     def __init__(self, *, network: 'Network', server: ServerAddr, proxy: Optional[dict]):
-        self.ready = asyncio.Future()
+        self.ready = network.asyncio_loop.create_future()
         self.got_disconnected = asyncio.Event()
         self.server = server
         Logger.__init__(self)
@@ -374,9 +374,17 @@ class Interface(Logger):
         self._requested_chunks = set()  # type: Set[Tuple[int, int]]
 
         self.network = network
-        self.proxy = MySocksProxy.from_proxy_dict(proxy)
         self.session = None  # type: Optional[NotificationSession]
         self._ipaddr_bucket = None
+        # Set up proxy.
+        # - for servers running on localhost, the proxy is not used. If user runs their own server
+        #   on same machine, this lets them enable the proxy (which is used for e.g. FX rates).
+        #   note: we could maybe relax this further and bypass the proxy for all private
+        #         addresses...? e.g. 192.168.x.x
+        if util.is_localhost(server.host):
+            self.logger.info(f"looks like localhost: not using proxy for this server")
+            proxy = None
+        self.proxy = MySocksProxy.from_proxy_dict(proxy)
 
         # Latest block header and corresponding height, as claimed by the server.
         # Note that these values are updated before they are verified.
@@ -600,6 +608,8 @@ class Interface(Logger):
         self.logger.info("cert fingerprint verification passed")
 
     async def get_block_header(self, height, assert_mode):
+        if not is_non_negative_integer(height):
+            raise Exception(f"{repr(height)} is not a block height")
         self.logger.info(f'requesting block header {height} in mode {assert_mode}')
         # use lower timeout as we usually have network.bhi_lock here
         timeout = self.network.get_network_timeout_seconds(NetworkTimeout.Urgent)
@@ -751,24 +761,30 @@ class Interface(Logger):
             if self.tip < constants.net.max_dgw_checkpoint() + 2016:
                 raise GracefulDisconnect('server tip below max checkpoint')
             self._mark_ready()
-            await self._process_header_at_tip()
+            blockchain_updated = await self._process_header_at_tip()
             # header processing done
-            util.trigger_callback('blockchain_updated')
+            if blockchain_updated:
+                util.trigger_callback('blockchain_updated')
             util.trigger_callback('network_updated')
             await self.network.switch_unwanted_fork_interface()
             await self.network.switch_lagging_interface()
 
-    async def _process_header_at_tip(self):
+    async def _process_header_at_tip(self) -> bool:
+        """Returns:
+        False - boring fast-forward: we already have this header as part of this blockchain from another interface,
+        True - new header we didn't have, or reorg
+        """
         height, header = self.tip, self.tip_header
         async with self.network.bhi_lock:
             if self.blockchain.height() >= height and self.blockchain.check_header(header):
                 # another interface amended the blockchain
                 self.logger.info(f"skipping header {height}")
-                return
+                return False
             _, height = await self.step(height, header)
             # in the simple case, height == self.tip+1
             if height <= self.tip:
                 await self.sync_until(height)
+            return True
 
     async def sync_until(self, height, next_height=None):
         if next_height is None:

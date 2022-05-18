@@ -79,21 +79,22 @@ class Peer(Logger):
             transport: LNTransportBase,
             *, is_channel_backup= False):
 
+        self.lnworker = lnworker
+        self.network = lnworker.network
+        self.asyncio_loop = self.network.asyncio_loop
         self.is_channel_backup = is_channel_backup
         self._sent_init = False  # type: bool
         self._received_init = False  # type: bool
-        self.initialized = asyncio.Future()
+        self.initialized = self.asyncio_loop.create_future()
         self.got_disconnected = asyncio.Event()
         self.querying = asyncio.Event()
         self.transport = transport
         self.pubkey = pubkey  # remote pubkey
-        self.lnworker = lnworker
         self.privkey = self.transport.privkey  # local privkey
         self.features = self.lnworker.features  # type: LnFeatures
         self.their_features = LnFeatures(0)  # type: LnFeatures
         self.node_ids = [self.pubkey, privkey_to_pubkey(self.privkey)]
         assert self.node_ids[0] != self.node_ids[1]
-        self.network = lnworker.network
         self.ping_time = 0
         self.reply_channel_range = asyncio.Queue()
         # gossip uses a single queue to preserve message order
@@ -104,7 +105,7 @@ class Peer(Logger):
         self.funding_signed_sent = set()  # for channels in PREOPENING
         self.shutdown_received = {} # chan_id -> asyncio.Future()
         self.announcement_signatures = defaultdict(asyncio.Queue)
-        self.channel_reestablish_msg = defaultdict(asyncio.Future)
+        self.channel_reestablish_msg = defaultdict(self.asyncio_loop.create_future)
         self.orphan_channel_updates = OrderedDict()  # type: OrderedDict[ShortChannelID, dict]
         Logger.__init__(self)
         self.taskgroup = OldTaskGroup()
@@ -208,7 +209,8 @@ class Peer(Logger):
             if message_type not in ('error', 'warning') and 'channel_id' in payload:
                 chan = self.get_channel_by_id(payload['channel_id'])
                 if chan is None:
-                    raise Exception('Got unknown '+ message_type)
+                    self.logger.info(f"Received {message_type} for unknown channel {payload['channel_id'].hex()}")
+                    return
                 args = (chan, payload)
             else:
                 args = (payload,)
@@ -1289,7 +1291,7 @@ class Peer(Logger):
             chan.config[LOCAL].was_announced = True
             self.lnworker.save_channel(chan)
             coro = self.handle_announcements(chan)
-            asyncio.run_coroutine_threadsafe(coro, self.network.asyncio_loop)
+            asyncio.run_coroutine_threadsafe(coro, self.asyncio_loop)
 
     @log_exceptions
     async def handle_announcements(self, chan: Channel):
@@ -1334,6 +1336,8 @@ class Peer(Logger):
         # only allow state transition from "FUNDED" to "OPEN"
         old_state = chan.get_state()
         if old_state == ChannelState.OPEN:
+            if self.lnworker:
+                self.lnworker.pay_scheduled_invoices()
             return
         if old_state != ChannelState.FUNDED:
             self.logger.info(f"cannot mark open ({chan.get_id_for_log()}), current state: {repr(old_state)}")
@@ -1353,6 +1357,8 @@ class Peer(Logger):
             self.logger.info(f"sending channel update for outgoing edge ({chan.get_id_for_log()})")
             chan_upd = chan.get_outgoing_gossip_channel_update()
             self.transport.send_bytes(chan_upd)
+        if self.lnworker:
+            self.lnworker.pay_scheduled_invoices()
 
     def send_announcement_signatures(self, chan: Channel):
         chan_ann = chan.construct_channel_announcement_without_sigs()
@@ -1870,7 +1876,7 @@ class Peer(Logger):
     @log_exceptions
     async def close_channel(self, chan_id: bytes):
         chan = self.channels[chan_id]
-        self.shutdown_received[chan_id] = asyncio.Future()
+        self.shutdown_received[chan_id] = self.asyncio_loop.create_future()
         await self.send_shutdown(chan)
         payload = await self.shutdown_received[chan_id]
         try:

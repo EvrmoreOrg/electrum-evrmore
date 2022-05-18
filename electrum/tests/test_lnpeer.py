@@ -14,15 +14,26 @@ from aiorpcx import timeout_after, TaskTimeout
 
 import electrum
 import electrum.trampoline
+<<<<<<< HEAD
 from electrum import ravencoin
+=======
+from electrum import bitcoin
+from electrum import util
+>>>>>>> 232e38e27dea91144ce4b2c057cc8db7de122936
 from electrum import constants
 from electrum.network import Network
 from electrum.ecc import ECPrivkey
 from electrum import simple_config, lnutil
 from electrum.lnaddr import lnencode, LnAddr, lndecode
+<<<<<<< HEAD
 from electrum.ravencoin import COIN, sha256
 from electrum.util import bh2u, create_and_start_event_loop, NetworkRetryManager, bfh, OldTaskGroup
 from electrum.lnpeer import Peer, UpfrontShutdownScriptViolation
+=======
+from electrum.bitcoin import COIN, sha256
+from electrum.util import bh2u, NetworkRetryManager, bfh, OldTaskGroup
+from electrum.lnpeer import Peer
+>>>>>>> 232e38e27dea91144ce4b2c057cc8db7de122936
 from electrum.lnutil import LNPeerAddr, Keypair, privkey_to_pubkey
 from electrum.lnutil import PaymentFailure, LnFeatures, HTLCOwner
 from electrum.lnchannel import ChannelState, PeerState, Channel
@@ -62,7 +73,7 @@ class MockNetwork:
         user_config = {}
         user_dir = tempfile.mkdtemp(prefix="electrum-lnpeer-test-")
         self.config = simple_config.SimpleConfig(user_config, read_user_dir_function=lambda: user_dir)
-        self.asyncio_loop = asyncio.get_event_loop()
+        self.asyncio_loop = util.get_asyncio_loop()
         self.channel_db = ChannelDB(self)
         self.channel_db.data_loaded.set()
         self.path_finder = LNPathFinder(self.channel_db)
@@ -97,6 +108,7 @@ class MockBlockchain:
 
 
 class MockWallet:
+    receive_requests = {}
 
     def set_label(self, x, y):
         pass
@@ -116,6 +128,7 @@ class MockWallet:
 
 class MockLNWallet(Logger, NetworkRetryManager[LNPeerAddr]):
     MPP_EXPIRY = 2  # HTLC timestamps are cast to int, so this cannot be 1
+    PAYMENT_TIMEOUT = 120
     TIMEOUT_SHUTDOWN_FAIL_PENDING_HTLCS = 0
     INITIAL_TRAMPOLINE_FEE_LEVEL = 0
 
@@ -157,6 +170,9 @@ class MockLNWallet(Logger, NetworkRetryManager[LNPeerAddr]):
         self.downstream_htlc_to_upstream_peer_map = {}
 
         self.logger.info(f"created LNWallet[{name}] with nodeID={local_keypair.pubkey.hex()}")
+
+    def pay_scheduled_invoices(self):
+        pass
 
     def get_invoice_status(self, key):
         pass
@@ -237,6 +253,7 @@ class MockLNWallet(Logger, NetworkRetryManager[LNPeerAddr]):
     get_channel_by_id = LNWallet.get_channel_by_id
     channels_for_peer = LNWallet.channels_for_peer
     calc_routing_hints_for_invoice = LNWallet.calc_routing_hints_for_invoice
+    border_nodes_that_can_receive = LNWallet.border_nodes_that_can_receive
     handle_error_code_from_failed_htlc = LNWallet.handle_error_code_from_failed_htlc
     is_trampoline_peer = LNWallet.is_trampoline_peer
     wait_for_received_pending_htlcs_to_get_removed = LNWallet.wait_for_received_pending_htlcs_to_get_removed
@@ -363,7 +380,6 @@ class TestPeer(TestCaseForTestnet):
 
     def setUp(self):
         super().setUp()
-        self.asyncio_loop, self._stop_loop, self._loop_thread = create_and_start_event_loop()
         self._lnworkers_created = []  # type: List[MockLNWallet]
 
     def tearDown(self):
@@ -374,8 +390,6 @@ class TestPeer(TestCaseForTestnet):
             self._lnworkers_created.clear()
         run(cleanup_lnworkers())
 
-        self.asyncio_loop.call_soon_threadsafe(self._stop_loop.set_result, 1)
-        self._loop_thread.join(timeout=1)
         super().tearDown()
 
     def prepare_peers(self, alice_channel: Channel, bob_channel: Channel):
@@ -482,14 +496,10 @@ class TestPeer(TestCaseForTestnet):
         w2.save_preimage(RHASH, payment_preimage)
         w2.save_payment_info(info)
         if include_routing_hints:
-            routing_hints = w2.calc_routing_hints_for_invoice(amount_msat)
+            routing_hints, trampoline_hints = w2.calc_routing_hints_for_invoice(amount_msat)
         else:
             routing_hints = []
-        trampoline_hints = []
-        for r in routing_hints:
-            node_id, short_channel_id, fee_base_msat, fee_proportional_millionths, cltv_expiry_delta = r[1][0]
-            if len(r[1])== 1 and w2.is_trampoline_peer(node_id):
-                trampoline_hints.append(('t', (node_id, fee_base_msat, fee_proportional_millionths, cltv_expiry_delta)))
+            trampoline_hints = []
         invoice_features = w2.features.for_invoice()
         if invoice_features.supports(LnFeatures.PAYMENT_SECRET_OPT):
             payment_secret = derive_payment_secret_from_payment_preimage(payment_preimage)
@@ -1356,4 +1366,4 @@ class TestPeer(TestCaseForTestnet):
 
 
 def run(coro):
-    return asyncio.run_coroutine_threadsafe(coro, loop=asyncio.get_event_loop()).result()
+    return asyncio.run_coroutine_threadsafe(coro, loop=util.get_asyncio_loop()).result()

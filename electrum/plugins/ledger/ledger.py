@@ -500,10 +500,6 @@ class Ledger_KeyStore(Hardware_KeyStore):
 
     def __init__(self, d):
         Hardware_KeyStore.__init__(self, d)
-        # Errors and other user interaction is done through the wallet's
-        # handler.  The handler is per-window and preserved across
-        # device reconnects
-        self.force_watching_only = False
         self.signing = False
         self.cfg = d.get('cfg', {'mode': 0})
 
@@ -518,14 +514,16 @@ class Ledger_KeyStore(Hardware_KeyStore):
     def get_client_electrum(self) -> Optional[Ledger_Client]:
         return self.plugin.get_client(self)
 
+<<<<<<< HEAD
     def give_error(self, message, clear_client=False):
+=======
+    def give_error(self, message):
+>>>>>>> 232e38e27dea91144ce4b2c057cc8db7de122936
         _logger.info(message)
         if not self.signing:
             self.handler.show_error(message)
         else:
             self.signing = False
-        if clear_client:
-            self.client = None
         raise UserFacingException(message)
 
     def set_and_unset_signing(func):
@@ -566,19 +564,25 @@ class Ledger_KeyStore(Hardware_KeyStore):
             signature = client_ledger.signMessageSign(pin)
         except BTChipException as e:
             if e.sw == 0x6a80:
+<<<<<<< HEAD
                 self.give_error(
                     _("Unfortunately, this message cannot be signed by the Ledger wallet. Only alphanumerical messages shorter than 140 characters are supported. Please remove any extra characters (tab, carriage return) and retry."))
+=======
+                self.give_error("Unfortunately, this message cannot be signed by the Ledger wallet. "
+                                "Only alphanumerical messages shorter than 140 characters are supported. "
+                                "Please remove any extra characters (tab, carriage return) and retry.")
+>>>>>>> 232e38e27dea91144ce4b2c057cc8db7de122936
             elif e.sw == 0x6985:  # cancelled by user
                 return b''
             elif e.sw == 0x6982:
                 raise  # pin lock. decorator will catch it
             else:
-                self.give_error(e, True)
+                self.give_error(e)
         except UserWarning:
             self.handler.show_error(_('Cancelled by user'))
             return b''
         except Exception as e:
-            self.give_error(e, True)
+            self.give_error(e)
         finally:
             self.handler.finished()
         # Parse the ASN.1 signature
@@ -844,12 +848,16 @@ class Ledger_KeyStore(Hardware_KeyStore):
                 raise  # pin lock. decorator will catch it
             else:
                 self.logger.exception('')
-                self.give_error(e, True)
+                self.give_error(e)
         except BaseException as e:
             self.logger.exception('')
+<<<<<<< HEAD
             self.give_error(e, True)
         except Exception:
             logging.exception('Ledger exception')
+=======
+            self.give_error(e)
+>>>>>>> 232e38e27dea91144ce4b2c057cc8db7de122936
         finally:
             self.handler.finished()
 
@@ -887,7 +895,6 @@ class Ledger_KeyStore(Hardware_KeyStore):
 class LedgerPlugin(HW_PluginBase):
     keystore_class = Ledger_KeyStore
     minimum_library = (0, 1, 32)
-    client = None
     DEVICE_IDS = [
                    (0x2581, 0x1807), # HW.1 legacy btchip
                    (0x2581, 0x2b7c), # HW.1 transitional production
@@ -1001,9 +1008,6 @@ class LedgerPlugin(HW_PluginBase):
 
     @runs_in_hwd_thread
     def create_client(self, device, handler):
-        if handler:
-            self.handler = handler
-
         client = self.get_btchip_device(device)
         if client is not None:
             client = Ledger_Client(client, product_key=device.product_key, plugin=self)

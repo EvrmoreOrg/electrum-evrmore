@@ -122,10 +122,8 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
         self.setLayout(vbox)
 
         vbox.addWidget(QLabel(_("Transaction ID:")))
-        self.tx_hash_e  = ButtonsLineEdit()
-        qr_show = lambda: parent.show_qrcode(str(self.tx_hash_e.text()), 'Transaction ID', parent=self)
-        qr_icon = "qrcode_white.png" if ColorScheme.dark_scheme else "qrcode.png"
-        self.tx_hash_e.addButton(qr_icon, qr_show, _("Show as QR code"))
+        self.tx_hash_e = ButtonsLineEdit()
+        self.tx_hash_e.add_qr_show_button(config=self.config, title='Transaction ID')
         self.tx_hash_e.setReadOnly(True)
         vbox.addWidget(self.tx_hash_e)
 
@@ -720,11 +718,11 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
         vbox_right = QVBoxLayout()
         self.size_label = TxDetailLabel()
         vbox_right.addWidget(self.size_label)
-        # self.rbf_label = TxDetailLabel()
-        # vbox_right.addWidget(self.rbf_label)
-        # self.rbf_cb = QCheckBox(_('Replace by fee'))
-        # self.rbf_cb.setChecked(bool(self.config.get('use_rbf', True)))
-        # vbox_right.addWidget(self.rbf_cb)
+        self.rbf_label = TxDetailLabel()
+        vbox_right.addWidget(self.rbf_label)
+        self.rbf_cb = QCheckBox(_('Replace by fee'))
+        self.rbf_cb.setChecked(bool(self.config.get('use_rbf', False)))
+        vbox_right.addWidget(self.rbf_cb)
 
         self.locktime_final_label = TxDetailLabel()
         vbox_right.addWidget(self.locktime_final_label)

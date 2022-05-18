@@ -748,8 +748,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         # todo: add lightning frozen
         c, u, x = self.get_balance()
         fc, fu, fx = self.get_frozen_balance()
-        lightning = self.lnworker.get_balance() if self.has_lightning() else 0
-        f_lightning = self.lnworker.get_balance(frozen=True) if self.has_lightning() else 0
+        lightning = self.lnworker.get_balance() if self.has_lightning() else RavenValue()
+        f_lightning = self.lnworker.get_balance(frozen=True) if self.has_lightning() else RavenValue()
         # subtract frozen funds
         cc = c - fc
         uu = u - fu
@@ -903,9 +903,10 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         if invoice.is_lightning() and not invoice.get_address():
             return False, []
         outputs = invoice.get_outputs()
-        invoice_amounts = defaultdict(int)  # type: Dict[bytes, int]  # scriptpubkey -> value_sats
+        invoice_amounts = defaultdict(RavenValue)  # type: Dict[bytes, RavenValue]  # scriptpubkey -> value_sats
         for txo in outputs:  # type: PartialTxOutput
-            invoice_amounts[txo.scriptpubkey] += 1 if parse_max_spend(txo.value) else txo.value
+            invoice_amounts[txo.scriptpubkey] += RavenValue(1 if txo.asset else 0, assets=({} if not txo.asset else {txo.asset: 1})) if parse_max_spend(txo.value) \
+                                                else RavenValue(txo.value if txo.asset else 0, assets=({} if not txo.asset else {txo.asset: txo.value}))
         relevant_txs = []
         with self.lock, self.transaction_lock:
             for invoice_scriptpubkey, invoice_amt in invoice_amounts.items():

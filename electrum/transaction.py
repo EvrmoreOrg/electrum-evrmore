@@ -44,7 +44,7 @@ import copy
 from . import ecc, ravencoin, constants, segwit_addr, bip32, assets
 from .assets import guess_asset_script_for_vin
 from .bip32 import UINT32_MAX, BIP32Node
-from .util import format_satoshis, profiler, to_bytes, bh2u, bfh, chunks, is_hex_str, Satoshis, format_satoshis
+from .util import format_satoshis, parse_max_spend, to_bytes, bh2u, bfh, chunks, is_hex_str, Satoshis, format_satoshis
 from .ravencoin import (TYPE_ADDRESS, TYPE_SCRIPT, hash_160,
                         hash160_to_p2sh, hash160_to_p2pkh, hash_to_segwit_addr,
                         var_int, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN,
@@ -113,16 +113,32 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
         assert isinstance(assets, Dict)
         if isinstance(rvn, int):
             self.__rvn_value = Satoshis(rvn)
-        else:
+        elif isinstance(rvn, Satoshis):
             self.__rvn_value = rvn
-        self.__asset_value = {k: (Satoshis(v) if isinstance(v, int) else v) for k, v in assets.items()}
+        elif isinstance(rvn, str) and '!' in rvn:
+            self.__rvn_value = rvn
+        else:
+            raise ValueError(f'Invalid rvn value: {rvn}')
+        
+        self.__asset_value = {}
+        for asset, value in assets.items():
+            if isinstance(value, int):
+                value = Satoshis(value)
+            elif isinstance(value, Satoshis):
+                pass
+            elif isinstance(value, str) and '!' in value:
+                pass
+            else:
+                raise ValueError(f'Invalid rvn value: {rvn}')
+
+            self.__asset_value[asset] = value
 
     @property
-    def rvn_value(self) -> Satoshis:
+    def rvn_value(self) -> Union[Satoshis, str]:
         return self.__rvn_value
 
     @property
-    def assets(self) -> Dict[str, Satoshis]:
+    def assets(self) -> Dict[str, Union[Satoshis, str]]:
         return copy.copy(self.__asset_value)
 
     def __repr__(self):
@@ -169,7 +185,7 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
     def __mul__(self, other):
         if isinstance(other, int):
             self.__rvn_value *= other
-            for asset, val in self.assets:
+            for asset, val in self.assets.items():
                 self.__asset_value[asset] = val * other
         else:
             raise ValueError('int required')
@@ -226,39 +242,36 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
 
 class TxOutput:
     scriptpubkey: bytes
-    _value: Satoshis
+    _value: Union[int, str]
     asset: Union[str, None]
-    max: bool  # This is just a cosmetic check and has no real effect on the actual value
 
     def __init__(self, *, scriptpubkey: bytes, value: Satoshis, is_max: bool = False, asset: str = None):
         assert isinstance(scriptpubkey, bytes)
         assert isinstance(value, Satoshis) or isinstance(value, int)
-        if isinstance(value, int):
-            value = Satoshis(value)
+        if not (isinstance(value, int) or parse_max_spend(value) is not None):
+            raise ValueError(f"bad txout value: {value!r}")
         self.scriptpubkey = scriptpubkey
         self._value = value
         self.asset = asset
-        self.max = is_max
 
     @property
-    def value(self):
+    def value(self) -> Union[int, str]:
         return self._value
 
     @value.setter
     def value(self, value):
-        assert isinstance(value, Satoshis)
+        assert isinstance(value, int) or parse_max_spend(value) is not None
         self._value = value
 
     @classmethod
-    def from_address_and_value(cls, address: str, value: Satoshis, asset: str = None, *, is_max = False) -> Union['TxOutput', 'PartialTxOutput']:
+    def from_address_and_value(cls, address: str, value: Union[int, str], asset: str = None) -> Union['TxOutput', 'PartialTxOutput']:
         script = bfh(ravencoin.address_to_script(address))
         if asset:
             script = assets.create_transfer_asset_script(script, asset, value.value)
 
         return cls(scriptpubkey=script,
                    value=value,
-                   asset=asset,
-                   is_max=is_max)
+                   asset=asset)
 
     def serialize_to_network(self) -> bytes:
         if self.asset:

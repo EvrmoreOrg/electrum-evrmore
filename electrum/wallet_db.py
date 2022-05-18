@@ -33,7 +33,7 @@ import binascii
 
 from . import util, ravencoin
 from .util import profiler, WalletFileException, multisig_type, TxMinedInfo, bfh, Satoshis
-from .invoices import Invoice, OnchainInvoice
+from .invoices import Invoice
 from .keystore import bip44_derivation
 from .transaction import Transaction, TxOutpoint, tx_from_any, PartialTransaction, PartialTxOutput, AssetMeta, RavenValue
 from .logging import Logger
@@ -929,6 +929,12 @@ class WalletDB(JsonDB):
             return
         # reset and redownload asset meta
         self.data.pop('asset_meta', {})
+        self.data['seed_version'] = 46
+
+    def _convert_version_47(self):
+        from .crypto import sha256d
+        if not self._is_upgrade_method_needed(46, 46):
+            return
         from .lnaddr import lndecode
         swaps = self.data.get('submarine_swaps', {})
         for key, item in swaps.items():
@@ -950,7 +956,7 @@ class WalletDB(JsonDB):
                     message = lnaddr.get_description()
                     height = 0
                 else:
-                    amount_sat = item['amount_sat']
+                    amount_sat = RavenValue.from_json(item['amount_sat'])
                     amount_msat = amount_sat * 1000 if amount_sat not in [None, '!'] else amount_sat
                     message = item['message']
                     timestamp = item['time']
@@ -967,12 +973,7 @@ class WalletDB(JsonDB):
                     'bip70':bip70,
                     'lightning_invoice':lightning_invoice,
                 }
-        self.data['seed_version'] = 46
-
-    def _convert_version_47(self):
-        from .crypto import sha256d
-        if not self._is_upgrade_method_needed(46, 46):
-            return
+        
         # recalc keys of outgoing on-chain invoices
         def get_id_from_onchain_outputs(raw_outputs, timestamp):
             outputs = [PartialTxOutput.from_legacy_tuple(*output) for output in raw_outputs]

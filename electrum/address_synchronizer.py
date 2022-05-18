@@ -26,6 +26,7 @@ import itertools
 from collections import defaultdict
 from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple, NamedTuple, Sequence, List, Iterable
 
+import asyncio
 from aiorpcx import TaskGroup
 
 from .crypto import sha256

@@ -11,6 +11,8 @@ from numbers import Real
 from copy import deepcopy
 from aiorpcx import NetAddress
 
+from electrum.transaction import RavenValue
+
 from . import util
 from . import constants
 from .util import base_units, base_unit_name_to_decimal_point, decimal_point_to_base_unit_name, UnknownBaseUnit, DECIMAL_POINT_DEFAULT
@@ -689,7 +691,11 @@ class SimpleConfig(Logger):
         )
 
     def format_amount_and_units(self, amount):
-        return self.format_amount(amount) + ' '+ self.get_base_unit()
+        suffix = ''
+        if isinstance(amount, RavenValue):
+            suffix = f'({len(amount.assets)} assets)'
+            amount = amount.rvn_value.value
+        return self.format_amount(amount) + ' '+ self.get_base_unit() + (' ' if suffix else '') + suffix
 
     def format_fee_rate(self, fee_rate):
         return format_fee_satoshis(fee_rate/1000, num_zeros=self.num_zeros) + ' sat/byte'

@@ -1,11 +1,12 @@
 #!/usr/bin/env python
+from decimal import Decimal
 import re
-from typing import Dict
+from typing import Dict, Union
 
 from .logging import get_logger
 from .ravencoin import opcodes, push_script, base_encode, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN, base_decode
 from . import transaction
-from .util import bfh
+from .util import Satoshis, bfh
 
 DOUBLE_PUNCTUATION = "^.*[._]{2,}.*$"
 LEADING_PUNCTUATION = "^[._].*$"
@@ -134,7 +135,11 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
         }
 
 
-def create_transfer_asset_script(standard: bytes, asset: str, value: int):
+def create_transfer_asset_script(standard: bytes, asset: str, value: Union[int, Satoshis, Decimal, str]):
+    if isinstance(value, Satoshis):
+        value = value.value
+    if isinstance(value, str):
+        value = 0
     asset_header = b'rvnt'.hex()
     name = push_script(asset.encode('ascii').hex())
     amt = value.to_bytes(8, byteorder="little", signed=False).hex()

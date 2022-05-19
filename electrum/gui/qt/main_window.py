@@ -178,7 +178,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
     computing_privkeys_signal = pyqtSignal()
     show_privkeys_signal = pyqtSignal()
     show_error_signal = pyqtSignal(str)
-
     payment_request: Optional[paymentrequest.PaymentRequest]
 
     def __init__(self, gui_object: 'ElectrumGui', wallet: Abstract_Wallet):
@@ -2522,7 +2521,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             else:
                 a = None
             self.pay_onchain_dialog(self.get_coins(asset=a), invoice.outputs)
-            self.pay_onchain_dialog(self.get_coins(), invoice.outputs)
 
     def cancel_scheduled_invoice(self, key):
         self.wallet.lnworker.set_invoice_status(key, PR_UNPAID)

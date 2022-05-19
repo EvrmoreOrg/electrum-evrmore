@@ -210,7 +210,7 @@ class CoinChooserBase(Logger):
             output_amounts_asset = [t[1] for t in output_amounts if t[0] == asset]
             minimum_division = 10 ** -divisions
             # Don't split change of less than min div or less than 0.02 BTC
-            max_change_asset = max(max([o.value for o in output_amounts_asset]) * 1.25,
+            max_change_asset = max(max([o for o in output_amounts_asset]) * 1.25,
                                    max(minimum_division * COIN, 0.02 * COIN))
 
             change_amount_asset = tx.get_fee().assets.get(asset, Satoshis(0)).value
@@ -249,7 +249,7 @@ class CoinChooserBase(Logger):
                                   fee_estimator_numchange(1, asset_divisions.keys())))]
 
         # Don't split change of less than 0.02 BTC
-        max_change_rvn = max(max([o.value for o in output_amounts_rvn]) * 1.25, 0.02 * COIN)
+        max_change_rvn = max(max([o for o in output_amounts_rvn]) * 1.25, 0.02 * COIN)
 
         # Use N change outputs
         change_amount_rvn = 0
@@ -608,14 +608,14 @@ class CoinChooserPrivacy(CoinChooserRandom):
 
     def penalty_func(self, base_tx, *, tx_from_buckets):
         # This is per bucket; we dont care about RavenValues; just values
-        min_change = min(o.value.value for o in base_tx.outputs()) * 0.75
-        max_change = max(o.value.value for o in base_tx.outputs()) * 1.33
+        min_change = min(o.value for o in base_tx.outputs()) * 0.75
+        max_change = max(o.value for o in base_tx.outputs()) * 1.33
 
         def penalty(buckets: List[Bucket]) -> ScoredCandidate:
             # Penalize using many buckets (~inputs)
             badness = len(buckets) - 1
             tx, change_outputs = tx_from_buckets(buckets)
-            change = sum(o.value.value for o in change_outputs)
+            change = sum(o.value for o in change_outputs)
             # Penalize change not roughly in output range
             if change == 0:
                 pass  # no change is great!

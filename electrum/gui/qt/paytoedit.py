@@ -233,13 +233,9 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
             asset = self.win.get_asset_from_spend_tab()
             script = self.payto_scriptpubkey
             if is_max:
-                amount_rval = sum([txin.value_sats() for txin in self.win.get_coins(asset=asset)], RavenValue())
-                if asset:
-                    amount = amount_rval.assets.get(asset, Satoshis(0))
-                else:
-                    amount = amount_rval.rvn_value
+                amount = '!'
             else:
-                amount = Satoshis(self.amount_edit.get_amount())
+                amount = self.amount_edit.get_amount()
                 if amount is None:
                     return []
             if asset:
@@ -247,7 +243,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
             if amount == 0:
                 self.errors.append(PayToLineError('The amount cannot be 0.', None))
                 return []
-            self.outputs = [PartialTxOutput(scriptpubkey=script, value=amount, asset=asset, is_max=is_max)]
+            self.outputs = [PartialTxOutput(scriptpubkey=script, value=amount, asset=asset)]
 
         return self.outputs[:]
 

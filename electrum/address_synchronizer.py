@@ -962,7 +962,7 @@ class AddressSynchronizer(Logger):
                 assert tx is not None # txid comes from get_addr_io
                 # we look at the outputs that are spent by this transaction
                 # if those outputs are ours and confirmed, we count this coin as confirmed
-                confirmed_spent_amount = 0
+                confirmed_spent_amount = RavenValue()
                 for txin in tx.inputs():
                     if txin.prevout in coins:
                         coin = coins[txin.prevout]
@@ -970,7 +970,8 @@ class AddressSynchronizer(Logger):
                             confirmed_spent_amount += coin.value_sats()
                 # Compare amount, in case tx has confirmed and unconfirmed inputs, or is a coinjoin.
                 # (fixme: tx may have multiple change outputs)
-                if confirmed_spent_amount >= v:
+                # TODO: Only RVN
+                if confirmed_spent_amount.rvn_value >= v.rvn_value:
                     c += v
                 else:
                     c += confirmed_spent_amount

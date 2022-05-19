@@ -209,8 +209,13 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
     def __eq__(self, other):
         if not isinstance(other, RavenValue):
             return False
-        return self.__rvn_value == other.__rvn_value and self.__asset_value == other.__asset_value
-
+        if self.__rvn_value != other.__rvn_value:
+            return False
+        for asset, value in self.__asset_value.items():
+            if value != other.__asset_value.get(asset, 0):
+                return False
+        return True
+        
     def __hash__(self):
         k1 = hash(self.__rvn_value)
         k2 = hash(frozenset(self.__asset_value.items()))
@@ -258,13 +263,15 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
 
 class TxOutput:
     scriptpubkey: bytes
-    _value: Union[int, Satoshis, str]
+    _value: Union[int, str]
     asset: Optional[str]
 
-    def __init__(self, *, scriptpubkey: bytes, value: Satoshis, asset: str = None):
+    def __init__(self, *, scriptpubkey: bytes, value: int, asset: str = None):
         assert isinstance(scriptpubkey, bytes)
-        assert isinstance(value, Satoshis) or isinstance(value, int)
-        if not (isinstance(value, (int, Satoshis)) or parse_max_spend(value) is not None):
+        if isinstance(value, Satoshis):
+            value = value.value
+        assert isinstance(value, int)
+        if not (isinstance(value, int) or parse_max_spend(value) is not None):
             raise ValueError(f"bad txout value: {value!r}")
         self.scriptpubkey = scriptpubkey
         self._value = value
@@ -283,7 +290,7 @@ class TxOutput:
     def from_address_and_value(cls, address: str, value: Union[int, str], asset: str = None) -> Union['TxOutput', 'PartialTxOutput']:
         script = bfh(ravencoin.address_to_script(address))
         if asset:
-            script = assets.create_transfer_asset_script(script, asset, value.value)
+            script = assets.create_transfer_asset_script(script, asset, value)
 
         return cls(scriptpubkey=script,
                    value=value,

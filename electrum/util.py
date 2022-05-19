@@ -684,15 +684,18 @@ def xor_bytes(a: bytes, b: bytes) -> bytes:
             .to_bytes(size, "big"))
 
 
-def convert_bytes_to_ascii_safe(_bytes: bytes) -> str:
+def convert_bytes_to_utf8_safe(_bytes: bytes) -> str:
     '''Returns bytes as ascii decoded with .'s for invalid bytes'''
-    ret = ''
-    for b in _bytes:
-        if b in range(128):
-            ret += chr(b)
-        else:
-            ret += '.'
-    return ret
+    try:
+        return _bytes.decode('utf8')
+    except Exception:
+        ret = ''
+        for b in _bytes:
+            if b in range(128):
+                ret += chr(b)
+            else:
+                ret += '.'
+        return ret
 
 
 def user_dir():

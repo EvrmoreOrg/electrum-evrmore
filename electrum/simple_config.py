@@ -680,6 +680,12 @@ class SimpleConfig(Logger):
                 pass
 
     def format_amount(self, x, is_diff=False, whitespaces=False):
+        suffix = ''
+        if isinstance(x, RavenValue):
+            if x.assets:
+                suffix = f'({len(x.assets)} assets)'
+            x = x.rvn_value.value
+        
         return format_satoshis(
             x,
             num_zeros=self.num_zeros,
@@ -688,12 +694,13 @@ class SimpleConfig(Logger):
             whitespaces=whitespaces,
             precision=self.amt_precision_post_satoshi,
             add_thousands_sep=self.amt_add_thousands_sep,
-        )
+        ) + (' ' if suffix else '') + suffix
 
     def format_amount_and_units(self, amount):
         suffix = ''
         if isinstance(amount, RavenValue):
-            suffix = f'({len(amount.assets)} assets)'
+            if amount.assets:
+                suffix = f'({len(amount.assets)} assets)'
             amount = amount.rvn_value.value
         return self.format_amount(amount) + ' '+ self.get_base_unit() + (' ' if suffix else '') + suffix
 

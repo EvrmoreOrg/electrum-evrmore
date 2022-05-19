@@ -177,7 +177,7 @@ class CoinGecko(ExchangeBase):
     async def get_rates(self, ccy):
         dicts = await self.get_json('api.coingecko.com',
                                     '/api/v3/coins/ravencoin/market_chart?vs_currency=%s&days=1' % ccy)
-        return {ccy: dicts['prices'][-1][1]}
+        return {ccy: to_decimal(dicts['prices'][-1][1])}
 
     def history_ccys(self):
         return CURRENCIES[self.name()]
@@ -185,7 +185,7 @@ class CoinGecko(ExchangeBase):
     async def request_history(self, ccy):
         dicts = await self.get_json('api.coingecko.com',
                                     '/api/v3/coins/ravencoin/market_chart?vs_currency=%s&days=max' % ccy)
-        return dict([(datetime.utcfromtimestamp(d[0] / 1000).strftime('%Y-%m-%d'), d[1]) for d in dicts['prices']])
+        return dict([(datetime.utcfromtimestamp(d[0] / 1000).strftime('%Y-%m-%d'), to_decimal(d[1])) for d in dicts['prices']])
 
 class Bittrex(ExchangeBase):
     # Refer to https://bittrex.github.io/api/v3
@@ -198,7 +198,7 @@ class Bittrex(ExchangeBase):
     async def get_rates(self, ccy):
         dicts = await self.get_json('api.bittrex.com',
                                     '/v3/markets/RVN-%s/ticker' % ccy)
-        return {ccy: dicts['lastTradeRate']}
+        return {ccy: to_decimal(dicts['lastTradeRate'])}
 
     def history_ccys(self):
         return CURRENCIES[self.name()]
@@ -206,7 +206,7 @@ class Bittrex(ExchangeBase):
     async def request_history(self, ccy):
         dicts = await self.get_json('api.bittrex.com',
                                     'v3/markets/RVN-%s/candles/TRADE/DAY_1/recent' % ccy)
-        return dict([(d['startsAt'][:10], d['close']) for d in dicts])
+        return dict([(d['startsAt'][:10], to_decimal(d['close'])) for d in dicts])
 
     # TODO: Add more exchange API's
 

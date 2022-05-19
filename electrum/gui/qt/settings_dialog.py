@@ -59,8 +59,8 @@ class SettingsDialog(QDialog):
         self.need_restart = False
         self.save_blacklist = False
         self.save_whitelist = False
-        self.fx = self.window.fx
-        self.wallet = self.window.wallet
+        self.fx = window.fx
+        self.wallet = window.wallet
         
         util.register_callback(self.on_network_callback, ['alias_received'])
         self.app.alias_received_signal.connect(self.set_alias_color)
@@ -605,16 +605,16 @@ class SettingsDialog(QDialog):
         msg = 'A list of regular expressions separated by new lines. ' \
               'If an asset\'s name matches any regular expression in this list, ' \
               'it will be hidden from view.'
-        regex_b = '\n'.join(self.window.asset_blacklist)
+        regex_b = '\n'.join(window.asset_blacklist)
         blacklist_info = HelpLabel(_('Asset Blacklist') + ':', msg)
         regex_e_b = QTextEdit()
         regex_e_b.setLineWrapMode(QTextEdit.NoWrap)
         regex_e_b.setPlainText(regex_b)
 
         def update_blacklist():
-            self.window.asset_blacklist = regex_e_b.toPlainText().split('\n')
-            if not self.window.asset_blacklist[0]: # We don't want an empty string, we want an empty regex
-                self.window.asset_blacklist = []
+            window.asset_blacklist = regex_e_b.toPlainText().split('\n')
+            if not window.asset_blacklist[0]: # We don't want an empty string, we want an empty regex
+                window.asset_blacklist = []
             self.save_blacklist = True
 
         regex_e_b.textChanged.connect(update_blacklist)
@@ -624,16 +624,16 @@ class SettingsDialog(QDialog):
         msg = 'A list of regular expressions seperated by new lines. ' \
               'Assets that match any of these regular expressions and would normally ' \
               'be blocked by the blacklist are shown.'
-        regex_w = '\n'.join(self.window.asset_whitelist)
+        regex_w = '\n'.join(window.asset_whitelist)
         whitelist_info = HelpLabel(_('Asset Whitelist') + ':', msg)
         regex_e_w = QTextEdit()
         regex_e_w.setLineWrapMode(QTextEdit.NoWrap)
         regex_e_w.setPlainText(regex_w)
 
         def update_whitelist():
-            self.window.asset_whitelist = regex_e_w.toPlainText().split('\n')
-            if not self.window.asset_whitelist[0]:
-                self.window.asset_whitelist = []
+            window.asset_whitelist = regex_e_w.toPlainText().split('\n')
+            if not window.asset_whitelist[0]:
+                window.asset_whitelist = []
             self.save_whitelist = True
 
         regex_e_w.textChanged.connect(update_whitelist)
@@ -643,9 +643,9 @@ class SettingsDialog(QDialog):
         show_spam_cb.setChecked(self.config.get('show_spam_assets', False))
 
         def on_set_show_spam(v):
-            self.window.config.set_key('show_spam_assets', v == Qt.Checked, save=True)
-            self.window.asset_list.update()
-            self.window.history_model.refresh('Toggled show spam assets', True)
+            window.config.set_key('show_spam_assets', v == Qt.Checked, save=True)
+            window.asset_list.update()
+            window.history_model.refresh('Toggled show spam assets', True)
 
         show_spam_cb.stateChanged.connect(on_set_show_spam)
         asset_widgets.append((show_spam_cb, None))
@@ -654,13 +654,13 @@ class SettingsDialog(QDialog):
         advanced_assets_cb.setChecked(self.config.get('advanced_asset_functions', False))
 
         def on_set_advanced_assets_cb(v):
-            self.window.config.set_key('advanced_asset_functions', v == Qt.Checked, save=True)
+            window.config.set_key('advanced_asset_functions', v == Qt.Checked, save=True)
 
-            self.window.create_workspace.associated_data_interpret_override.setVisible(v == Qt.Checked)
-            self.window.create_workspace.asset_addr_w.setVisible(v == Qt.Checked)
-            self.window.reissue_workspace.associated_data_interpret_override.setVisible(v == Qt.Checked)
-            self.window.reissue_workspace.asset_addr_w.setVisible(v == Qt.Checked)
-            self.window.asset_list.update()
+            window.create_workspace.associated_data_interpret_override.setVisible(v == Qt.Checked)
+            window.create_workspace.asset_addr_w.setVisible(v == Qt.Checked)
+            window.reissue_workspace.associated_data_interpret_override.setVisible(v == Qt.Checked)
+            window.reissue_workspace.asset_addr_w.setVisible(v == Qt.Checked)
+            window.asset_list.update()
 
         advanced_assets_cb.stateChanged.connect(on_set_advanced_assets_cb)
         asset_widgets.append((advanced_assets_cb, None))
@@ -668,11 +668,11 @@ class SettingsDialog(QDialog):
         message_widgets = []
 
         dev_notifications_cb = QCheckBox(_("Enable developer notifications"))
-        dev_notifications_cb.setChecked(self.config.get('get_dev_notifications', True))
+        dev_notifications_cb.setChecked(self.config.get('get_dev_notifications', False))
 
         def on_set_dev_notifications_cb(v):
-            self.window.config.set_key('get_dev_notifications', v == Qt.Checked, save=True)
-            self.window.message_list.update()
+            window.config.set_key('get_dev_notifications', v == Qt.Checked, save=True)
+            window.message_list.update()
 
         dev_notifications_cb.stateChanged.connect(on_set_dev_notifications_cb)
         message_widgets.append((dev_notifications_cb, None))
@@ -685,7 +685,7 @@ class SettingsDialog(QDialog):
             #(lightning_widgets, _('Lightning')),
             (fiat_widgets, _('Fiat')),
             (message_widgets, _('Messages')),
-            (oa_widgets, _('OpenAlias')),
+            #(oa_widgets, _('OpenAlias')),
             (misc_widgets, _('Misc')),
         ]
         for widgets, name in tabs_info:

@@ -413,7 +413,7 @@ class ChoicesLayout(object):
             msg = ""
         gb2 = QGroupBox(msg)
         vbox.addWidget(gb2)
-        vbox2 = QVBoxLayout()
+        vbox2 = QHBoxLayout() if horizontal else QVBoxLayout()
         gb2.setLayout(vbox2)
         self.group = group = QButtonGroup()
         if isinstance(choices, list):

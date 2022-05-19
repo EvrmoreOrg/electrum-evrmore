@@ -103,6 +103,8 @@ class SIGHASH(IntEnum):
 class RavenValue:  # The raw RVN value as well as asset values of a transaction
     @staticmethod
     def from_json(d: Dict):
+        if d is None:
+            return None
         assert 'RVN' in d and 'ASSETS' in d
         return RavenValue(d['RVN'], d['ASSETS'])
 
@@ -184,9 +186,23 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
 
     def __mul__(self, other):
         if isinstance(other, int):
-            self.__rvn_value *= other
+            new_rvn_value = Satoshis(self.__rvn_value.value * other)
+            new_assets = {}
             for asset, val in self.assets.items():
-                self.__asset_value[asset] = val * other
+                new_assets[asset] = val * other
+            return RavenValue(new_rvn_value, new_assets)
+        else:
+            raise ValueError('int required')
+
+    def __floordiv__(self, other):
+        if isinstance(other, int):
+            new_v_r = self.__rvn_value.value // other
+            new_rvn_value = Satoshis(int(new_v_r))
+            new_assets = {}
+            for asset, val in self.assets.items():
+                new_v_a = val.value // other
+                new_assets[asset] = Satoshis(int(new_v_a))
+            return RavenValue(new_rvn_value, new_assets)
         else:
             raise ValueError('int required')
 
@@ -242,13 +258,13 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
 
 class TxOutput:
     scriptpubkey: bytes
-    _value: Union[int, str]
-    asset: Union[str, None]
+    _value: Union[int, Satoshis, str]
+    asset: Optional[str]
 
-    def __init__(self, *, scriptpubkey: bytes, value: Satoshis, is_max: bool = False, asset: str = None):
+    def __init__(self, *, scriptpubkey: bytes, value: Satoshis, asset: str = None):
         assert isinstance(scriptpubkey, bytes)
         assert isinstance(value, Satoshis) or isinstance(value, int)
-        if not (isinstance(value, int) or parse_max_spend(value) is not None):
+        if not (isinstance(value, (int, Satoshis)) or parse_max_spend(value) is not None):
             raise ValueError(f"bad txout value: {value!r}")
         self.scriptpubkey = scriptpubkey
         self._value = value
@@ -322,7 +338,7 @@ class TxOutput:
             script = bfh(addr)
             if asset:
                 script = assets.create_transfer_asset_script(script, asset, value)
-            return cls(scriptpubkey=script, value=value, is_max=False, asset=asset)
+            return cls(scriptpubkey=script, value=value, asset=asset)
         raise Exception(f"unexpected legacy address type: {_type}")
     
     @property
@@ -948,7 +964,7 @@ def parse_output(vds: BCDataStream) -> TxOutput:
     if assets:
         asset, value = list(assets.items())[0]
 
-    return TxOutput(value=value, asset=asset, is_max=False, scriptpubkey=scriptpubkey)
+    return TxOutput(value=value, asset=asset, scriptpubkey=scriptpubkey)
 
 
 # pay & redeem scripts
@@ -2048,8 +2064,7 @@ class PartialTxOutput(TxOutput, PSBTSection):
     def from_txout(cls, txout: TxOutput) -> 'PartialTxOutput':
         res = PartialTxOutput(scriptpubkey=txout.scriptpubkey,
                               value=txout.value,
-                              asset=txout.asset,
-                              is_max=txout.max)
+                              asset=txout.asset)
         return res
 
     def parse_psbt_section_kv(self, kt, key, val):

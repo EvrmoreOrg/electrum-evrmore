@@ -40,7 +40,7 @@ import qrcode
 from qrcode import exceptions
 
 from electrum.simple_config import SimpleConfig
-from electrum.util import quantize_feerate, convert_bytes_to_ascii_safe
+from electrum.util import quantize_feerate, convert_bytes_to_utf8_safe
 from electrum.ravencoin import base_encode, NLOCKTIME_BLOCKHEIGHT_MAX
 from electrum.i18n import _
 from electrum.plugin import run_hook
@@ -666,8 +666,8 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
                 b = b[start:]
                 if b:
                     cursor.insertBlock()
-                    cursor.insertText('ascii: ', ext)
-                    cursor.insertText(convert_bytes_to_ascii_safe(b), ext)
+                    cursor.insertText('utf8: ', ext)
+                    cursor.insertText(convert_bytes_to_utf8_safe(b), ext)
 
             cursor.insertBlock()
 

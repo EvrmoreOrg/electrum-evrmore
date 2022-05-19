@@ -1242,14 +1242,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.receive_address_help.setVisible(True)
             self.receive_address_e.setVisible(False)
             self.receive_address_qr.setVisible(False)
-        if str(self.receive_lightning_e.text()):
-            self.receive_lightning_help.setVisible(False)
-            self.receive_lightning_e.setVisible(not b)
-            self.receive_lightning_qr.setVisible(b)
-        else:
-            self.receive_lightning_help.setVisible(True)
-            self.receive_lightning_e.setVisible(False)
-            self.receive_lightning_qr.setVisible(False)
+        #if str(self.receive_lightning_e.text()):
+        #    self.receive_lightning_help.setVisible(False)
+        #    self.receive_lightning_e.setVisible(not b)
+        #    self.receive_lightning_qr.setVisible(b)
+        #else:
+        #    self.receive_lightning_help.setVisible(True)
+        #    self.receive_lightning_e.setVisible(False)
+        #    self.receive_lightning_qr.setVisible(False)
 
     def create_receive_tab(self):
         # A 4-column grid layout.  All the stretch is in the last column.
@@ -1324,13 +1324,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.receive_address_help = WWLabel('')
         self.receive_address_help.setVisible(False)
         self.receive_URI_e = ButtonsTextEdit()
-        self.receive_lightning_e = ButtonsTextEdit()
-        self.receive_lightning_help = WWLabel('')
-        self.receive_lightning_help.setVisible(False)
+        #self.receive_lightning_e = ButtonsTextEdit()
+        #self.receive_lightning_help = WWLabel('')
+        #self.receive_lightning_help.setVisible(False)
         #self.receive_URI_e.setFocusPolicy(Qt.ClickFocus)
 
         fixedSize = 200
-        for e in [self.receive_address_e, self.receive_URI_e, self.receive_lightning_e]:
+        for e in [self.receive_address_e, self.receive_URI_e, ]:#self.receive_lightning_e]:
             e.setFont(QFont(MONOSPACE_FONT))
             e.addCopyButton(self.app)
             e.setReadOnly(True)
@@ -1338,9 +1338,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         self.receive_address_qr = QRCodeWidget(fixedSize=fixedSize)
         self.receive_URI_qr = QRCodeWidget(fixedSize=fixedSize)
-        self.receive_lightning_qr = QRCodeWidget(fixedSize=fixedSize)
+        #self.receive_lightning_qr = QRCodeWidget(fixedSize=fixedSize)
 
-        self.receive_lightning_e.textChanged.connect(self.update_receive_widgets)
+        #self.receive_lightning_e.textChanged.connect(self.update_receive_widgets)
 
         receive_address_layout = QHBoxLayout()
         receive_address_layout.addWidget(self.receive_address_e)
@@ -1349,10 +1349,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         receive_URI_layout = QHBoxLayout()
         receive_URI_layout.addWidget(self.receive_URI_e)
         receive_URI_layout.addWidget(self.receive_URI_qr)
-        receive_lightning_layout = QHBoxLayout()
-        receive_lightning_layout.addWidget(self.receive_lightning_e)
-        receive_lightning_layout.addWidget(self.receive_lightning_qr)
-        receive_lightning_layout.addWidget(self.receive_lightning_help)
+        #receive_lightning_layout = QHBoxLayout()
+        #receive_lightning_layout.addWidget(self.receive_lightning_e)
+        #receive_lightning_layout.addWidget(self.receive_lightning_qr)
+        #receive_lightning_layout.addWidget(self.receive_lightning_help)
 
         from .util import VTabWidget
         self.receive_tabs = VTabWidget()
@@ -1360,8 +1360,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         receive_address_widget.setLayout(receive_address_layout)
         receive_URI_widget = QWidget()
         receive_URI_widget.setLayout(receive_URI_layout)
-        receive_lightning_widget = QWidget()
-        receive_lightning_widget.setLayout(receive_lightning_layout)
+        #receive_lightning_widget = QWidget()
+        #receive_lightning_widget.setLayout(receive_lightning_layout)
 
         self.receive_address_e.setFocusPolicy(Qt.NoFocus)
         self.receive_address_e.mousePressEvent = self.toggle_receive_qr
@@ -1369,13 +1369,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.receive_URI_e.setFocusPolicy(Qt.NoFocus)
         self.receive_URI_e.mousePressEvent = self.toggle_receive_qr
         self.receive_URI_qr.mousePressEvent = self.toggle_receive_qr
-        self.receive_lightning_e.setFocusPolicy(Qt.NoFocus)
-        self.receive_lightning_e.mousePressEvent = self.toggle_receive_qr
-        self.receive_lightning_qr.mousePressEvent = self.toggle_receive_qr
+        #self.receive_lightning_e.setFocusPolicy(Qt.NoFocus)
+        #self.receive_lightning_e.mousePressEvent = self.toggle_receive_qr
+        #self.receive_lightning_qr.mousePressEvent = self.toggle_receive_qr
 
         self.receive_tabs.addTab(receive_URI_widget, read_QIcon("link.png"), _('URI'))
         self.receive_tabs.addTab(receive_address_widget, read_QIcon("bitcoin.png"), _('Address'))
-        self.receive_tabs.addTab(receive_lightning_widget, read_QIcon("lightning.png"), _('Lightning'))
+        #self.receive_tabs.addTab(receive_lightning_widget, read_QIcon("lightning.png"), _('Lightning'))
         self.receive_tabs.setToolTip(_('Click to switch between text and QR code view'))
         self.receive_tabs.currentChanged.connect(self.update_receive_qr_window)
         self.receive_tabs.setCurrentIndex(self.config.get('receive_tabs_index', 0))
@@ -1428,7 +1428,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         else:
             ln_help = ''
 
-        self.receive_tabs.setTabIcon(2, read_QIcon(icon_name))
+        #self.receive_tabs.setTabIcon(2, read_QIcon(icon_name))
         # encode lightning invoices as uppercase so QR encoding can use
         # alphanumeric mode; resulting in smaller QR codes
         lnaddr_qr = lnaddr.upper()
@@ -1438,26 +1438,28 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.receive_address_help.setText(address_help)
         self.receive_URI_e.setText(URI)
         self.receive_URI_qr.setData(URI)
-        self.receive_lightning_e.setText(lnaddr)  # TODO maybe prepend "lightning:" ??
-        self.receive_lightning_help.setText(ln_help)
-        self.receive_lightning_qr.setData(lnaddr_qr)
+        #self.receive_lightning_e.setText(lnaddr)  # TODO maybe prepend "lightning:" ??
+        #self.receive_lightning_help.setText(ln_help)
+        #self.receive_lightning_qr.setData(lnaddr_qr)
         # macOS hack (similar to #4777)
-        self.receive_lightning_e.repaint()
+        #self.receive_lightning_e.repaint()
         self.receive_URI_e.repaint()
         self.receive_address_e.repaint()
         # always show
         self.receive_tabs.setVisible(True)
         self.update_receive_qr_window()
+        self.toggle_receive_qr(None)
 
     def update_receive_qr_window(self):
         if self.qr_window and self.qr_window.isVisible():
             i = self.receive_tabs.currentIndex()
             if i == 0:
                 data = self.receive_address_qr.data
-            elif i == 1:
-                data = self.receive_URI_qr.data
+            #elif i == 1:
             else:
-                data = self.receive_lightning_qr.data
+                data = self.receive_URI_qr.data
+            #else:
+            #    data = self.receive_lightning_qr.data
             self.qr_window.qrw.setData(data)
 
     def delete_requests(self, keys):
@@ -1563,7 +1565,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
     def clear_receive_tab(self):
         self.receive_address_e.setText('')
         self.receive_URI_e.setText('')
-        self.receive_lightning_e.setText('')
+        #self.receive_lightning_e.setText('')
         self.receive_tabs.setVisible(False)
         self.receive_message_e.setText('')
         self.receive_amount_e.setAmount(None)
@@ -3272,10 +3274,12 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             ok, encrypt_file = d.run()
             if not ok:
                 return
-
             try:
                 hw_dev_pw = self.wallet.keystore.get_password_for_storage_encryption()
             except UserCancelled:
+                return
+            except ValueError:
+                self.show_error('No hardware device connected')
                 return
             except BaseException as e:
                 self.logger.exception('')

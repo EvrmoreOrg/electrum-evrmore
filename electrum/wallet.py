@@ -2435,6 +2435,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 status = self.get_request_status(addr)
                 util.trigger_callback('request_status', self, addr, status)
 
+
+    # TODO: Only RVN
     def create_request(self, amount_sat: int, message: str, exp_delay: int, address: str, lightning: bool):
         # for receiving
         amount_sat = amount_sat or 0
@@ -2448,7 +2450,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             outputs=outputs,
             message=message,
             time=timestamp,
-            amount_msat=amount_sat*1000,
+            amount_msat=RavenValue(amount_sat)*1000,
             exp=exp_delay,
             height=height,
             bip70=None,

@@ -86,7 +86,8 @@ class RequestList(MyTreeView):
     def item_changed(self, idx: Optional[QModelIndex]):
         if idx is None:
             self.parent.receive_URI_e.setText('')
-            self.parent.receive_lightning_e.setText('')
+            #self.parent.update_receive_widgets()
+            #self.parent.receive_lightning_e.setText('')
             self.parent.receive_address_e.setText('')
             return
         if not idx.isValid():

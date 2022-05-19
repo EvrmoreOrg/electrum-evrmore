@@ -239,7 +239,6 @@ class ChangePasswordDialogBase(WindowModalDialog):
     def create_password_layout(self, wallet, is_encrypted, OK_button):
         raise NotImplementedError()
 
-
 class ChangePasswordDialogForSW(ChangePasswordDialogBase):
 
     def __init__(self, parent, wallet):
@@ -277,7 +276,7 @@ class ChangePasswordDialogForHW(ChangePasswordDialogBase):
     def __init__(self, parent, wallet):
         ChangePasswordDialogBase.__init__(self, parent, wallet)
 
-    def create_password_layout(self, wallet, is_encrypted, OK_button):
+    def create_password_layout(self, wallet, is_encrypted, OK_button: OkButton):
         if not is_encrypted:
             msg = _('Your wallet file is NOT encrypted.')
         else:

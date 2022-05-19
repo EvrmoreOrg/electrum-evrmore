@@ -6,7 +6,7 @@ import attr
 
 from .json_db import StoredObject
 from .i18n import _
-from .util import age, InvoiceError, Satoshis
+from .util import age, InvoiceError, Satoshis, parse_max_spend
 from .lnaddr import lndecode, LnAddr
 from . import constants
 from .ravencoin import COIN, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC
@@ -92,7 +92,13 @@ LN_EXPIRY_NEVER = 100 * 365 * 24 * 60 * 60  # 100 years
 class Invoice(StoredObject):
 
     # mandatory fields
-    amount_msat = attr.ib(kw_only=True)  # type: Optional[Union[int, str]]  # can be '!' or None
+
+    def generate_amount(x):
+        if isinstance(x, RavenValue):
+            return x
+        return RavenValue.from_json(x)
+
+    amount_msat = attr.ib(kw_only=True, converter=generate_amount)  # type: Optional[Union[int, str]]  # can be '!' or None
     message = attr.ib(type=str, kw_only=True)
     time = attr.ib(type=int, kw_only=True, validator=attr.validators.instance_of(int))  # timestamp of the invoice
     exp = attr.ib(type=int, kw_only=True, validator=attr.validators.instance_of(int))   # expiration delay (relative). 0 means never
@@ -142,7 +148,7 @@ class Invoice(StoredObject):
         # 0 means never
         return self.exp + self.time if self.exp else 0
 
-    def get_amount_msat(self) -> Union[int, str, None]:
+    def get_amount_msat(self) -> Union[RavenValue, None]:
         return self.amount_msat
 
     def get_time(self):
@@ -151,20 +157,23 @@ class Invoice(StoredObject):
     def get_message(self):
         return self.message
 
-    def get_amount_sat(self) -> Union[int, str, None]:
+    def get_amount_sat(self) -> Union[RavenValue, None]:
         """
         Returns an integer satoshi amount, or '!' or None.
         Callers who need msat precision should call get_amount_msat()
         """
         amount_msat = self.amount_msat
-        if amount_msat in [None, "!"]:
+        if amount_msat is None or parse_max_spend(amount_msat):
             return amount_msat
-        return int(amount_msat // 1000)
+        return amount_msat // 1000
 
     def get_bip21_URI(self, lightning=None):
         from electrum.util import create_bip21_uri
         addr = self.get_address()
-        amount = int(self.get_amount_sat())
+        amount = self.get_amount_sat()
+        # TODO: Only RVN
+        if amount:
+            amount = amount.rvn_value.value
         message = self.message
         extra = {}
         if self.time and self.exp:
@@ -183,14 +192,15 @@ class Invoice(StoredObject):
         if value is not None:
             lndecode(value)  # this checks the str can be decoded
 
+    # TODO: RVN Only
     @amount_msat.validator
-    def _validate_amount(self, attribute, value):
+    def _validate_amount(self, attribute, value: Optional[RavenValue]):
         if value is None:
             return
-        if isinstance(value, int):
-            if not (0 <= value <= TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN * 1000):
+        if isinstance(value.rvn_value, Satoshis):
+            if not (0 <= value.rvn_value <= TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN * 1000):
                 raise InvoiceError(f"amount is out-of-bounds: {value!r} msat")
-        elif isinstance(value, str):
+        elif isinstance(value.rvn_value, str):
             if value != '!':
                 raise InvoiceError(f"unexpected amount: {value!r}")
         else:

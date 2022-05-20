@@ -173,8 +173,8 @@ class BalanceDialog(WindowModalDialog):
             (_('Unmatured'), COLOR_UNMATURED, unmatured),
             (_('Unconfirmed'), COLOR_UNCONFIRMED, unconfirmed),
             (_('Confirmed'), COLOR_CONFIRMED, confirmed),
-            (_('Lightning'), COLOR_LIGHTNING, lightning),
-            (_('Lightning frozen'), COLOR_FROZEN_LIGHTNING, f_lightning),
+            #(_('Lightning'), COLOR_LIGHTNING, lightning),
+            #(_('Lightning frozen'), COLOR_FROZEN_LIGHTNING, f_lightning),
         ])
 
         vbox = QVBoxLayout()
@@ -204,16 +204,16 @@ class BalanceDialog(WindowModalDialog):
             grid.addWidget(QLabel(_("Confirmed") + ':'), 1, 1)
             grid.addWidget(QLabel(confirmed_str), 1, 2, alignment=Qt.AlignRight)
             grid.addWidget(QLabel(confirmed_fiat_str), 1, 3, alignment=Qt.AlignRight)
-        if lightning:
-            grid.addWidget(LegendWidget(COLOR_LIGHTNING), 4, 0)
-            grid.addWidget(QLabel(_("Lightning") + ':'), 4, 1)
-            grid.addWidget(QLabel(lightning_str), 4, 2, alignment=Qt.AlignRight)
-            grid.addWidget(QLabel(lightning_fiat_str), 4, 3, alignment=Qt.AlignRight)
-        if f_lightning:
-            grid.addWidget(LegendWidget(COLOR_FROZEN_LIGHTNING), 5, 0)
-            grid.addWidget(QLabel(_("Lightning (frozen)") + ':'), 5, 1)
-            grid.addWidget(QLabel(f_lightning_str), 5, 2, alignment=Qt.AlignRight)
-            grid.addWidget(QLabel(f_lightning_fiat_str), 5, 3, alignment=Qt.AlignRight)
+        #if lightning:
+        #    grid.addWidget(LegendWidget(COLOR_LIGHTNING), 4, 0)
+        #    grid.addWidget(QLabel(_("Lightning") + ':'), 4, 1)
+        #    grid.addWidget(QLabel(lightning_str), 4, 2, alignment=Qt.AlignRight)
+        #    grid.addWidget(QLabel(lightning_fiat_str), 4, 3, alignment=Qt.AlignRight)
+        #if f_lightning:
+        #    grid.addWidget(LegendWidget(COLOR_FROZEN_LIGHTNING), 5, 0)
+        #    grid.addWidget(QLabel(_("Lightning (frozen)") + ':'), 5, 1)
+        #    grid.addWidget(QLabel(f_lightning_str), 5, 2, alignment=Qt.AlignRight)
+        #    grid.addWidget(QLabel(f_lightning_fiat_str), 5, 3, alignment=Qt.AlignRight)
 
         vbox.addLayout(grid)
         vbox.addStretch(1)

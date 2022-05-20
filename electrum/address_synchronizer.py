@@ -33,9 +33,9 @@ from .crypto import sha256
 from . import ravencoin, util
 from .assets import pull_meta_from_create_or_reissue_script
 from .ravencoin import COINBASE_MATURITY
-from .util import profiler, bfh, TxMinedInfo, UnrelatedTransactionException, with_lock, OldTaskGroup
+from .util import profiler, bfh, TxMinedInfo, UnrelatedTransactionException, with_lock, OldTaskGroup, RavenValue
 from .transaction import Transaction, TxOutput, TxInput, PartialTxInput, TxOutpoint, PartialTransaction, AssetMeta, \
-    RavenValue, is_output_script_p2pk, is_asset_output_script_malformed_or_non_standard
+    is_output_script_p2pk, is_asset_output_script_malformed_or_non_standard
 from .synchronizer import Synchronizer
 from .verifier import SPV
 

@@ -56,7 +56,8 @@ from .util import (NotEnoughFunds, UserCancelled, profiler, OldTaskGroup,
                    format_satoshis, format_fee_satoshis, NoDynamicFeeEstimates,
                    WalletFileException, BitcoinException,
                    InvalidPassword, format_time, timestamp_to_datetime, Satoshis,
-                   Fiat, bfh, bh2u, TxMinedInfo, quantize_feerate, create_bip21_uri, OrderedDictWithIndex, parse_max_spend)
+                   Fiat, bfh, bh2u, TxMinedInfo, quantize_feerate, create_bip21_uri, OrderedDictWithIndex, 
+                   parse_max_spend, RavenValue)
 from .simple_config import SimpleConfig, FEE_RATIO_HIGH_WARNING, FEERATE_WARNING_HIGH_FEE
 from .ravencoin import COIN, TYPE_ADDRESS
 from .ravencoin import is_address, address_to_script, is_minikey, relayfee, dust_threshold
@@ -69,7 +70,7 @@ from .storage import StorageEncryptionVersion, WalletStorage
 from .wallet_db import WalletDB
 from . import transaction, ravencoin, coinchooser, paymentrequest, ecc, bip32
 from .transaction import (Transaction, TxInput, UnknownTxinType, TxOutput,
-                          PartialTransaction, PartialTxInput, PartialTxOutput, TxOutpoint, RavenValue, get_script_type_from_output_script)
+                          PartialTransaction, PartialTxInput, PartialTxOutput, TxOutpoint, get_script_type_from_output_script)
 from .plugin import run_hook
 from .address_synchronizer import (AddressSynchronizer, TX_HEIGHT_LOCAL,
                                    TX_HEIGHT_UNCONF_PARENT, TX_HEIGHT_UNCONFIRMED, TX_HEIGHT_FUTURE)
@@ -792,13 +793,13 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         height = self.get_local_height()
         if pr:
             return Invoice.from_bip70_payreq(pr, height=height)
-        amount_msat = 0
+        amount_msat = RavenValue()
         for x in outputs:
             if parse_max_spend(x.value):
-                amount_msat = '!'
+                amount_msat = RavenValue('!') if not x.asset else RavenValue(0, {x.asset:'!'})
                 break
             else:
-                amount_msat += x.value * 1000
+                amount_msat += (RavenValue(x.value) if not x.asset else RavenValue(0, {x.asset:x.value})) * 1000
         timestamp = None
         exp = None
         if URI:
@@ -807,7 +808,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         timestamp = timestamp or int(time.time())
         exp = exp or 0
         invoice = Invoice(
-            amount_msat=RavenValue(amount_msat),
+            amount_msat=amount_msat,
             message=message,
             time=timestamp,
             exp=exp,

@@ -32,10 +32,10 @@ from typing import Dict, Optional, List, Tuple, Set, Iterable, NamedTuple, Seque
 import binascii
 
 from . import util, ravencoin
-from .util import profiler, WalletFileException, multisig_type, TxMinedInfo, bfh, Satoshis
+from .util import profiler, WalletFileException, multisig_type, TxMinedInfo, bfh, Satoshis, RavenValue
 from .invoices import Invoice
 from .keystore import bip44_derivation
-from .transaction import Transaction, TxOutpoint, tx_from_any, PartialTransaction, PartialTxOutput, AssetMeta, RavenValue
+from .transaction import Transaction, TxOutpoint, tx_from_any, PartialTransaction, PartialTxOutput, AssetMeta
 from .logging import Logger
 from .lnutil import LOCAL, REMOTE, FeeUpdate, UpdateAddHtlc, LocalConfig, RemoteConfig, ChannelType
 from .lnutil import ImportedChannelBackupStorage, OnchainChannelBackupStorage

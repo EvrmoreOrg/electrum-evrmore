@@ -11,12 +11,10 @@ from numbers import Real
 from copy import deepcopy
 from aiorpcx import NetAddress
 
-from electrum.transaction import RavenValue
-
 from . import util
 from . import constants
 from .util import base_units, base_unit_name_to_decimal_point, decimal_point_to_base_unit_name, UnknownBaseUnit, DECIMAL_POINT_DEFAULT
-from .util import format_satoshis, format_fee_satoshis
+from .util import format_satoshis, format_fee_satoshis, RavenValue
 from .util import user_dir, make_dir, NoDynamicFeeEstimates, quantize_feerate
 from .i18n import _
 from .logging import get_logger, Logger

@@ -11,8 +11,7 @@ from typing import Optional, TYPE_CHECKING, Type
 import random
 import bitstring
 
-from electrum.transaction import RavenValue
-from electrum.util import Satoshis
+from electrum.util import Satoshis, RavenValue
 from .ravencoin import hash160_to_b58_address, b58_address_to_hash160, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC
 from .segwit_addr import bech32_encode, bech32_decode, CHARSET
 from . import segwit_addr

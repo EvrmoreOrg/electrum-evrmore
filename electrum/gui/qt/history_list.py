@@ -46,15 +46,13 @@ from electrum.address_synchronizer import TX_HEIGHT_LOCAL, TX_HEIGHT_FUTURE
 from electrum.i18n import _
 from electrum.util import (block_explorer_URL, profiler, TxMinedInfo,
                            OrderedDictWithIndex, timestamp_to_datetime,
-                           Satoshis, Fiat, format_time)
+                           Satoshis, Fiat, format_time, RavenValue)
 from electrum.logging import get_logger, Logger
 
 from .custom_model import CustomNode, CustomModel
 from .util import (read_QIcon, MONOSPACE_FONT, Buttons, CancelButton, OkButton,
                    filename_field, MyTreeView, AcceptFileDragDrop, WindowModalDialog,
                    CloseButton, webopen, WWLabel)
-
-from electrum.transaction import RavenValue
 
 if TYPE_CHECKING:
     from electrum.wallet import Abstract_Wallet

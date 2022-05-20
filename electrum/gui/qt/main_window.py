@@ -66,11 +66,11 @@ from electrum.util import (format_time,
                            InvalidBitcoinURI, maybe_extract_bolt11_invoice, NotEnoughFunds,
                            NoDynamicFeeEstimates,
                            AddTransactionException, BITCOIN_BIP21_URI_SCHEME,
-                           InvoiceError, parse_max_spend)
+                           InvoiceError, parse_max_spend, RavenValue)
 from electrum.invoices import PR_DEFAULT_EXPIRATION_WHEN_CREATING, Invoice
 from electrum.invoices import PR_PAID, PR_UNPAID, PR_FAILED, PR_SCHEDULED, pr_expiration_values, Invoice
 from electrum.transaction import (Transaction, PartialTxInput, SIGHASH,
-                                  PartialTransaction, PartialTxOutput, script_GetOp, RavenValue, TxOutpoint)
+                                  PartialTransaction, PartialTxOutput, script_GetOp, TxOutpoint)
 from electrum.wallet import (Multisig_Wallet, CannotBumpFee, Abstract_Wallet,
                              sweep_preparations, InternalAddressCorruption,
                              CannotDoubleSpendTx, CannotCPFP)
@@ -2515,6 +2515,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if invoice.is_lightning():
             self.pay_lightning_invoice(invoice)
         else:
+            print(invoice.get_amount_msat())
+            print(invoice.get_amount_sat())
             l = list(invoice.get_amount_sat().assets.keys())
             if l:
                 a = l[0]

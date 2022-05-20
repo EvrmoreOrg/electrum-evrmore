@@ -22,8 +22,8 @@ from electrum.gui.qt.util import ComplexLineEdit, HelpLabel, EnterButton, ColorS
 from electrum.i18n import _
 from electrum.logging import get_logger
 from electrum.ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, base_decode, address_to_script, COIN, is_address
-from electrum.transaction import RavenValue, PartialTxOutput, AssetMeta
-from electrum.util import Satoshis, bfh
+from electrum.transaction import PartialTxOutput, AssetMeta
+from electrum.util import Satoshis, bfh, RavenValue
 
 
 _logger = get_logger(__name__)

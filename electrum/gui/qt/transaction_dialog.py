@@ -40,12 +40,12 @@ import qrcode
 from qrcode import exceptions
 
 from electrum.simple_config import SimpleConfig
-from electrum.util import quantize_feerate, convert_bytes_to_utf8_safe
+from electrum.util import quantize_feerate, convert_bytes_to_utf8_safe, RavenValue
 from electrum.ravencoin import base_encode, NLOCKTIME_BLOCKHEIGHT_MAX
 from electrum.i18n import _
 from electrum.plugin import run_hook
 from electrum import simple_config
-from electrum.transaction import SerializationError, Transaction, PartialTransaction, PartialTxInput, RavenValue
+from electrum.transaction import SerializationError, Transaction, PartialTransaction, PartialTxInput
 from electrum.logging import get_logger
 
 from .util import (MessageBoxMixin, read_QIcon, Buttons, icon_path,

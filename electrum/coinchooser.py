@@ -28,8 +28,8 @@ from typing import NamedTuple, List, Callable, Sequence, Union, Dict, Tuple, Opt
 from decimal import Decimal
 
 from .ravencoin import sha256, COIN, is_address
-from .transaction import Transaction, TxOutput, PartialTransaction, PartialTxInput, PartialTxOutput, RavenValue
-from .util import NotEnoughFunds, Satoshis
+from .transaction import Transaction, TxOutput, PartialTransaction, PartialTxInput, PartialTxOutput
+from .util import NotEnoughFunds, Satoshis, RavenValue
 from .logging import Logger
 
 
@@ -245,8 +245,8 @@ class CoinChooserBase(Logger):
 
         if not output_amounts_rvn:
             # Append an amount for the vout after our transaction fee
-            output_amounts_rvn = [Satoshis(max(0, tx.get_fee().rvn_value.value -
-                                  fee_estimator_numchange(1, asset_divisions.keys())))]
+            output_amounts_rvn = [max(0, tx.get_fee().rvn_value.value -
+                                  fee_estimator_numchange(1, asset_divisions.keys()))]
 
         # Don't split change of less than 0.02 BTC
         max_change_rvn = max(max([o for o in output_amounts_rvn]) * 1.25, 0.02 * COIN)

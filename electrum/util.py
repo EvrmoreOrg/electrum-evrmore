@@ -868,11 +868,27 @@ def xor_bytes(a: bytes, b: bytes) -> bytes:
 def convert_bytes_to_utf8_safe(_bytes: bytes) -> str:
     '''Returns bytes as ascii decoded with .'s for invalid bytes'''
     try:
-        return _bytes.decode('utf8')
+        new_string = _bytes.decode('utf8')
+        to_ret = ''
+        for new_chr in new_string:
+            chr_ord = ord(new_chr)
+            # Control characters
+            if chr_ord < 32 or \
+                chr_ord in range(0x7f, 0xA0) or \
+                chr_ord in (0x2028, 0x2029, 0xfff9, 0xfffa, 0xfffb) or \
+                chr_ord in range (0x0e0001, 0x0e007f) or \
+                chr_ord == 0x061C or \
+                chr_ord in (0x200E, 0x200F) or \
+                chr_ord in range(0x202A, 0x202F) or \
+                chr_ord in range(0x2066, 0x206A):
+                to_ret += '.'
+            else:
+                to_ret += new_chr
+        return to_ret
     except Exception:
         ret = ''
         for b in _bytes:
-            if b in range(128):
+            if b in range(32,128):
                 ret += chr(b)
             else:
                 ret += '.'

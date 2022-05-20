@@ -631,6 +631,10 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
         for txin in self.tx.inputs():
             if txin.is_coinbase_input():
                 cursor.insertText('coinbase')
+                if txin.script_sig:
+                    cursor.insertBlock()
+                    cursor.insertText(f'\tscriptsig: {convert_bytes_to_utf8_safe(txin.script_sig)}', ext)
+                    cursor.insertBlock()
             else:
                 prevout_hash = txin.prevout.txid.hex()
                 prevout_n = txin.prevout.out_idx
@@ -665,21 +669,19 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
                 if message:
                     ipfs, timestamp = message
                     cursor.insertBlock()
-                    cursor.insertText(f'Message: {ipfs}', ext)
+                    cursor.insertText(f'\tMessage: {ipfs}', ext)
                     if timestamp:
                         time_str = datetime.datetime.fromtimestamp(timestamp).isoformat(' ')[:-3]
                         cursor.insertBlock()
-                        cursor.insertText(f'Expiry: {time_str}')
+                        cursor.insertText(f'\tExpiry: {time_str}')
                     cursor.insertBlock()
             elif 'SCRIPT' in addr:
                 h = addr.split(" ")[1]
                 b = bytes.fromhex(h)
-                start = 2 if b[1] == len(b[2:]) else 1  # First byte is always opcode
-                b = b[start:]
                 if b:
                     cursor.insertBlock()
-                    cursor.insertText('utf8: ', ext)
-                    cursor.insertText(convert_bytes_to_utf8_safe(b), ext)
+                    cursor.insertText(f'\tutf8: {convert_bytes_to_utf8_safe(b)}', ext)
+                    cursor.insertBlock()
 
             cursor.insertBlock()
 

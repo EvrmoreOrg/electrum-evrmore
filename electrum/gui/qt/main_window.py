@@ -2515,8 +2515,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if invoice.is_lightning():
             self.pay_lightning_invoice(invoice)
         else:
-            print(invoice.get_amount_msat())
-            print(invoice.get_amount_sat())
             l = list(invoice.get_amount_sat().assets.keys())
             if l:
                 a = l[0]

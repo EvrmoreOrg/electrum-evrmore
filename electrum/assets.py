@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from decimal import Decimal
 import re
-from typing import Dict, Union
+from typing import Dict, Union, Optional, Tuple
 
 from .logging import get_logger
 from .ravencoin import opcodes, push_script, base_encode, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN, base_decode
@@ -63,6 +63,46 @@ def is_name_valid(name: str) -> bool:
             # Too many #
             return False
 
+
+def try_get_message_from_asset_transfer(script: bytes) -> Optional[Tuple[str, Optional[int]]]:
+    # Returns message, expiry
+    if script[-1] != 0x75:
+        return None
+    ops = transaction.script_GetOp(script)
+    rvn_ptr = -1
+    for op, _, ptr in ops:
+        if op == opcodes.OP_RVN_ASSET:
+            rvn_ptr = ptr - 1
+            break
+    if not rvn_ptr > 0:
+        return None
+    if script[rvn_ptr+2:rvn_ptr+5] == b'rvn':
+        rvn_ptr += 5
+    else:
+        rvn_ptr += 6
+    type = bytes([script[rvn_ptr]])
+    if type != b't':
+        return None
+    rvn_ptr += 1
+    name_len = script[rvn_ptr]
+    ipfs = None
+    timestamp = None
+    try:
+        if script[rvn_ptr+1+name_len+8] != 0xff:
+            ipfs = script[rvn_ptr+1+name_len+8:rvn_ptr+1+name_len+8+34]
+        if script[rvn_ptr+1+name_len+8+34] != 0xff:
+            timestamp = script[rvn_ptr+1+name_len+8+34:rvn_ptr+1+name_len+8+34+8]
+    except Exception as e:
+        return None
+
+    if ipfs:
+        ipfs = base_encode(ipfs, base=58)
+    if timestamp:
+        timestamp = int.from_bytes(timestamp, 'little')
+
+    if ipfs:
+        return [ipfs, timestamp]
+    return None
 
 def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
     if script[-1] != 0x75:

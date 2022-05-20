@@ -42,6 +42,7 @@ from qrcode import exceptions
 from electrum.simple_config import SimpleConfig
 from electrum.util import quantize_feerate, convert_bytes_to_utf8_safe, RavenValue
 from electrum.ravencoin import base_encode, NLOCKTIME_BLOCKHEIGHT_MAX
+from electrum.assets import try_get_message_from_asset_transfer
 from electrum.i18n import _
 from electrum.plugin import run_hook
 from electrum import simple_config
@@ -659,6 +660,17 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
             if v != RavenValue():
                 cursor.insertText('\t', ext)
                 cursor.insertText(format_amount(v), ext)
+            if o.asset:
+                message = try_get_message_from_asset_transfer(o.scriptpubkey)
+                if message:
+                    ipfs, timestamp = message
+                    cursor.insertBlock()
+                    cursor.insertText(f'Message: {ipfs}', ext)
+                    if timestamp:
+                        time_str = datetime.datetime.fromtimestamp(timestamp).isoformat(' ')[:-3]
+                        cursor.insertBlock()
+                        cursor.insertText(f'Expiry: {time_str}')
+                    cursor.insertBlock()
             elif 'SCRIPT' in addr:
                 h = addr.split(" ")[1]
                 b = bytes.fromhex(h)

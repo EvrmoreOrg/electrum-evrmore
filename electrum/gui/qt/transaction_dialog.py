@@ -661,9 +661,8 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
             else:
                 v = RavenValue(o.value)
             cursor.insertText(addr, text_format(addr))
-            if v != RavenValue():
-                cursor.insertText('\t', ext)
-                cursor.insertText(format_amount(v), ext)
+            cursor.insertText('\t', ext)
+            cursor.insertText(format_amount(v), ext)
             if o.asset:
                 message = try_get_message_from_asset_transfer(o.scriptpubkey)
                 if message:

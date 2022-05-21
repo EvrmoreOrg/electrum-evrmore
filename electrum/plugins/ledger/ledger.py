@@ -541,6 +541,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
     @test_pin_unlocked
     @set_and_unset_signing
     def sign_message(self, sequence, message, password, script_type):
+        raise UserFacingException(_('Signing messages is not currently supported on ledger devices'))
         message = message.encode('utf8')
         message_hash = hashlib.sha256(message).hexdigest().upper()
         # prompt for the PIN before displaying the dialog if necessary
@@ -664,6 +665,9 @@ class Ledger_KeyStore(Hardware_KeyStore):
             script = o.scriptpubkey.hex()
             txOutput += var_int(len(script) // 2)
             txOutput += script
+            if o.asset:
+                raise UserFacingException(_('Ledger does not currently support asset transactions'))
+
         txOutput = bfh(txOutput)
 
         if not client_electrum.supports_multi_output():

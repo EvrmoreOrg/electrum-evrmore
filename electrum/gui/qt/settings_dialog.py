@@ -650,21 +650,6 @@ class SettingsDialog(QDialog):
         show_spam_cb.stateChanged.connect(on_set_show_spam)
         asset_widgets.append((show_spam_cb, None))
 
-        advanced_assets_cb = QCheckBox(_("Enable advanced asset options"))
-        advanced_assets_cb.setChecked(self.config.get('advanced_asset_functions', False))
-
-        def on_set_advanced_assets_cb(v):
-            window.config.set_key('advanced_asset_functions', v == Qt.Checked, save=True)
-
-            window.create_workspace.associated_data_interpret_override.setVisible(v == Qt.Checked)
-            window.create_workspace.asset_addr_w.setVisible(v == Qt.Checked)
-            window.reissue_workspace.associated_data_interpret_override.setVisible(v == Qt.Checked)
-            window.reissue_workspace.asset_addr_w.setVisible(v == Qt.Checked)
-            window.asset_list.update()
-
-        advanced_assets_cb.stateChanged.connect(on_set_advanced_assets_cb)
-        #asset_widgets.append((advanced_assets_cb, None))
-
         message_widgets = []
 
         dev_notifications_cb = QCheckBox(_("Enable developer notifications"))

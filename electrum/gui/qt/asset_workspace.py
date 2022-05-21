@@ -439,7 +439,7 @@ class AssetCreateWorkspace(QWidget):
     def refresh_owners(self):
         confirmed, unconfirmed, _ = self.parent.wallet.get_balance()
         owned_assets = confirmed.assets
-        in_mempool = unconfirmed.assets
+        in_mempool = self.parent.wallet.get_assets_in_mempool()
         owners = [n for n in owned_assets.keys() if
                   n[-1] == '!' and owned_assets.get(n, 0) != 0]
         indexes_in_mempool = set()
@@ -686,7 +686,11 @@ class AssetReissueWorkspace(QWidget):
                         i = data
                         if i:
                             self.associated_data.setFrozen(not r)
-                            self.associated_data.setText(i)
+                            raw_associated = base_decode(i, base=58)
+                            if raw_associated[:2] == b'\x54\x20':
+                                self.associated_data.setText(raw_associated[2:].hex())
+                            else:
+                                self.associated_data.setText(i)
                             self._check_associated_data()
                         else:
                             self.associated_data.setFrozen(not r)
@@ -738,7 +742,12 @@ class AssetReissueWorkspace(QWidget):
                 i = m.ipfs_str
                 if i:
                     self.associated_data.setFrozen(not r)
-                    self.associated_data.setText(m.ipfs_str)
+                    raw_associated = base_decode(i, base=58)
+                    if raw_associated[:2] == b'\x54\x20':
+                        self.associated_data.setText(raw_associated[2:].hex())
+                    else:
+                        self.associated_data.setText(i)
+                            
                     self._check_associated_data()
                 else:
                     self.associated_data.setFrozen(not r)
@@ -960,7 +969,7 @@ class AssetReissueWorkspace(QWidget):
     def refresh_owners(self):
         confirmed, unconfirmed, _ = self.parent.wallet.get_balance()
         owned_assets = confirmed.assets
-        in_mempool = unconfirmed.assets
+        in_mempool = self.parent.wallet.get_assets_in_mempool()
 
         owners = [n for n in owned_assets.keys() if
                   n[-1] == '!' and owned_assets.get(n, 0) != 0]

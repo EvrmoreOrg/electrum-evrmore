@@ -916,6 +916,14 @@ class AddressSynchronizer(Logger):
     def get_addr_balance(self, address):
         return self.get_balance([address])
 
+    def get_assets_in_mempool(self) -> Set[str]:
+        ret_val = set()
+        for address in self.get_addresses():
+            for utxo in self.get_addr_outputs(address).values():
+                if utxo.block_height == 0:
+                    ret_val.update(utxo.value_sats().assets.keys())
+        return ret_val
+
     @with_local_height_cached
     def get_balance(self, domain=None, *, excluded_addresses: Set[str] = None,
                     excluded_coins: Set[str] = None) -> Tuple[int, int, int]:

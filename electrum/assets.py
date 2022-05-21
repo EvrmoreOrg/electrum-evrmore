@@ -69,7 +69,7 @@ def get_asset_vout_type(script: bytes) -> Optional[str]:
         return None
     ops = transaction.script_GetOp(script)
     rvn_ptr = -1
-    for op, _, ptr in ops:
+    for op, l, ptr in ops:
         if op == opcodes.OP_RVN_ASSET:
             rvn_ptr = ptr - 1
             break

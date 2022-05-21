@@ -1432,9 +1432,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         return w
 
-    def show_receive_request(self, req):
+    def show_receive_request(self, req: Invoice):
         addr = req.get_address() or ''
-        amount_sat = req.get_amount_sat() or 0
+        amount_sat = req.get_amount_sat().rvn_value.value or 0
         address_help = '' if addr else _('Amount too small to be received onchain')
         lnaddr = req.lightning_invoice
         bip21_lightning = lnaddr if self.config.get('bip21_lightning', False) else None
@@ -1448,15 +1448,15 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             ln_help = _('You must be online to receive Lightning payments.')
             lnaddr = ''
         elif not can_receive_lightning:
-            self.receive_rebalance_button.suggestion = self.wallet.lnworker.suggest_rebalance_to_receive(amount_sat)
-            self.receive_swap_button.suggestion = self.wallet.lnworker.suggest_swap_to_receive(amount_sat)
+            #self.receive_rebalance_button.suggestion = self.wallet.lnworker.suggest_rebalance_to_receive(amount_sat)
+            #self.receive_swap_button.suggestion = self.wallet.lnworker.suggest_swap_to_receive(amount_sat)
             ln_help = _('Your Lightning channels do not have the capacity to receive this amount.')
-            can_rebalance = bool(self.receive_rebalance_button.suggestion)
-            can_swap = bool(self.receive_swap_button.suggestion)
-            self.receive_rebalance_button.setEnabled(can_rebalance)
-            self.receive_rebalance_button.setVisible(can_rebalance)
-            self.receive_swap_button.setEnabled(can_swap)
-            self.receive_swap_button.setVisible(can_swap)
+            #can_rebalance = bool(self.receive_rebalance_button.suggestion)
+            #can_swap = bool(self.receive_swap_button.suggestion)
+            #self.receive_rebalance_button.setEnabled(can_rebalance)
+            #self.receive_rebalance_button.setVisible(can_rebalance)
+            #self.receive_swap_button.setEnabled(can_swap)
+            #self.receive_swap_button.setVisible(can_swap)
             lnaddr = ''
         else:
             ln_help = ''

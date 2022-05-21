@@ -13,15 +13,9 @@ from kivy.properties import StringProperty
 
 from electrum.invoices import (PR_DEFAULT_EXPIRATION_WHEN_CREATING,
                                PR_PAID, PR_UNKNOWN, PR_EXPIRED, PR_INFLIGHT,
-<<<<<<< HEAD
-                               LNInvoice, pr_expiration_values, Invoice, OnchainInvoice)
-from electrum import ravencoin, constants
-from electrum.transaction import tx_from_any, PartialTxOutput, RavenValue
-=======
                                pr_expiration_values, Invoice)
-from electrum import bitcoin, constants
+from electrum import ravencoin, constants
 from electrum.transaction import tx_from_any, PartialTxOutput
->>>>>>> 232e38e27dea91144ce4b2c057cc8db7de122936
 from electrum.util import (parse_URI, InvalidBitcoinURI, TxMinedInfo, maybe_extract_bolt11_invoice,
                            InvoiceError, format_time, parse_max_spend)
 from electrum.lnaddr import lndecode, LnInvoiceException
@@ -455,7 +449,7 @@ class ReceiveScreen(CScreen):
         amount_sat = self.app.get_amount(amount_str) if amount_str else 0
         message = self.message
         expiry = self.expiry()
-        if amount_sat and amount_sat < self.wallet.dust_threshold():
+        if amount_sat and amount_sat < self.app.wallet.dust_threshold():
             self.address = ''
             if not self.app.wallet.has_lightning():
                 return

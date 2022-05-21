@@ -514,11 +514,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
     def get_client_electrum(self) -> Optional[Ledger_Client]:
         return self.plugin.get_client(self)
 
-<<<<<<< HEAD
-    def give_error(self, message, clear_client=False):
-=======
     def give_error(self, message):
->>>>>>> 232e38e27dea91144ce4b2c057cc8db7de122936
         _logger.info(message)
         if not self.signing:
             self.handler.show_error(message)
@@ -564,14 +560,9 @@ class Ledger_KeyStore(Hardware_KeyStore):
             signature = client_ledger.signMessageSign(pin)
         except BTChipException as e:
             if e.sw == 0x6a80:
-<<<<<<< HEAD
-                self.give_error(
-                    _("Unfortunately, this message cannot be signed by the Ledger wallet. Only alphanumerical messages shorter than 140 characters are supported. Please remove any extra characters (tab, carriage return) and retry."))
-=======
                 self.give_error("Unfortunately, this message cannot be signed by the Ledger wallet. "
                                 "Only alphanumerical messages shorter than 140 characters are supported. "
                                 "Please remove any extra characters (tab, carriage return) and retry.")
->>>>>>> 232e38e27dea91144ce4b2c057cc8db7de122936
             elif e.sw == 0x6985:  # cancelled by user
                 return b''
             elif e.sw == 0x6982:
@@ -851,13 +842,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
                 self.give_error(e)
         except BaseException as e:
             self.logger.exception('')
-<<<<<<< HEAD
-            self.give_error(e, True)
-        except Exception:
-            logging.exception('Ledger exception')
-=======
             self.give_error(e)
->>>>>>> 232e38e27dea91144ce4b2c057cc8db7de122936
         finally:
             self.handler.finished()
 

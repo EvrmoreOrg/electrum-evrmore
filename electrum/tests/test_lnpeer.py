@@ -14,26 +14,16 @@ from aiorpcx import timeout_after, TaskTimeout
 
 import electrum
 import electrum.trampoline
-<<<<<<< HEAD
 from electrum import ravencoin
-=======
-from electrum import bitcoin
 from electrum import util
->>>>>>> 232e38e27dea91144ce4b2c057cc8db7de122936
 from electrum import constants
 from electrum.network import Network
 from electrum.ecc import ECPrivkey
 from electrum import simple_config, lnutil
 from electrum.lnaddr import lnencode, LnAddr, lndecode
-<<<<<<< HEAD
 from electrum.ravencoin import COIN, sha256
-from electrum.util import bh2u, create_and_start_event_loop, NetworkRetryManager, bfh, OldTaskGroup
-from electrum.lnpeer import Peer, UpfrontShutdownScriptViolation
-=======
-from electrum.bitcoin import COIN, sha256
 from electrum.util import bh2u, NetworkRetryManager, bfh, OldTaskGroup
 from electrum.lnpeer import Peer
->>>>>>> 232e38e27dea91144ce4b2c057cc8db7de122936
 from electrum.lnutil import LNPeerAddr, Keypair, privkey_to_pubkey
 from electrum.lnutil import PaymentFailure, LnFeatures, HTLCOwner
 from electrum.lnchannel import ChannelState, PeerState, Channel
@@ -253,7 +243,7 @@ class MockLNWallet(Logger, NetworkRetryManager[LNPeerAddr]):
     get_channel_by_id = LNWallet.get_channel_by_id
     channels_for_peer = LNWallet.channels_for_peer
     calc_routing_hints_for_invoice = LNWallet.calc_routing_hints_for_invoice
-    border_nodes_that_can_receive = LNWallet.border_nodes_that_can_receive
+    get_channels_for_receiving = LNWallet.get_channels_for_receiving
     handle_error_code_from_failed_htlc = LNWallet.handle_error_code_from_failed_htlc
     is_trampoline_peer = LNWallet.is_trampoline_peer
     wait_for_received_pending_htlcs_to_get_removed = LNWallet.wait_for_received_pending_htlcs_to_get_removed

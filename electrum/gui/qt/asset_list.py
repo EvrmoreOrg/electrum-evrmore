@@ -37,6 +37,7 @@ from electrum.plugin import run_hook
 from electrum.ravencoin import is_address, base_decode
 from electrum.wallet import InternalAddressCorruption
 from electrum.transaction import AssetMeta
+import electrum.transaction as transaction
 
 from .util import MyTreeView, MONOSPACE_FONT, webopen, MySortModel
 
@@ -108,6 +109,13 @@ class AssetList(MyTreeView):
         if data[:2] == 'Qm':  # If it starts with Qm, it's an IPFS
             url = ipfs_explorer_URL(self.parent.config, 'ipfs', data)
             self.webopen_safe(url)
+        elif bytes.fromhex(data):
+            raw_tx = self.parent._fetch_tx_from_network(data, False)
+            if not raw_tx:
+                self.parent.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                return
+            tx = transaction.Transaction(raw_tx)
+            self.parent.show_transaction(tx)
 
     def refresh_headers(self):
         headers = {
@@ -170,15 +178,14 @@ class AssetList(MyTreeView):
 
             balance_text = self.parent.format_amount(balance, whitespaces=True)
 
-            if self.config.get('advanced_asset_functions', False):
-                if meta and meta.ipfs_str:
-                    s = meta.ipfs_str
-                    h, a = get_alternate_data(base_decode(s, base=58))
-                    ipfs_str = '\nBASE58: {}\nHEX: {}\nLATIN-1: {}\n'.format(s, h, a)
+            if meta and meta.ipfs_str:
+                raw = base_decode(meta.ipfs_str, base=58)
+                if raw[:2] == b'\x54\x20':
+                    ipfs_str = raw[2:].hex()
                 else:
-                    ipfs_str = '\nBASE58: None\nHEX: None\nLATIN-1: None\n'
+                    ipfs_str = meta.ipfs_str
             else:
-                ipfs_str = str(meta.ipfs_str) if meta else ''  # May be none
+                ipfs_str = ''
 
             is_reis = str(meta.is_reissuable) if meta else ''
             divs = str(meta.divisions) if meta else ''

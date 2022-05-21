@@ -373,7 +373,7 @@ class AssetCreateWorkspace(QWidget):
             self.associated_data_interpret = InterpretType.NO_DATA
             return True
         try:
-            if len(bytes.fromhex(text) != 32):
+            if len(bytes.fromhex(text)) != 32:
                 raise Exception()
             self.associated_data_interpret = InterpretType.TXID
             self.associated_data_info.setText('Reading as TXID')
@@ -916,7 +916,7 @@ class AssetReissueWorkspace(QWidget):
             return True
             
         try:
-            if len(bytes.fromhex(text) != 32):
+            if len(bytes.fromhex(text)) != 32:
                 raise Exception()
             self.associated_data_interpret = InterpretType.TXID
             self.associated_data_info.setText('Reading as TXID')

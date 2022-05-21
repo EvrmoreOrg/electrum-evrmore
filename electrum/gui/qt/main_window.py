@@ -3762,7 +3762,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             tx = transaction.Transaction(raw_tx)
             self.show_transaction(tx)
 
-    def _fetch_tx_from_network(self, txid: str) -> Optional[str]:
+    def _fetch_tx_from_network(self, txid: str, show_message = True) -> Optional[str]:
         if not self.network:
             self.show_message(_("You are offline."))
             return
@@ -3770,11 +3770,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             raw_tx = self.network.run_from_another_thread(
                 self.network.get_transaction(txid, timeout=10))
         except UntrustedServerReturnedError as e:
-            self.logger.info(f"Error getting transaction from network: {repr(e)}")
-            self.show_message(_("Error getting transaction from network") + ":\n" + e.get_message_for_gui())
+            if show_message:
+                self.logger.info(f"Error getting transaction from network: {repr(e)}")
+                self.show_message(_("Error getting transaction from network") + ":\n" + e.get_message_for_gui())
             return
         except Exception as e:
-            self.show_message(_("Error getting transaction from network") + ":\n" + repr(e))
+            if show_message:
+                self.show_message(_("Error getting transaction from network") + ":\n" + repr(e))
             return
         return raw_tx
 

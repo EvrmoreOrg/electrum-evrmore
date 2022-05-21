@@ -32,8 +32,7 @@ _logger = get_logger(__name__)
 class InterpretType(IntEnum):
     NO_DATA = 0
     IPFS = 1
-    HEX = 2
-    LATIN = 3
+    TXID = 2
     
 
 # TODO: Clean up these classes
@@ -218,12 +217,6 @@ class AssetCreateWorkspace(QWidget):
 
         self.associated_data.textChanged.connect(self._check_associated_data)
 
-        self.associated_data_interpret_override = QComboBox()
-        self.associated_data_interpret_override.addItems(['AUTO', 'IPFS', 'HEX', 'LATIN-1'])
-
-        self.associated_data_interpret_override.currentIndexChanged.connect(self._check_associated_data)
-        self.associated_data_interpret_override.setVisible(self.parent.config.get('advanced_asset_functions', False))
-
         data_grid = QHBoxLayout()
         data_grid.setSpacing(0)
         data_grid.setContentsMargins(0, 0, 0, 0)
@@ -233,7 +226,6 @@ class AssetCreateWorkspace(QWidget):
         data_w.setLayout(data_grid)
         c_grid_b.addWidget(data_w, 0, 2)
         c_grid_b.addWidget(self.associated_data_info, 1, 2)
-        c_grid_b.addWidget(self.associated_data_interpret_override, 0, 3)
 
         c_grid_c = QGridLayout()
         c_grid_c.setColumnStretch(4, 1)
@@ -376,100 +368,20 @@ class AssetCreateWorkspace(QWidget):
 
     def _check_associated_data(self) -> bool:
         text = self.associated_data.text()
-        i = self.associated_data_interpret_override.currentIndex()
         if len(text) == 0:
             self.associated_data_info.setText('')
             self.associated_data_interpret = InterpretType.NO_DATA
             return True
-        if i != 0:
-            if i == 1:
+        try:
+            if len(bytes.fromhex(text) != 32):
+                raise Exception()
+            self.associated_data_interpret = InterpretType.TXID
+            self.associated_data_info.setText('Reading as TXID')
+            self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+            return True
+        except Exception:
+            try:
                 self.associated_data_interpret = InterpretType.IPFS
-                try:
-                    if len(base_decode(text, base=58)) > 34:
-                        self.associated_data_info.setText('Too much data in IPFS hash!')
-                        self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                        return False
-                    else:
-                        self.associated_data_info.setText('Reading as IPFS')
-                        self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                        return True
-                except:
-                    self.associated_data_info.setText('Invalid base 58 encoding!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-            if i == 2:
-                self.associated_data_interpret = InterpretType.HEX
-                try:
-                    bfh(text)
-                except:
-                    self.associated_data_info.setText('Not a valid hex string!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                if len(text) > 34 * 2:
-                    self.associated_data_info.setText('Too much data in hex string!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                else:
-                    self.associated_data_info.setText('Reading as hex string')
-                    self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                    return True
-
-            else:
-                self.associated_data_interpret = InterpretType.LATIN
-                try:
-                    text.encode('latin-1')
-                except:
-                    self.associated_data_info.setText('Text not compatible with latin-1!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                if len(text) > 34:
-                    self.associated_data_info.setText('Too much data in latin-1 string!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                else:
-                    self.associated_data_info.setText('Reading as latin-1 string')
-                    self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                    return True
-        if self.parent.config.get('advanced_asset_functions', False):
-            if text[:2] == 'Qm':
-                try:
-                    if len(base_decode(text, base=58)) == 34:
-                        self.associated_data_info.setText('Reading as IPFS')
-                        self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                        self.associated_data_interpret = InterpretType.IPFS
-                        return True
-                except:
-                    pass
-            try:
-                if len(text) == 1:
-                    raise Exception()
-                bytes.fromhex(text)
-                self.associated_data_info.setText('Reading as hex string')
-                self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                self.associated_data_interpret = InterpretType.HEX
-                if len(text) > 34 * 2:
-                    self.associated_data_info.setText('Too much data in hex string!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                return True
-            except:
-                self.associated_data_info.setText('Reading as latin-1 string')
-                self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                self.associated_data_interpret = InterpretType.LATIN
-                try:
-                    text.encode('latin-1')
-                except:
-                    self.associated_data_info.setText('Text not compatible with latin-1!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                if len(text) > 34:
-                    self.associated_data_info.setText('Too much data in latin-1 string!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                return True
-        else:
-            self.associated_data_interpret = InterpretType.IPFS
-            try:
                 raw = base_decode(text, base=58)
                 if len(raw) > 34:
                     self.associated_data_info.setText('Too much data in IPFS hash!')
@@ -483,7 +395,7 @@ class AssetCreateWorkspace(QWidget):
                     self.associated_data_info.setText('Reading as IPFS')
                     self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
                     return True
-            except:
+            except Exception:
                 self.associated_data_info.setText('Invalid IPFS hash!')
                 self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
                 return False
@@ -592,21 +504,6 @@ class AssetCreateWorkspace(QWidget):
             return 'Invalid associated data'
         return None
 
-    def should_warn_associated_data(self):
-        text = self.associated_data.text()  # type: str
-        i = self.associated_data_interpret
-        if i == InterpretType.NO_DATA:
-            return False
-        elif i == InterpretType.IPFS:
-            b = base_decode(text, base=58)
-        elif i == InterpretType.HEX:
-            b = bfh(text)
-        else:
-            b = text.encode('latin-1')
-        if len(b) < 34 and self.parent.config.get('warn_asset_small_associated', True):
-            return True
-        return False
-
     def should_warn_on_non_reissuable(self):
         is_unique = self.create_options_layout.selected_index() == 2
         c = self.reissuable.isChecked()
@@ -637,7 +534,6 @@ class AssetCreateWorkspace(QWidget):
         self.reissue_label.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
         self.last_checked = None
         self.associated_data_interpret = InterpretType.NO_DATA
-        self.associated_data_interpret_override.setCurrentIndex(0)
         self.refresh_change_addrs()
         self.send_asset_address.setText(self.change_addrs[1])
         self.send_asset_address_error.setText('')
@@ -688,12 +584,8 @@ class AssetCreateWorkspace(QWidget):
         else:
             if i == InterpretType.IPFS:
                 data = base_decode(d, base=58)
-            elif i == InterpretType.HEX:
-                data = bfh(d)
-            else:
-                data = d.encode('latin-1')
-            data = data.rjust(34, b'\0')
-
+            elif i == InterpretType.TXID:
+                data = b'\x54\x20' + bfh(d)
         new = [
             PartialTxOutput(
                 scriptpubkey=create_new_asset_script(bfh(address_to_script(self.send_asset_address.text())),
@@ -738,7 +630,6 @@ class AssetReissueWorkspace(QWidget):
 
         self.associated_data_info = QLabel()
         self.associated_data_info.setAlignment(Qt.AlignCenter)
-        self.associated_data_interpret_override = QComboBox()
         self.associated_data_interpret = InterpretType.NO_DATA
 
         self.cost_label = QLabel('Cost: {} RVN'.format(constants.net.BURN_AMOUNTS.ReissueAssetBurnAmount))
@@ -796,7 +687,6 @@ class AssetReissueWorkspace(QWidget):
                         if i:
                             self.associated_data.setFrozen(not r)
                             self.associated_data.setText(i)
-                            self.associated_data_interpret_override.setCurrentIndex(0)
                             self._check_associated_data()
                         else:
                             self.associated_data.setFrozen(not r)
@@ -849,7 +739,6 @@ class AssetReissueWorkspace(QWidget):
                 if i:
                     self.associated_data.setFrozen(not r)
                     self.associated_data.setText(m.ipfs_str)
-                    self.associated_data_interpret_override.setCurrentIndex(0)
                     self._check_associated_data()
                 else:
                     self.associated_data.setFrozen(not r)
@@ -915,11 +804,6 @@ class AssetReissueWorkspace(QWidget):
 
         self.associated_data.textChanged.connect(self._check_associated_data)
 
-        self.associated_data_interpret_override.addItems(['AUTO', 'IPFS', 'HEX', 'LATIN-1'])
-
-        self.associated_data_interpret_override.currentIndexChanged.connect(self._check_associated_data)
-        self.associated_data_interpret_override.setVisible(self.parent.config.get('advanced_asset_functions', False))
-
         data_grid = QHBoxLayout()
         data_grid.setSpacing(0)
         data_grid.setContentsMargins(0, 0, 0, 0)
@@ -929,7 +813,6 @@ class AssetReissueWorkspace(QWidget):
         data_w.setLayout(data_grid)
         c_grid_b.addWidget(data_w, 0, 2)
         c_grid_b.addWidget(self.associated_data_info, 1, 2)
-        c_grid_b.addWidget(self.associated_data_interpret_override, 0, 3)
 
         c_grid_c = QGridLayout()
         c_grid_c.setColumnStretch(4, 1)
@@ -1027,100 +910,21 @@ class AssetReissueWorkspace(QWidget):
 
     def _check_associated_data(self) -> bool:
         text = self.associated_data.text()
-        i = self.associated_data_interpret_override.currentIndex()
         if len(text) == 0:
             self.associated_data_info.setText('')
             self.associated_data_interpret = InterpretType.NO_DATA
             return True
-        if i != 0:
-            if i == 1:
+            
+        try:
+            if len(bytes.fromhex(text) != 32):
+                raise Exception()
+            self.associated_data_interpret = InterpretType.TXID
+            self.associated_data_info.setText('Reading as TXID')
+            self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
+            return True
+        except Exception:
+            try:
                 self.associated_data_interpret = InterpretType.IPFS
-                try:
-                    if len(base_decode(text, base=58)) > 34:
-                        self.associated_data_info.setText('Too much data in IPFS hash!')
-                        self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                        return False
-                    else:
-                        self.associated_data_info.setText('Reading as IPFS')
-                        self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                        return True
-                except:
-                    self.associated_data_info.setText('Invalid base 58 encoding!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-            if i == 2:
-                self.associated_data_interpret = InterpretType.HEX
-                try:
-                    bfh(text)
-                except:
-                    self.associated_data_info.setText('Not a valid hex string!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                if len(text) > 34 * 2:
-                    self.associated_data_info.setText('Too much data in hex string!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                else:
-                    self.associated_data_info.setText('Reading as hex string')
-                    self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                    return True
-
-            else:
-                self.associated_data_interpret = InterpretType.LATIN
-                try:
-                    text.encode('latin-1')
-                except:
-                    self.associated_data_info.setText('Text not compatible with latin-1!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                if len(text) > 34:
-                    self.associated_data_info.setText('Too much data in latin-1 string!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                else:
-                    self.associated_data_info.setText('Reading as latin-1 string')
-                    self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                    return True
-        if self.parent.config.get('advanced_asset_functions', False):
-            if text[:2] == 'Qm':
-                try:
-                    if len(base_decode(text, base=58)) == 34:
-                        self.associated_data_info.setText('Reading as IPFS')
-                        self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                        self.associated_data_interpret = InterpretType.IPFS
-                        return True
-                except:
-                    pass
-            try:
-                if len(text) == 1:
-                    raise Exception()
-                bytes.fromhex(text)
-                self.associated_data_info.setText('Reading as hex string')
-                self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                self.associated_data_interpret = InterpretType.HEX
-                if len(text) > 34 * 2:
-                    self.associated_data_info.setText('Too much data in hex string!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                return True
-            except:
-                self.associated_data_info.setText('Reading as latin-1 string')
-                self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
-                self.associated_data_interpret = InterpretType.LATIN
-                try:
-                    text.encode('latin-1')
-                except:
-                    self.associated_data_info.setText('Text not compatible with latin-1!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                if len(text) > 34:
-                    self.associated_data_info.setText('Too much data in latin-1 string!')
-                    self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
-                    return False
-                return True
-        else:
-            self.associated_data_interpret = InterpretType.IPFS
-            try:
                 raw = base_decode(text, base=58)
                 if len(raw) > 34:
                     self.associated_data_info.setText('Too much data in IPFS hash!')
@@ -1134,7 +938,7 @@ class AssetReissueWorkspace(QWidget):
                     self.associated_data_info.setText('Reading as IPFS')
                     self.associated_data_info.setStyleSheet(ColorScheme.DEFAULT.as_stylesheet())
                     return True
-            except:
+            except Exception:
                 self.associated_data_info.setText('Invalid IPFS hash!')
                 self.associated_data_info.setStyleSheet(ColorScheme.RED.as_stylesheet())
                 return False
@@ -1217,21 +1021,6 @@ class AssetReissueWorkspace(QWidget):
             return 'Invalid associated data'
         return None
 
-    def should_warn_associated_data(self):
-        text = self.associated_data.text()  # type: str
-        i = self.associated_data_interpret
-        if i == InterpretType.NO_DATA:
-            return False
-        elif i == InterpretType.IPFS:
-            b = base_decode(text, base=58)
-        elif i == InterpretType.HEX:
-            b = bfh(text)
-        else:
-            b = text.encode('latin-1')
-        if len(b) < 34 and self.parent.config.get('warn_asset_small_associated', True):
-            return True
-        return False
-
     def should_warn_on_non_reissuable(self):
         c = self.reissuable.isChecked()
         if not c and self.parent.config.get('warn_asset_non_reissuable', True):
@@ -1253,7 +1042,6 @@ class AssetReissueWorkspace(QWidget):
         self.associated_data.setText('')
         self.associated_data_info.setText('')
         self.associated_data_interpret = InterpretType.NO_DATA
-        self.associated_data_interpret_override.setCurrentIndex(0)
 
         self.asset_amount.setFrozen(True)
         self.asset_amount.setText('')
@@ -1303,11 +1091,8 @@ class AssetReissueWorkspace(QWidget):
         else:
             if i == InterpretType.IPFS:
                 data = base_decode(d, base=58)
-            elif i == InterpretType.HEX:
-                data = bfh(d)
-            else:
-                data = d.encode('latin-1')
-            data = data.rjust(34, b'\0')
+            elif i == InterpretType.TXID:
+                data = b'\x54\x20' + bfh(d)
 
         divs = int(self.divisions.text())
         new = [

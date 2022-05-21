@@ -663,7 +663,7 @@ class SettingsDialog(QDialog):
             window.asset_list.update()
 
         advanced_assets_cb.stateChanged.connect(on_set_advanced_assets_cb)
-        asset_widgets.append((advanced_assets_cb, None))
+        #asset_widgets.append((advanced_assets_cb, None))
 
         message_widgets = []
 
@@ -684,7 +684,7 @@ class SettingsDialog(QDialog):
             #(invoices_widgets, _('Invoices')),
             #(lightning_widgets, _('Lightning')),
             (fiat_widgets, _('Fiat')),
-            (message_widgets, _('Messages')),
+            #(message_widgets, _('Messages')),
             #(oa_widgets, _('OpenAlias')),
             (misc_widgets, _('Misc')),
         ]

@@ -2063,34 +2063,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                                 '{}').format(error))
             return
 
-        def show_small_association_warning():
-            if self.reissue_workspace.should_warn_associated_data():
-                cb = QCheckBox(_("Don't show this message again."))
-                cb_checked = False
-
-                def on_cb(x):
-                    nonlocal cb_checked
-                    cb_checked = x == Qt.Checked
-
-                cb.stateChanged.connect(on_cb)
-                goto = self.question(_('Your associated data is smalled than the '
-                                       '34 byte size.\n'
-                                       'Double check that you have input the correct '
-                                       'data.\n'
-                                       'If you continue, null bytes will be prepended '
-                                       'to the end of your data to fit this size.\n\n'
-                                       'Is this okay?'),
-                                     title=_('Warning: Small associated data'), checkbox=cb)
-
-                if cb_checked:
-                    self.config.set_key('warn_asset_small_associated', False)
-                if goto:
-                    return True
-                else:
-                    return False
-            else:
-                return True
-
         def show_non_reissuable_warning():
             if self.reissue_workspace.should_warn_on_non_reissuable():
                 cb = QCheckBox(_("Don't show this message again."))
@@ -2115,9 +2087,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             else:
                 return True
 
-        if not show_small_association_warning():
-            return
-
         if not show_non_reissuable_warning():
             return
 
@@ -2140,34 +2109,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.show_warning(_('Invalid asset metadata:\n'
                                 '{}').format(error))
             return
-
-        def show_small_association_warning():
-            if self.create_workspace.should_warn_associated_data():
-                cb = QCheckBox(_("Don't show this message again."))
-                cb_checked = False
-
-                def on_cb(x):
-                    nonlocal cb_checked
-                    cb_checked = x == Qt.Checked
-
-                cb.stateChanged.connect(on_cb)
-                goto = self.question(_('Your associated data is smalled than the '
-                                              '34 byte size.\n'
-                                              'Double check that you have input the correct '
-                                              'data.\n'
-                                              'If you continue, null bytes will be prepended '
-                                              'to the end of your data to fit this size.\n\n'
-                                              'Is this okay?'),
-                                            title=_('Warning: Small associated data'), checkbox=cb)
-
-                if cb_checked:
-                    self.config.set_key('warn_asset_small_associated', False)
-                if goto:
-                    return True
-                else:
-                    return False
-            else:
-                return True
 
         def show_non_reissuable_warning():
             if self.create_workspace.should_warn_on_non_reissuable():
@@ -2192,9 +2133,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                     return False
             else:
                 return True
-
-        if not show_small_association_warning():
-            return
 
         if not show_non_reissuable_warning():
             return

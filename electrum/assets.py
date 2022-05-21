@@ -6,7 +6,8 @@ from typing import Dict, Union, Optional, Tuple
 from .logging import get_logger
 from .ravencoin import opcodes, push_script, base_encode, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN, base_decode
 from . import transaction
-from .util import Satoshis, bfh
+from .util import Satoshis
+from .i18n import _
 
 DOUBLE_PUNCTUATION = "^.*[._]{2,}.*$"
 LEADING_PUNCTUATION = "^[._].*$"
@@ -81,11 +82,11 @@ def get_asset_vout_type(script: bytes) -> Optional[str]:
     type = bytes([script[rvn_ptr]])
 
     if type == b't':
-        return 'Transfer'
+        return _('Transfer')
     elif type in (b'q', b'o'):
-        return 'Creation'
+        return _('Creation')
     elif type == b'r':
-        return 'Reissue'
+        return _('Reissue')
 
     return None
     

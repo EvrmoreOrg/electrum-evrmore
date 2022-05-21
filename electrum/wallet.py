@@ -2229,7 +2229,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
     def get_onchain_request_status(self, r: Invoice) -> Tuple[bool, Optional[int]]:
         address = r.get_address()
-        amount = int(r.get_amount_sat() or 0)
+        amount = r.get_amount_sat() or RavenValue()
         received, sent = self.get_addr_io(address)
         l = []
         for txo, x in received.items():

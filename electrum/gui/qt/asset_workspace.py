@@ -632,6 +632,8 @@ class AssetReissueWorkspace(QWidget):
         self.associated_data_info.setAlignment(Qt.AlignCenter)
         self.associated_data_interpret = InterpretType.NO_DATA
 
+        self.last_asset = None
+
         self.cost_label = QLabel('Cost: {} RVN'.format(constants.net.BURN_AMOUNTS.ReissueAssetBurnAmount))
 
         msg = _('Reissuability') + '\n\n' \
@@ -860,7 +862,7 @@ class AssetReissueWorkspace(QWidget):
             self.send_asset_address.setText(self.change_addrs[1])
         else:
             async def delayed_address_update():
-                time.sleep(5)
+                time.sleep(2)
                 self.refresh_change_addrs()
                 self.send_asset_address.setText(self.change_addrs[1])
 
@@ -1066,6 +1068,7 @@ class AssetReissueWorkspace(QWidget):
         self.reset_gui()
         self.refresh_change_addrs()
         self.refresh_owners()
+        self.last_asset = None
         self.send_asset_address.setText(self.change_addrs[1])
 
     def get_owner(self):

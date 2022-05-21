@@ -1662,19 +1662,29 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         grid.addWidget(self.message_e, 2, 1, 1, -1)
 
         vis = self.config.get('enable_op_return_messages', False)
-        self.pubkey_e = FreezableLineEdit()
-        self.pubkey_e.setMaxLength(40)  # Maximum length of an OP_RETURN message is 40. 1 byte for message length
-        self.pubkey_e.setMinimumWidth(700)
+        self.op_return_e = FreezableLineEdit()
+        self.op_return_e.setMaxLength(40)  # Maximum length of an OP_RETURN message is 40. 1 byte for message length
+        self.op_return_e.setMinimumWidth(700)
         msg = _('OP_RETURN message.') + '\n\n' \
-              + _('A short message to be encoded in a null pubkey') + ' ' \
-              + _(
-            'Note that this is not an intented feature of Ravencoin and may be removed in the future.') + '\n\n' \
+              + _('A short message of arbitrary data.') + ' ' \
+              + _('This message is associated with the transaction as a whole') + '\n\n' \
               + _('This will increase your fee slightly.')
-        self.pubkey_label = HelpLabel(_('OP_RETURN Message'), msg)
-        grid.addWidget(self.pubkey_label, 3, 0)
-        self.pubkey_label.setVisible(vis)
-        self.pubkey_e.setVisible(vis)
-        grid.addWidget(self.pubkey_e, 3, 1, 1, -1)
+        self.op_return_label = HelpLabel(_('OP_RETURN Message'), msg)
+        self.op_return_label.setVisible(vis)
+        self.op_return_e.setVisible(vis)
+        grid.addWidget(self.op_return_label, 3, 0)
+        grid.addWidget(self.op_return_e, 3, 1, 1, -1)
+
+        self.asset_memo_e = FreezableLineEdit()
+        self.asset_memo_e.setMinimumWidth(700)
+        msg = _('Asset Memo') + '\n\n' \
+            + _('An IPFS hash or txid to be') + ' ' \
+            + _('associated with the utxo of the asset transaction.')
+        self.asset_memo_label = HelpLabel(_('Asset Memo'), msg)
+        self.asset_memo_e.setVisible(vis and self.to_send_combo.currentIndex() != 0)
+        self.asset_memo_label.setVisible(vis and self.to_send_combo.currentIndex() != 0)
+        #grid.addWidget(self.asset_memo_label, 4, 0)
+        #grid.addWidget(self.asset_memo_e, 4, 1, 1, -1)
 
         msg = (_('The amount to be received by the recipient.') + ' '
                + _('Fees are paid by the sender.') + '\n\n'
@@ -1682,21 +1692,25 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                + _('Note that if you have frozen some of your addresses, the available funds will be lower than your total balance.'))
 
         amount_label = HelpLabel(_('Amount'), msg)
-        grid.addWidget(amount_label, 4, 0)
-        grid.addWidget(self.amount_e, 4, 1)
+        grid.addWidget(amount_label, 5, 0)
+        grid.addWidget(self.amount_e, 5, 1)
 
-        grid.addWidget(self.to_send_combo, 4, 2)
+        grid.addWidget(self.to_send_combo, 5, 2)
 
         self.fiat_send_e = AmountEdit(self.fx.get_currency if self.fx else '')
         if not self.fx or not self.fx.is_enabled():
             self.fiat_send_e.setVisible(False)
-        grid.addWidget(self.fiat_send_e, 4, 3)
+        grid.addWidget(self.fiat_send_e, 5, 3)
         self.amount_e.frozen.connect(
             lambda: self.fiat_send_e.setFrozen(self.amount_e.isReadOnly()))
 
         def on_to_send():
+            vis = self.config.get('enable_op_return_messages', False)
+
             i = self.to_send_combo.currentIndex()
             self.fiat_send_e.setVisible(i == 0)
+            self.asset_memo_e.setVisible(vis and i != 0)
+            self.asset_memo_label.setVisible(vis and i != 0)
             if i == 0:
                 reg = QRegExp('^[0-9]{0,11}\\.([0-9]{1,8})$')
             else:
@@ -1719,7 +1733,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.max_button = EnterButton(_("Max"), self.spend_max)
         self.max_button.setFixedWidth(100)
         self.max_button.setCheckable(True)
-        grid.addWidget(self.max_button, 4, 4)
+        grid.addWidget(self.max_button, 5, 4)
 
         self.save_button = EnterButton(_("Save"), self.do_save_invoice)
         self.send_button = EnterButton(_("Pay") + "...", self.do_pay)
@@ -2402,7 +2416,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 return invoice
             else:
                 outputs = self.read_outputs()
-                pubkey_msg = self.pubkey_e.text()
+                pubkey_msg = self.op_return_e.text()
                 if pubkey_msg != '' and len(pubkey_msg) < 40:
                     outputs.append(
                         PartialTxOutput(
@@ -2410,7 +2424,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                             scriptpubkey=
                             b'\x6a' +
                             len(pubkey_msg).to_bytes(1, 'big', signed=False) +
-                            pubkey_msg.encode('ascii')
+                            pubkey_msg.encode('utf8')
                         ))
                 if self.check_send_tab_onchain_outputs_and_show_errors(outputs):
                     return
@@ -2438,6 +2452,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.pending_invoice = None
 
     def do_pay(self):
+
         self.pending_invoice = self.read_invoice()
         if not self.pending_invoice:
             return
@@ -2867,7 +2882,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.payto_URI = None
         self.payto_e.is_pr = False
         self.set_onchain(False)
-        for e in [self.payto_e, self.message_e, self.amount_e]:
+        for e in [self.payto_e, self.message_e, self.amount_e, self.op_return_e, self.asset_memo_e]:
             e.setText('')
             e.setFrozen(False)
         self.update_status()
@@ -4090,8 +4105,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if d.need_restart:
             self.show_warning(_('Please restart Electrum to activate the new GUI settings'), title=_('Success'))
         vis = self.config.get('enable_op_return_messages', False)
-        self.pubkey_label.setVisible(vis)
-        self.pubkey_e.setVisible(vis)
+        self.op_return_label.setVisible(vis)
+        self.op_return_e.setVisible(vis)
+        self.asset_memo_label.setVisible(vis and self.to_send_combo.currentIndex() != 0)
+        self.asset_memo_e.setVisible(vis and self.to_send_combo.currentIndex() != 0)
 
     def closeEvent(self, event):
         # note that closeEvent is NOT called if the user quits with Ctrl-C

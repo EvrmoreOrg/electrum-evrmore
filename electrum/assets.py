@@ -63,6 +63,32 @@ def is_name_valid(name: str) -> bool:
             # Too many #
             return False
 
+def get_asset_vout_type(script: bytes) -> Optional[str]:
+    if script[-1] != 0x75:
+        return None
+    ops = transaction.script_GetOp(script)
+    rvn_ptr = -1
+    for op, _, ptr in ops:
+        if op == opcodes.OP_RVN_ASSET:
+            rvn_ptr = ptr - 1
+            break
+    if not rvn_ptr > 0:
+        return None
+    if script[rvn_ptr+2:rvn_ptr+5] == b'rvn':
+        rvn_ptr += 5
+    else:
+        rvn_ptr += 6
+    type = bytes([script[rvn_ptr]])
+
+    if type == b't':
+        return 'Transfer'
+    elif type in (b'q', b'o'):
+        return 'Creation'
+    elif type == b'r':
+        return 'Reissue'
+
+    return None
+    
 
 def try_get_message_from_asset_transfer(script: bytes) -> Optional[Tuple[str, Optional[int]]]:
     # Returns message, expiry

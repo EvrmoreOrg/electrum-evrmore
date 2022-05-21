@@ -42,7 +42,7 @@ from qrcode import exceptions
 from electrum.simple_config import SimpleConfig
 from electrum.util import quantize_feerate, convert_bytes_to_utf8_safe, RavenValue
 from electrum.ravencoin import base_encode, NLOCKTIME_BLOCKHEIGHT_MAX
-from electrum.assets import try_get_message_from_asset_transfer
+from electrum.assets import try_get_message_from_asset_transfer, get_asset_vout_type
 from electrum.i18n import _
 from electrum.plugin import run_hook
 from electrum import simple_config
@@ -664,6 +664,9 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
             cursor.insertText('\t', ext)
             cursor.insertText(format_amount(v), ext)
             if o.asset:
+                a_type = get_asset_vout_type(o.scriptpubkey)
+                if a_type:
+                    cursor.insertText(f'\t({a_type})', ext)
                 message = try_get_message_from_asset_transfer(o.scriptpubkey)
                 if message:
                     ipfs, timestamp = message

@@ -850,10 +850,7 @@ class Hardware_KeyStore(Xpub, KeyStore):
         return False
 
     def get_password_for_storage_encryption(self) -> str:
-        client = self.plugin.get_client(self, allow_user_interaction=False)
-        if client is None:
-            # Use a custom exception?
-            raise ValueError()
+        client = self.plugin.get_client(self)
         return client.get_password_for_storage_encryption()
 
     def has_usable_connection_with_device(self) -> bool:

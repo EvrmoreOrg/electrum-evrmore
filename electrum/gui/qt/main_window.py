@@ -231,11 +231,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         coincontrol_sb = self.create_coincontrol_statusbar()
 
         self.tabs = tabs = QTabWidget(self)
+        # We depend on the utxo tab in the send tab now
+        # Circular dependencies ensue: TODO: Fix
+        self.utxo_list = None
         self.send_tab = self.create_send_tab()
         self.receive_tab = self.create_receive_tab()
         self.addresses_tab = self.create_addresses_tab()
-        self.assets_tab = self.create_assets_tab()
         self.utxo_tab = self.create_utxo_tab()
+        self.assets_tab = self.create_assets_tab()
         self.console_tab = self.create_console_tab()
         self.contacts_tab = self.create_contacts_tab()
         # self.messages_tab = self.create_messages_tab()
@@ -1639,11 +1642,18 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
     def refresh_send_tab(self):
         # Don't interrupt if we don't need to
-        balance = sum(self.wallet.get_balance(), RavenValue())
-        new_send_options = [util.decimal_point_to_base_unit_name(self.get_decimal_point())] + \
-                            sorted([asset for asset, bal in balance.assets.items() if bal != 0])
+        coins = self.get_manually_selected_coins() if self.utxo_list else None
+        if coins:
+            selected_value = sum((x.value_sats() for x in coins), RavenValue())
+            list_rvn = selected_value.rvn_value > 0
+            selectable_assets = list(selected_value.assets.keys())
+        else:
+            list_rvn, selectable_assets = self.wallet.get_non_frozen_assets()
 
-        diff = set(new_send_options) - set(self.send_options)
+        new_send_options = ([util.decimal_point_to_base_unit_name(self.get_decimal_point())] if list_rvn else []) + \
+                            sorted(selectable_assets)
+
+        diff = set(new_send_options) ^ set(self.send_options)
         if self.send_options and not diff:
             return
 
@@ -1744,8 +1754,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
             i = self.to_send_combo.currentIndex()
             self.fiat_send_e.setVisible(i == 0)
-            self.asset_memo_e.setVisible(vis and i != 0)
-            self.asset_memo_label.setVisible(vis and i != 0)
+            #self.asset_memo_e.setVisible(vis and i != 0)
+            #self.asset_memo_label.setVisible(vis and i != 0)
             if i == 0:
                 reg = QRegExp('^[0-9]{0,11}\\.([0-9]{1,8})$')
             else:
@@ -2528,7 +2538,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 a = None
             self.pay_onchain_dialog(self.get_coins(asset=a), invoice.outputs)
 
-    def get_coins(self, *, nonlocal_only=False) -> Sequence[PartialTxInput]:
+    def get_coins(self, *, nonlocal_only=False, asset=None) -> Sequence[PartialTxInput]:
         coins = self.get_manually_selected_coins()
         if coins is not None:
             return coins
@@ -4157,8 +4167,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         vis = self.config.get('enable_op_return_messages', False)
         self.op_return_label.setVisible(vis)
         self.op_return_e.setVisible(vis)
-        self.asset_memo_label.setVisible(vis and self.to_send_combo.currentIndex() != 0)
-        self.asset_memo_e.setVisible(vis and self.to_send_combo.currentIndex() != 0)
+        #self.asset_memo_label.setVisible(vis and self.to_send_combo.currentIndex() != 0)
+        #self.asset_memo_e.setVisible(vis and self.to_send_combo.currentIndex() != 0)
 
     def closeEvent(self, event):
         # note that closeEvent is NOT called if the user quits with Ctrl-C

@@ -291,17 +291,11 @@ def guess_asset_script_for_vin(script: bytes, asset: str, amt: int, txin, wallet
                                                  base_decode(meta.ipfs_str,
                                                              base=58) if meta.ipfs_str else None).hex()
             else:
-                if meta.source_prev_outpoint:
-                    # Reissue amt is FF
-                    script = create_reissue_asset_script(script, asset, amt, b'\xff',
+                script = create_reissue_asset_script(script, asset, amt,
+                                                         b'\xff' if meta.source_divisions else bytes([meta.divisions]), 
                                                          meta.is_reissuable,
                                                          base_decode(meta.ipfs_str,
-                                                                     base=58) if meta.ipfs_str else None).hex()
-                else:
-                    script = create_reissue_asset_script(script, asset, amt,
-                                                         bytes([meta.divisions]), meta.is_reissuable,
-                                                         base_decode(meta.ipfs_str,
-                                                                     base=58) if meta.ipfs_str else None).hex()
+                                                                     base=58) if (meta.ipfs_str and not meta.source_ipfs) else None).hex()
         elif txin.prevout.to_str() in reissue_outpoints:
             script = reissue_outpoints[txin.prevout.to_str()]
         else:

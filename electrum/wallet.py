@@ -692,6 +692,12 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             is_lightning_funding_tx=is_lightning_funding_tx,
         )
 
+    def get_non_frozen_assets(self) -> List[str]:
+        with self._freeze_lock:
+            frozen_addresses = self._frozen_addresses.copy()
+        total_sum = sum((x.value_sats() for x in self.get_utxos(excluded_addresses=frozen_addresses)), RavenValue())
+        return total_sum.rvn_value > 0, list(total_sum.assets.keys())
+
     def get_spendable_coins(self, domain, *, nonlocal_only=False, asset: Optional[str] = None) -> Sequence[PartialTxInput]:
         confirmed_only = self.config.get('confirmed_only', False)
         with self._freeze_lock:
@@ -702,7 +708,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                                confirmed_funding_only=confirmed_only,
                                nonlocal_only=nonlocal_only)
 
-        # If we don't want a RVN transactions, omit all asset transactions
+        # If we want a RVN transactions, omit all asset transactions
         # If we want an asset transaction, include all transactions that include that asset and
         # RVN transactions for the fee
 

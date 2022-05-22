@@ -124,6 +124,7 @@ class UTXOList(MyTreeView):
             self.parent.set_coincontrol_msg(_("Coin control active") + f': {num_outputs_str}, {amount_str}')
         else:
             self.parent.set_coincontrol_msg(None)
+        self.parent.refresh_send_tab()
 
     def refresh_row(self, key, row):
         utxo = self._utxo_dict[key]

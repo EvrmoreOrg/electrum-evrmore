@@ -1174,7 +1174,7 @@ def ipfs_explorer_info():
 def ipfs_explorer(config: 'SimpleConfig') -> Optional[str]:
     if config.get('ipfs_explorer_custom') is not None:
         return None
-    default_ = 'ipfs.io'
+    default_ = 'infura.io'
     ie_key = config.get('ipfs_explorer', default_)
     ie_tuple = ipfs_explorer_info().get(ie_key)
     if ie_tuple is None:

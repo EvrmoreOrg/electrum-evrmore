@@ -21,6 +21,25 @@ UNIQUE_CHECK = "^[-A-Za-z0-9@$%&*()[\\]{}_.?:]+$"
 _logger = get_logger(__name__)
 
 
+# This is used in the asset_workspace to make place-holders for the coin-chooser
+# We add null-bytes to the beginning to approximate a full-size tx for the coin-chooser
+
+P2PKH_SCRIPT_SIZE = 25
+DUMMY_BYTES = bytes(P2PKH_SCRIPT_SIZE)
+
+def GENERATE_OWNERSHIP_PLACEHOLDER(asset: str) -> bytes:
+    return create_owner_asset_script(DUMMY_BYTES, asset)
+
+def GENERATE_TRANSFER_PLACEHOLDER(asset: str, amount: int, memo: Optional[bytes], expiry: Optional[int]):
+    return create_transfer_asset_script(DUMMY_BYTES, asset, amount, memo=memo, expiry=expiry)
+
+def GENERATE_NEW_PLACEHOLDER(asset: str, amount: int, divisions: int, reissuable: bool, data: Optional[bytes]):
+    return create_new_asset_script(DUMMY_BYTES, asset, amount, divisions, reissuable, data)
+
+def GENERATE_REISSUE_PLACEHOLDER(asset: str, amount: int, divisions: int, reissuable: bool, data: Optional[bytes]):
+    return create_reissue_asset_script(DUMMY_BYTES, asset, amount, bytes([divisions]), reissuable, data)
+
+
 class BadAssetScript(Exception): pass
 
 
@@ -202,7 +221,10 @@ def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
         }
 
 
-def create_transfer_asset_script(standard: bytes, asset: str, value: Union[int, Satoshis, Decimal, str]):
+def create_transfer_asset_script(standard: bytes, asset: str, value: Union[int, Satoshis, Decimal, str], *, memo: Optional[bytes] = None, expiry: Optional[int] = None):
+    assert not memo or len(memo) == 34
+    if expiry:
+        assert memo
     if isinstance(value, Satoshis):
         value = value.value
     if isinstance(value, str):
@@ -210,7 +232,7 @@ def create_transfer_asset_script(standard: bytes, asset: str, value: Union[int, 
     asset_header = b'rvnt'.hex()
     name = push_script(asset.encode('ascii').hex())
     amt = value.to_bytes(8, byteorder="little", signed=False).hex()
-    asset_portion = asset_header+name+amt
+    asset_portion = asset_header+name+amt + (memo.hex() if memo else '') + (expiry.to_bytes(8, 'little', signed=False) if expiry else '')
     return standard + \
         bytes([opcodes.OP_RVN_ASSET]) + \
         bytes.fromhex(push_script(asset_portion)) + \

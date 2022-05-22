@@ -2149,7 +2149,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if not show_non_reissuable_warning():
             return
 
-        norm, new, owner_change_addr = self.reissue_workspace.get_output()
+        norm, new = self.reissue_workspace.get_output()
 
         self.pay_onchain_dialog(
             list(set(self.get_coins(asset=self.reissue_workspace.get_owner()))),
@@ -2196,7 +2196,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if not show_non_reissuable_warning():
             return
 
-        norm, new, owner_change_addr = self.create_workspace.get_output()
+        norm, new = self.create_workspace.get_output()
 
         self.pay_onchain_dialog(
             list(set(self.get_coins(asset=self.create_workspace.get_owner()))),

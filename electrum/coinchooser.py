@@ -27,7 +27,7 @@ from math import floor, log10
 from typing import NamedTuple, List, Callable, Sequence, Union, Dict, Tuple, Optional
 from decimal import Decimal
 
-from .ravencoin import sha256, COIN, is_address
+from .ravencoin import address_to_script, sha256, COIN, is_address
 from .transaction import Transaction, TxOutput, PartialTransaction, PartialTxInput, PartialTxOutput
 from .util import NotEnoughFunds, Satoshis, RavenValue
 from .logging import Logger
@@ -309,8 +309,10 @@ class CoinChooserBase(Logger):
 
     def _change_outputs(self, tx: PartialTransaction, change_addrs, fee_estimator_numchange,
                         dust_threshold, asset_divs: Dict[str, int], has_return: bool) -> List[PartialTxOutput]:
-        amounts = self._change_amounts(tx, len(change_addrs) - len(asset_divs), fee_estimator_numchange, asset_divs)
+        amounts = self._change_amounts(tx, len(change_addrs), fee_estimator_numchange, asset_divs)
         assert all([t[1] >= 0 for t in amounts])
+        while len(change_addrs) < len(amounts) - (1 if has_return else 0):
+            change_addrs.append(change_addrs[0])
         assert len(change_addrs) >= len(amounts) - (1 if has_return else 0)
         assert all([isinstance(amt, Tuple) for amt in amounts])
         # If change is above dust threshold after accounting for the
@@ -336,7 +338,7 @@ class CoinChooserBase(Logger):
 
         # change is sent back to sending address unless specified
         if not change_addrs:
-            change_addrs = [tx.inputs()[0].address]
+            change_addrs.append(tx.inputs()[0].address)
             # note: this is not necessarily the final "first input address"
             # because the inputs had not been sorted at this point
             assert is_address(change_addrs[0])
@@ -492,6 +494,11 @@ class CoinChooserBase(Logger):
 
         self.logger.info(f"using {len(tx.inputs())} inputs")
         self.logger.info(f"using buckets: {[bucket.desc for bucket in scored_candidate.buckets]}")
+
+        # Replace dummy asset creations
+        for i, output in enumerate(tx._outputs):
+            if output.scriptpubkey[:25] == bytes(25):
+                output.scriptpubkey = bytes.fromhex(address_to_script(change_addrs[i % len(change_addrs)])) + output.scriptpubkey[25:]
 
         return tx
 

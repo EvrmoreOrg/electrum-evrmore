@@ -1341,7 +1341,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             for _ in range(extra_addresses):
                 append_change_addrs(change_addrs)
         for addr in change_addrs:
-            assert is_address(addr), f"not valid bitcoin address: {addr}"
+            assert is_address(addr), f"not valid ravencoin address: {addr}"
             # note that change addresses are not necessarily ismine
             # in which case this is a no-op
             self.check_address_for_corruption(addr)
@@ -1498,9 +1498,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             change_addrs = self.get_change_addresses_for_new_transaction(change_addr or old_change_addrs,
                                 extra_addresses=extra_addresses if not force_same_change_addr else 0)
 
-            # Enforce same change addr if needed, plus 1 for RVN change
-            while len(change_addrs) < extra_addresses + 1:
-                change_addrs.append(change_addrs[0])
+            if change_addrs and force_same_change_addr:
+                change_addrs = change_addrs[:1]
 
             tx = coin_chooser.make_tx(
                 coins=coins,

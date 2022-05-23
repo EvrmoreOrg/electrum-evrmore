@@ -681,7 +681,7 @@ class SimpleConfig(Logger):
         suffix = ''
         if isinstance(x, RavenValue):
             if x.assets:
-                suffix = f'({len(x.assets)} assets)'
+                suffix = f' ({len(x.assets)} asset' + ('s' if len(x.assets) > 1 else '') + ')'
             x = x.rvn_value.value
         
         return format_satoshis(
@@ -692,15 +692,15 @@ class SimpleConfig(Logger):
             whitespaces=whitespaces,
             precision=self.amt_precision_post_satoshi,
             add_thousands_sep=self.amt_add_thousands_sep,
-        ) + (' ' if suffix else '') + suffix
+        ) + suffix
 
     def format_amount_and_units(self, amount):
         suffix = ''
         if isinstance(amount, RavenValue):
             if amount.assets:
-                suffix = f'({len(amount.assets)} assets)'
+                suffix = f' ({len(amount.assets)} asset' + ('s' if len(amount.assets) > 1 else '') + ')'
             amount = amount.rvn_value.value
-        return self.format_amount(amount) + ' '+ self.get_base_unit() + (' ' if suffix else '') + suffix
+        return self.format_amount(amount) + ' ' + self.get_base_unit() + suffix
 
     def format_fee_rate(self, fee_rate):
         return format_fee_satoshis(fee_rate/1000, num_zeros=self.num_zeros) + ' sat/byte'

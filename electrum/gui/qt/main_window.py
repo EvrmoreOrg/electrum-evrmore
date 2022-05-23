@@ -193,8 +193,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         self.asset_blacklist = self.wallet.config.get('asset_blacklist', [])
         self.asset_whitelist = self.wallet.config.get('asset_whitelist', [])
-        self.use_own_cb = QCheckBox(_('Force use own RVN'))
-        self.force_use_own = False
 
         # Tracks sendable things
         self.send_options = []  # type: List[str]
@@ -1021,12 +1019,18 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         """Returns string with both bitcoin and fiat amounts, in desired units.
         E.g. 500_000 -> '0.005 BTC (191.42 EUR)'
         """
+
+        suffix = ''
         if isinstance(amount_sat, RavenValue):
+            if amount_sat.assets:
+                suffix = f' ({len(amount_sat.assets)} asset' + ('s' if len(amount_sat.assets) > 1 else '') + ')'
             amount_sat = amount_sat.rvn_value.value
         text = self.config.format_amount_and_units(amount_sat)
         fiat = self.fx.format_amount_and_units(amount_sat, timestamp=timestamp) if self.fx else None
         if text and fiat:
             text += f' ({fiat})'
+        if suffix:
+            text += suffix
         return text
 
     def format_fiat_and_units(self, amount_sat) -> str:
@@ -1720,14 +1724,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         grid.addWidget(self.op_return_label, 3, 0)
         grid.addWidget(self.op_return_e, 3, 1, 1, -1)
 
-        self.asset_memo_e = FreezableLineEdit()
-        self.asset_memo_e.setMinimumWidth(700)
-        msg = _('Asset Memo') + '\n\n' \
-            + _('An IPFS hash or txid to be') + ' ' \
-            + _('associated with the utxo of the asset transaction.')
-        self.asset_memo_label = HelpLabel(_('Asset Memo'), msg)
-        self.asset_memo_e.setVisible(vis and self.to_send_combo.currentIndex() != 0)
-        self.asset_memo_label.setVisible(vis and self.to_send_combo.currentIndex() != 0)
+        #self.asset_memo_e = FreezableLineEdit()
+        #self.asset_memo_e.setMinimumWidth(700)
+        #msg = _('Asset Memo') + '\n\n' \
+        #    + _('An IPFS hash or txid to be') + ' ' \
+        #    + _('associated with the utxo of the asset transaction.')
+        #self.asset_memo_label = HelpLabel(_('Asset Memo'), msg)
+        #self.asset_memo_e.setVisible(vis and self.to_send_combo.currentIndex() != 0)
+        #self.asset_memo_label.setVisible(vis and self.to_send_combo.currentIndex() != 0)
         #grid.addWidget(self.asset_memo_label, 4, 0)
         #grid.addWidget(self.asset_memo_e, 4, 1, 1, -1)
 
@@ -2155,7 +2159,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             list(set(self.get_coins(asset=self.reissue_workspace.get_owner()))),
             norm,
             coinbase_outputs=new,
-            change_addr=owner_change_addr if (self.wallet.keystore and self.wallet.keystore.get_type_text()[:2] == 'hw') else None
         )
 
         self.reissue_workspace.reset_workspace()
@@ -2202,7 +2205,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             list(set(self.get_coins(asset=self.create_workspace.get_owner()))),
             norm,
             coinbase_outputs=new,
-            change_addr=owner_change_addr if (self.wallet.keystore and self.wallet.keystore.get_type_text()[:2] == 'hw') else None
         )
 
         self.create_workspace.reset_workspace()
@@ -4012,13 +4014,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         vbox.addStretch(1)
         button = OkButton(d, _('Sweep'))
-        self.use_own_cb = QCheckBox(_('Force use own RVN'))
-
-        def on_cb(x):
-            self.force_use_own = x == Qt.Checked
-
-        self.use_own_cb.stateChanged.connect(on_cb)
-        vbox.addLayout(Buttons(self.use_own_cb, CancelButton(d), button))
+    
+        vbox.addLayout(Buttons(CancelButton(d), button))
         button.setEnabled(False)
 
         def get_address():
@@ -4067,19 +4064,14 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.warn_if_watching_only()
 
             # If there is not RVN in the privkeys, use our own
-            # TODO: dynamically use our own RVN if not enough
-            # TODO: Ensure that any RVN held in the privkey is moved over
-            use_own = total_held.rvn_value.value < 0.1 or self.force_use_own
-            if use_own:
-                coins_rvn += list(self.get_coins())
-
+                        
             outputs = []
             if total_held.assets:
-                outputs = [PartialTxOutput.from_address_and_value(addr, value=value, asset=asset) for asset, value in total_held.assets.items()]
+                outputs = [PartialTxOutput.from_address_and_value(addr, value='!', asset=asset) for asset in total_held.assets.keys()]
             if total_held.rvn_value.value != 0:
-                outputs += [PartialTxOutput.from_address_and_value(addr, value=total_held.rvn_value, is_max=not use_own)]
+                outputs += [PartialTxOutput.from_address_and_value(addr, value='!')]
 
-            self.pay_onchain_dialog(coins_rvn + coins_assets, outputs, external_keypairs=keypairs, mixed=use_own)
+            self.pay_onchain_dialog(self.get_coins(), outputs, mandatory_inputs=coins_rvn + coins_assets, external_keypairs=keypairs, mixed=True)
 
         def on_failure(exc_info):
             self.on_error(exc_info)

@@ -109,7 +109,7 @@ class TxOutput:
         assert isinstance(scriptpubkey, bytes)
         if isinstance(value, Satoshis):
             value = value.value
-        assert isinstance(value, int)
+        assert isinstance(value, (str, int))
         if not (isinstance(value, int) or parse_max_spend(value) is not None):
             raise ValueError(f"bad txout value: {value!r}")
         self.scriptpubkey = scriptpubkey

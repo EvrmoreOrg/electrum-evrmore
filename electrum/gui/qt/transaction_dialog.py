@@ -40,7 +40,7 @@ import qrcode
 from qrcode import exceptions
 
 from electrum.simple_config import SimpleConfig
-from electrum.util import quantize_feerate, convert_bytes_to_utf8_safe, RavenValue
+from electrum.util import parse_max_spend, quantize_feerate, convert_bytes_to_utf8_safe, RavenValue
 from electrum.ravencoin import base_encode, NLOCKTIME_BLOCKHEIGHT_MAX
 from electrum.assets import try_get_message_from_asset_transfer, get_asset_vout_type
 from electrum.i18n import _
@@ -542,7 +542,7 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
             fee_str += '  ( %s ) ' % self.main_window.format_fee_rate(fee_rate * 1000)
             if isinstance(self.tx, PartialTransaction):
                 if isinstance(self, PreviewTxDialog):
-                    invoice_amt = self.tx.output_value() if self.output_value == '!' else self.output_value
+                    invoice_amt = self.tx.output_value() if parse_max_spend(self.output_value) else self.output_value
                 else:
                     invoice_amt = amount
                 fee_warning_tuple = self.wallet.get_tx_fee_warning(

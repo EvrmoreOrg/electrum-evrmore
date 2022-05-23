@@ -59,7 +59,7 @@ from .util import (NotEnoughFunds, UserCancelled, profiler, OldTaskGroup,
                    Fiat, bfh, bh2u, TxMinedInfo, quantize_feerate, create_bip21_uri, OrderedDictWithIndex, 
                    parse_max_spend, RavenValue)
 from .simple_config import SimpleConfig, FEE_RATIO_HIGH_WARNING, FEERATE_WARNING_HIGH_FEE
-from .ravencoin import COIN, TYPE_ADDRESS
+from .ravencoin import COIN, TYPE_ADDRESS, standardize_script
 from .ravencoin import is_address, address_to_script, is_minikey, relayfee, dust_threshold
 from .crypto import sha256d
 from . import keystore
@@ -71,6 +71,7 @@ from .wallet_db import WalletDB
 from . import transaction, ravencoin, coinchooser, paymentrequest, ecc, bip32
 from .transaction import (Transaction, TxInput, UnknownTxinType, TxOutput,
                           PartialTransaction, PartialTxInput, PartialTxOutput, TxOutpoint, get_script_type_from_output_script)
+from .assets import replace_amount_in_transfer_asset_script
 from .plugin import run_hook
 from .address_synchronizer import (AddressSynchronizer, TX_HEIGHT_LOCAL,
                                    TX_HEIGHT_UNCONF_PARENT, TX_HEIGHT_UNCONFIRMED, TX_HEIGHT_FUTURE)
@@ -1417,7 +1418,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             for_swap=False,
             force_same_change_addr=False) -> PartialTransaction:
 
-        if not coins:  # any bitcoin tx must have at least 1 input by consensus
+        if not coins and not inputs:  # any bitcoin tx must have at least 1 input by consensus
             raise NotEnoughFunds()
         if any([c.already_has_some_signatures() for c in coins]):
             raise Exception("Some inputs already contain signatures!")
@@ -1427,11 +1428,13 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
         # check outputs
         i_max = []
-        i_max_sum = 0
+        i_max_sum = defaultdict(lambda: 0)
+        counts_of_each = defaultdict(lambda: 0)
         for i, o in enumerate(outputs):
             weight = parse_max_spend(o.value)
             if weight:
-                i_max_sum += weight
+                counts_of_each[o.asset] += 1
+                i_max_sum[o.asset] += weight
                 i_max.append((weight, i))
 
         if fee is None and self.config.fee_per_kb() is None:
@@ -1514,8 +1517,6 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 freeze_locktime=freeze_locktime,
                 for_swap=for_swap)
         else:
-            #TODO:
-            raise Exception('TODO')
             # "spend max" branch
             # note: This *will* spend inputs with negative effective value (if there are any).
             #       Given as the user is spending "max", and so might be abandoning the wallet,
@@ -1523,24 +1524,68 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             #       forever. see #5433
             # note: Actually, it might be the case that not all UTXOs from the wallet are
             #       being spent if the user manually selected UTXOs.
-            asset = list(assets)[0] if assets else None
-            sendable = sum(map(lambda c: c.value_sats().assets.get(asset, 0) if asset else c.value_sats().rvn_value.value, coins))
-            for (_,i) in i_max:
-                outputs[i].value = 0
-            tx = PartialTransaction.from_io(list(coins), list(outputs))
-            fee = fee_estimator(tx.estimated_size())
-            amount = sendable - tx.output_value() - fee
-            if amount < 0:
-                raise NotEnoughFunds()
-            distr_amount = 0
-            for (weight, i) in i_max:
-                val = int((amount/i_max_sum) * weight)
-                outputs[i].value = val
-                distr_amount += val
+            
+            # Prioritize static "inputs", if not enough for fee, use the coins for backup
+            # Otherwise, just use coins
 
-            (x,i) = i_max[-1]
-            outputs[i].value += (amount - distr_amount)
-            tx = PartialTransaction.from_io(list(coins), list(outputs))
+            coins = list(coins)
+            for (_,i) in i_max:
+                # Set to 0 here to properly calculate non-max amount
+                outputs[i].value = 0
+
+            amount = RavenValue(-1)
+            coins_used = []
+            added_output = False
+            while True:
+                sendable = sum(map(lambda c: c.value_sats(), (inputs or coins) + coins_used), RavenValue())
+                tx = PartialTransaction.from_io(list(inputs or coins) + coins_used, list(outputs))
+                fee = fee_estimator(tx.estimated_size())
+                amount = sendable - tx.output_value() - RavenValue(fee)
+                if not inputs or amount.rvn_value.value > 0:
+                    # We do not have any inputs -> this was from our coins
+                    break
+                # If we have inputs -> implies sweep -> shouldn't need a lot because just for fee
+                if len(coins) > 0:
+                    coins_used.append(coins.pop())
+                    # If none is in counts of each, we already have a RVN output
+                    if not added_output and None not in counts_of_each:
+                        added_output = True
+                        # is an asset script pub key
+                        scriptpubkey = standardize_script(outputs[0].scriptpubkey)
+                        outputs.append(PartialTxOutput(scriptpubkey=scriptpubkey, value=0))
+                        # Does not matter what weight we put, because the excess gets appended to last outpoint of same type
+                        i_max.append((1, len(i_max)))
+                        counts_of_each[None] = 1
+                        i_max_sum[None] = 1
+                else:
+                    break
+
+            # Only RVN is neccissary
+            if amount.rvn_value.value <= 0:
+                raise NotEnoughFunds()
+            
+            distr_amount = defaultdict(lambda: 0)
+            current_count = defaultdict(lambda: 0)
+            for (weight, i) in i_max:
+                asset_name = outputs[i].asset
+                if asset_name is None:
+                    val = int((amount.rvn_value.value/i_max_sum[None]) * weight)
+                else:
+                    val = int((amount.assets[asset_name].value/i_max_sum[asset_name]) * weight)
+
+                distr_amount[asset_name] += val
+                if current_count[asset_name] == counts_of_each[asset_name]:
+                    if not asset_name:
+                        val += (amount.rvn_value.value - distr_amount[asset_name])
+                    else:
+                        val += (amount.assets[asset_name].value - distr_amount[asset_name])
+
+                outputs[i].value = val
+                if asset_name:
+                    # We must re-generate the script with the correct value
+                    outputs[i].scriptpubkey = replace_amount_in_transfer_asset_script(outputs[i].scriptpubkey, val)
+
+            tx = PartialTransaction.from_io(list(inputs or coins) + coins_used, list(outputs))
 
         # Timelock tx to current height.
 
@@ -2751,7 +2796,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
         feerate = Decimal(fee) / tx_size  # sat/byte
         try:
-            fee_ratio = Decimal(fee) / invoice_amt.rvn_value.value if invoice_amt else 1
+            fee_ratio = Decimal(fee) / invoice_amt.rvn_value.value if invoice_amt.rvn_value.value else 1
         except decimal.DivisionByZero:  # For assets
             fee_ratio = 0
         long_warning = None

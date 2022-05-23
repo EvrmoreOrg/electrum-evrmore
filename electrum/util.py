@@ -121,19 +121,14 @@ def parse_max_spend(amt: Any) -> Optional[int]:
 
     if isinstance(amt, RavenValue):
         def parse_ravenvalue():
-            rvn_max_spent = parse_max_spend(amt.rvn_value)
-            asset_max_count = 0
+            rvn_max_spend = parse_max_spend(amt.rvn_value)
+            if rvn_max_spend is not None:
+                return rvn_max_spend
+            
             for _, value in amt.assets.items():
-                if parse_max_spend(value) is not None:
-                    asset_max_count += 1
-            if (rvn_max_spent is not None) ^ (asset_max_count == 1):
-                if rvn_max_spent is not None:
-                    return rvn_max_spent
-                else:
-                    for _, value in amt.assets.items():
-                        m_spend = parse_max_spend(value)
-                        if m_spend is not None:
-                            return m_spend
+                m_spend = parse_max_spend(value)
+                if m_spend is not None:
+                    return m_spend
             return None
 
         return parse_ravenvalue()
@@ -348,7 +343,7 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
     def __init__(self, rvn: Union[int, Satoshis, str] = 0, assets=None):
         if assets is None:
             assets = {}
-        assert isinstance(rvn, int) or isinstance(rvn, Satoshis)
+        assert isinstance(rvn, (int, Satoshis, str))
         assert isinstance(assets, Dict)
         if isinstance(rvn, int):
             self.__rvn_value = Satoshis(rvn)
@@ -395,11 +390,17 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
 
     def __add__(self, other):
         if isinstance(other, RavenValue):
-            v_r = self.rvn_value + other.rvn_value
+            if '!' == self.rvn_value or '!' == other.rvn_value:
+                v_r = '!'
+            else:
+                v_r = self.rvn_value + other.rvn_value
             v_a = self.assets
             for k, v in other.assets.items():
                 if k in v_a:
-                    v_a[k] += v
+                    if v_a[k] == '!' or v == '!':
+                        v_a[k] = '!'
+                    else:
+                        v_a[k] += v
                 else:
                     v_a[k] = v
             return RavenValue(v_r, v_a)

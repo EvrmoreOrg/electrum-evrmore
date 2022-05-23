@@ -30,7 +30,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QVBoxLayout, QLabel, QGridLayout, QPushButton, QLineEdit
 
 from electrum.i18n import _
-from electrum.util import NotEnoughFunds, NoDynamicFeeEstimates
+from electrum.util import NotEnoughFunds, NoDynamicFeeEstimates, parse_max_spend
 from electrum.plugin import run_hook
 from electrum.transaction import Transaction, PartialTransaction, RavenValue
 from electrum.wallet import InternalAddressCorruption
@@ -219,18 +219,17 @@ class ConfirmTxDialog(TxEditor, WindowModalDialog):
         self.pw.setEnabled(enable)
         self.send_button.setEnabled(enable)
 
-    # TODO: Currently only for RVN
     def _update_amount_label(self):
         tx = self.tx
-        if self.output_value == '!':
+        if parse_max_spend(self.output_value) is not None:
             if tx:
                 amount = tx.output_value()
-                amount_str = self.main_window.format_amount_and_units(amount.rvn_value)
+                amount_str = self.main_window.format_amount_and_units(amount)
             else:
                 amount_str = "max"
         else:
             amount = self.output_value
-            amount_str = self.main_window.format_amount_and_units(amount.rvn_value)
+            amount_str = self.main_window.format_amount_and_units(amount)
         self.amount_label.setText(amount_str)
 
     def update(self):
@@ -255,7 +254,7 @@ class ConfirmTxDialog(TxEditor, WindowModalDialog):
             self.extra_fee_value.setVisible(True)
             self.extra_fee_value.setText(self.main_window.format_amount_and_units(x_fee_amount))
 
-        amount = self.output_value
+        amount = tx.output_value() if parse_max_spend(self.output_value) else self.output_value
         tx_size = tx.estimated_size()
         fee_warning_tuple = self.wallet.get_tx_fee_warning(
             invoice_amt=amount, tx_size=tx_size, fee=fee)

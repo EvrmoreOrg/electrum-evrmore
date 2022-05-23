@@ -527,14 +527,17 @@ def address_to_scripthash(addr: str, *, net=None) -> str:
     return script_to_scripthash(bfh(script))
 
 
-def script_to_scripthash(script: bytes) -> str:
+def standardize_script(script: bytes) -> str:
     assert isinstance(script, bytes)
     # Cut off assets if any for correct address -> scripthash <- script
     if len(script) > 22 and script[0] == 0xA9 and script[1] == 0x14 and script[22] == 0x87:  # Script hash
         end = 23
     else:  # Assumed Pubkey hash
         end = 25
-    script = script[:end]
+    return script[:end]
+
+def script_to_scripthash(script: bytes) -> str:
+    script = standardize_script(script)
     h = sha256(script)[0:32]
     return bh2u(bytes(reversed(h)))
 

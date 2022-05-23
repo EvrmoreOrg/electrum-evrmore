@@ -150,6 +150,30 @@ def try_get_message_from_asset_transfer(script: bytes) -> Optional[Tuple[str, Op
         return [ipfs, timestamp]
     return None
 
+def replace_amount_in_transfer_asset_script(script: bytes, amount: int) -> bytes:
+    if script[-1] != 0x75:
+        raise BadAssetScript('No OP_DROP')
+    ops = transaction.script_GetOp(script)
+    rvn_ptr = -1
+    for op, _, ptr in ops:
+        if op == opcodes.OP_RVN_ASSET:
+            rvn_ptr = ptr - 1
+            break
+    if not rvn_ptr > 0:
+        raise BadAssetScript('No OP_RVN_ASSET')
+    if script[rvn_ptr+2:rvn_ptr+5] == b'rvn':
+        rvn_ptr += 5
+    else:
+        rvn_ptr += 6
+    type = bytes([script[rvn_ptr]])
+    if type != b't':
+        raise BadAssetScript('Not an asset transfer script')
+    rvn_ptr += 1
+    name_len = script[rvn_ptr]
+    pre_sats = script[:rvn_ptr+1+name_len]
+    post_sats = script[rvn_ptr+1+name_len+8:]
+    return pre_sats + amount.to_bytes(8, 'little', signed=False) + post_sats
+
 def pull_meta_from_create_or_reissue_script(script: bytes) -> Dict:
     if script[-1] != 0x75:
         raise BadAssetScript('No OP_DROP')
@@ -292,6 +316,7 @@ def create_new_asset_script(standard: bytes, asset: str, value: int, divisions: 
 def guess_asset_script_for_vin(script: bytes, asset: str, amt: int, txin, wallet) -> str:
     if wallet is None:
         _logger.warning("Using best effort pre-image script for asset: no wallet: {}".format(asset))
+        
         script = create_transfer_asset_script(script, asset, amt).hex()
         return script
     else:

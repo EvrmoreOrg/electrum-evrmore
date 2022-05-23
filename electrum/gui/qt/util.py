@@ -1492,6 +1492,13 @@ class VTabWidget(QtWidgets.QTabWidget):
         self.setTabBar(VTabBar(self))
         self.setTabPosition(QtWidgets.QTabWidget.West)
 
+    def resizeEvent(self, e):
+        # keep square aspect ratio when resized
+        size = e.size()
+        w = self.tabBar().width() + size.height()
+        self.setFixedWidth(w)
+        return super().resizeEvent(e)
+
 
 if __name__ == "__main__":
     app = QApplication([])

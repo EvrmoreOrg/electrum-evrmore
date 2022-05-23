@@ -1058,7 +1058,7 @@ class Transaction:
         return script
 
     @classmethod
-    def get_preimage_script(cls, txin: 'PartialTxInput', wallet: 'Abstract_Wallet' = None) -> str:
+    def get_preimage_script(cls, txin: 'PartialTxInput', wallet: 'Abstract_Wallet' = None, txin_locking_script_overrides: Dict = None) -> str:
         if txin.witness_script:
             if opcodes.OP_CODESEPARATOR in [x[0] for x in script_GetOp(txin.witness_script)]:
                 raise Exception('OP_CODESEPARATOR black magic is not supported')
@@ -1087,9 +1087,11 @@ class Transaction:
         if a:
             asset, amt = list(a.items())[0]
             script = guess_asset_script_for_vin(bfh(script), asset, amt, txin, wallet)
-
         if wallet:
             script = wallet.get_nonstandard_outpoints().get(txin.prevout.to_str(), script)
+        if txin_locking_script_overrides:
+            _logger.debug('Trying to override')
+            script = txin_locking_script_overrides.get(txin.prevout.to_str(), script)
 
         return script
 
@@ -1973,6 +1975,7 @@ class PartialTransaction(Transaction):
         self._inputs = []  # type: List[PartialTxInput]
         self._outputs = []  # type: List[PartialTxOutput]
         self._unknown = {}  # type: Dict[bytes, bytes]
+        self._prevout_overrides = {}  # type: Dict[str, bytes]
 
     def to_json(self) -> dict:
         d = super().to_json()
@@ -2276,7 +2279,7 @@ class PartialTransaction(Transaction):
         if sighash not in list(map(int, SIGHASH)):
             raise Exception("invalid sighash: {}".format(sighash))
         nHashType = int_to_hex(sighash, 4)
-        preimage_script = self.get_preimage_script(txin, self._wallet)
+        preimage_script = self.get_preimage_script(txin, self._wallet, txin_locking_script_overrides=self._prevout_overrides)
         _logger.info(f"Preimage script for {txin.prevout.txid.hex()}\n{bfh(preimage_script)}")
         if txin.is_segwit():
             raise NotImplementedError()

@@ -106,7 +106,7 @@ class BumpFeeStrategy(enum.Enum):
 
 
 async def _append_utxos_to_inputs(*, inputs: List[PartialTxInput], network: 'Network',
-                                  pubkey: str, txin_type: str, imax: int) -> None:
+                                  pubkey: str, txin_type: str, imax: int, outpoint_to_script: Dict) -> None:
     if txin_type in ('p2pkh', 'p2wpkh', 'p2wpkh-p2sh'):
         address = ravencoin.pubkey_to_address(txin_type, pubkey)
         scripthash = ravencoin.address_to_scripthash(address)
@@ -124,6 +124,10 @@ async def _append_utxos_to_inputs(*, inputs: List[PartialTxInput], network: 'Net
             raise Exception('scripthash mismatch when sweeping')
         prevout_str = item['tx_hash'] + ':%d' % item['tx_pos']
         prevout = TxOutpoint.from_str(prevout_str)
+
+        if prev_txout.asset:
+            outpoint_to_script[prevout_str] = prev_txout.scriptpubkey.hex()
+        
         txin = PartialTxInput(prevout=prevout)
         txin.utxo = prev_tx
         txin.block_height = int(item['height'])
@@ -155,11 +159,13 @@ async def sweep_preparations(privkeys, network: 'Network', imax=100):
             network=network,
             pubkey=pubkey,
             txin_type=txin_type,
-            imax=imax)
+            imax=imax,
+            outpoint_to_script=asset_outpoints_to_locking_scripts)
         keypairs[pubkey] = privkey, compressed
 
     inputs = []  # type: List[PartialTxInput]
     keypairs = {}
+    asset_outpoints_to_locking_scripts = {}
     async with OldTaskGroup() as group:
         for sec in privkeys:
             txin_type, privkey, compressed = ravencoin.deserialize_privkey(sec)
@@ -175,7 +181,7 @@ async def sweep_preparations(privkeys, network: 'Network', imax=100):
                 await group.spawn(find_utxos_for_privkey('p2pk', privkey, compressed))
     if not inputs:
         raise UserFacingException(_('No inputs found.'))
-    return inputs, keypairs
+    return inputs, keypairs, asset_outpoints_to_locking_scripts
 
 
 async def sweep(
@@ -188,7 +194,7 @@ async def sweep(
         imax=100,
         locktime=None,
         tx_version=None) -> PartialTransaction:
-    inputs, keypairs = await sweep_preparations(privkeys, network, imax)
+    inputs, keypairs, asset_outpoints_to_locking_scripts = await sweep_preparations(privkeys, network, imax)
     total = sum(txin.value_sats() for txin in inputs)
     if fee is None:
         outputs = [PartialTxOutput(scriptpubkey=bfh(ravencoin.address_to_script(to_address)),
@@ -1416,6 +1422,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             coinbase_outputs=None,
             freeze_locktime=None,
             for_swap=False,
+            locking_script_overrides=None,
             force_same_change_addr=False) -> PartialTransaction:
 
         if not coins and not inputs:  # any bitcoin tx must have at least 1 input by consensus
@@ -1587,8 +1594,10 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
             tx = PartialTransaction.from_io(list(inputs or coins) + coins_used, list(outputs))
 
-        # Timelock tx to current height.
+        if locking_script_overrides:
+            tx._prevout_overrides = locking_script_overrides
 
+        # Timelock tx to current height.
         tx.locktime = get_locktime_for_new_transaction(self.network)
 
         tx.set_rbf(rbf)

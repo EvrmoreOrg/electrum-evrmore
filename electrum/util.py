@@ -146,6 +146,7 @@ def parse_max_spend(amt: Any) -> Optional[int]:
         return x
     return None
 
+
 class NotEnoughFunds(Exception):
     def __str__(self):
         return _("Insufficient funds")

@@ -1489,6 +1489,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         # always show
         self.receive_tabs.setVisible(True)
         self.update_receive_qr_window()
+        
+        # Since no lightning, need to trigger this
+        # Call twice to put back in original state
+        self.toggle_receive_qr(None)
         self.toggle_receive_qr(None)
 
     def update_receive_qr_window(self):
@@ -2427,8 +2431,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if req is None:
             return
         if status == PR_PAID:
-            self.notify(_('Payment received') + '\n' + key)
-            self.request_list.delete_item(key)
+            try:
+                self.request_list.delete_item(key)
+                self.notify(_('Payment received') + '\n' + key)
+            except TypeError:
+                # If we recieve twice to a payment request, this will get called again
+                # However, we have no request in the list now
+                pass
             self.receive_tabs.setVisible(False)
             self.need_update.set()
         else:
@@ -2579,7 +2588,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             change_addr=None,
             mixed=False,
             freeze_locktime=None,
-            for_swap=False) -> None:
+            for_swap=False,
+            locking_script_overrides=None) -> None:
         # trustedcoin requires this
         if run_hook('abort_send', self):
             return
@@ -2594,6 +2604,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             change_addr=change_addr,
             freeze_locktime=freeze_locktime,
             for_swap=for_swap,
+            locking_script_overrides=locking_script_overrides,
             force_same_change_addr=(self.wallet.keystore and self.wallet.keystore.get_type_text()[:2] == 'hw'),
             )
 
@@ -2944,7 +2955,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.payto_URI = None
         self.payto_e.is_pr = False
         self.set_onchain(False)
-        for e in [self.payto_e, self.message_e, self.amount_e, self.op_return_e, self.asset_memo_e]:
+        for e in [self.payto_e, self.message_e, self.amount_e, self.op_return_e]:#, self.asset_memo_e]:
             e.setText('')
             e.setFrozen(False)
         self.update_status()
@@ -4055,7 +4066,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         privkeys = get_pk()
 
         def on_success(result):
-            coins, keypairs = result
+            coins, keypairs, asset_outpoints_to_locking_scripts = result
             total_held = sum([coin.value_sats() for coin in coins], RavenValue())
 
             coins_rvn = [coin for coin in coins if coin.value_sats().rvn_value.value != 0]
@@ -4071,7 +4082,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             if total_held.rvn_value.value != 0:
                 outputs += [PartialTxOutput.from_address_and_value(addr, value='!')]
 
-            self.pay_onchain_dialog(self.get_coins(), outputs, mandatory_inputs=coins_rvn + coins_assets, external_keypairs=keypairs, mixed=True)
+            self.pay_onchain_dialog(self.get_coins(), outputs, mandatory_inputs=coins_rvn + coins_assets, external_keypairs=keypairs, mixed=True,
+                                        locking_script_overrides=asset_outpoints_to_locking_scripts)
 
         def on_failure(exc_info):
             self.on_error(exc_info)

@@ -213,6 +213,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.showing_cert_mismatch_error = False
         self.tl_windows = []
         self.pending_invoice = None
+        self.current_request = None # request shown in the receive tab
         Logger.__init__(self)
 
         self._coroutines_scheduled = set()  # type: Set[concurrent.futures.Future]
@@ -1164,6 +1165,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             return
         self.history_model.refresh('update_tabs')
         self.request_list.update()
+        self.update_current_request()
         self.invoice_list.update()
         self.address_list.update()
         self.asset_list.update()
@@ -1356,17 +1358,20 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         #self.receive_lightning_help = QWidget()
         #self.receive_lightning_help.setVisible(False)
         #self.receive_lightning_help.setLayout(vbox)
+        self.receive_address_qr = QRCodeWidget()
+        self.receive_URI_qr = QRCodeWidget()
+        #self.receive_lightning_qr = QRCodeWidget()
 
-        fixedSize = 200
-        for e in [self.receive_address_e, self.receive_URI_e, ]:#self.receive_lightning_e]:
+        min_size = QSize(200, 200)
+        for e in [self.receive_address_e, self.receive_URI_e]:#, self.receive_lightning_e]:
             e.setFont(QFont(MONOSPACE_FONT))
             e.addCopyButton(self.app)
             e.setReadOnly(True)
-            e.setFixedSize(fixedSize, fixedSize)
-
-        self.receive_address_qr = QRCodeWidget(fixedSize=fixedSize)
-        self.receive_URI_qr = QRCodeWidget(fixedSize=fixedSize)
-        #self.receive_lightning_qr = QRCodeWidget(fixedSize=fixedSize)
+            e.setMinimumSize(min_size)
+        #for w in [self.receive_address_help, self.receive_lightning_help]:
+        #    w.setMinimumSize(min_size)
+        for w in [self.receive_address_qr, self.receive_URI_qr]:#, self.receive_lightning_qr]:
+            w.setMinimumSize(min_size)
 
         #self.receive_lightning_e.textChanged.connect(self.update_receive_widgets)
 
@@ -1430,16 +1435,26 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         w.searchable_list = self.request_list
         vbox = QVBoxLayout(w)
         vbox.addLayout(hbox)
-
-        vbox.addStretch(1)
+        vbox.addStretch()
         vbox.addWidget(self.receive_requests_label)
         vbox.addWidget(self.request_list)
-        vbox.setStretchFactor(self.request_list, 1000)
+        vbox.setStretchFactor(hbox, 40)
+        vbox.setStretchFactor(self.request_list, 60)
         self.request_list.update()  # after parented and put into a layout, can update without flickering
 
         return w
 
-    def show_receive_request(self, req: Invoice):
+    def set_current_request(self, req):
+        self.current_request = req
+        self.update_current_request()
+
+    def update_current_request(self):
+        req = self.current_request
+        if req is None:
+            self.receive_URI_e.setText('')
+            #self.receive_lightning_e.setText('')
+            self.receive_address_e.setText('')
+            return
         addr = req.get_address() or ''
         amount_sat = req.get_amount_sat().rvn_value.value or 0
         address_help = '' if addr else _('Amount too small to be received onchain')
@@ -1451,30 +1466,39 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if lnaddr is None:
             ln_help = _('This request does not have a Lightning invoice.')
             lnaddr = ''
+            can_rebalance = False
+            can_swap = False
         elif not lightning_online:
             ln_help = _('You must be online to receive Lightning payments.')
             lnaddr = ''
+            can_rebalance = False
+            can_swap = False
         elif not can_receive_lightning:
             #self.receive_rebalance_button.suggestion = self.wallet.lnworker.suggest_rebalance_to_receive(amount_sat)
             #self.receive_swap_button.suggestion = self.wallet.lnworker.suggest_swap_to_receive(amount_sat)
             ln_help = _('Your Lightning channels do not have the capacity to receive this amount.')
-            #can_rebalance = bool(self.receive_rebalance_button.suggestion)
-            #can_swap = bool(self.receive_swap_button.suggestion)
-            #self.receive_rebalance_button.setEnabled(can_rebalance)
-            #self.receive_rebalance_button.setVisible(can_rebalance)
-            #self.receive_swap_button.setEnabled(can_swap)
-            #self.receive_swap_button.setVisible(can_swap)
+            can_rebalance = bool(self.receive_rebalance_button.suggestion)
+            can_swap = bool(self.receive_swap_button.suggestion)
+            if can_rebalance:
+                ln_help += '\n\n' + _('You may have that capacity after rebalancing your channels.')
+            elif can_swap:
+                ln_help += '\n\n' + _('You may have that capacity after swapping some of your funds.')
             lnaddr = ''
         else:
             ln_help = ''
-
-        #icon_name = "lightning.png" if lnaddr else "lightning_disconnected.png"
+            can_rebalance = False
+            can_swap = False
+        #self.receive_rebalance_button.setEnabled(can_rebalance)
+        #self.receive_rebalance_button.setVisible(can_rebalance)
+        #self.receive_swap_button.setEnabled(can_swap)
+        #self.receive_swap_button.setVisible(can_swap)
+        icon_name = "lightning.png" if lnaddr else "lightning_disconnected.png"
         #self.receive_tabs.setTabIcon(2, read_QIcon(icon_name))
         # encode lightning invoices as uppercase so QR encoding can use
         # alphanumeric mode; resulting in smaller QR codes
         lnaddr_qr = lnaddr.upper()
         self.receive_address_e.setText(addr)
-        self.update_receive_address_styling()
+        #self.update_receive_address_styling()
         self.receive_address_qr.setData(addr)
         self.receive_address_help.setText(address_help)
         self.receive_URI_e.setText(URI)
@@ -1492,15 +1516,21 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         
         # Since no lightning, need to trigger this
         # Call twice to put back in original state
-        self.toggle_receive_qr(None)
-        self.toggle_receive_qr(None)
+        #self.toggle_receive_qr(None)
+        #self.toggle_receive_qr(None)
 
     def update_receive_qr_window(self):
         if self.qr_window and self.qr_window.isVisible():
             i = self.receive_tabs.currentIndex()
             if i == 0:
+<<<<<<< HEAD
                 data = self.receive_address_qr.data
             #elif i == 1:
+=======
+                data = self.receive_URI_qr.data
+            elif i == 1:
+                data = self.receive_address_qr.data
+>>>>>>> spesmilo-master
             else:
                 data = self.receive_URI_qr.data
             #else:
@@ -2357,32 +2387,32 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             lightning_needed += (lightning_needed // 20) # operational safety margin
             coins = self.get_coins(nonlocal_only=True)
             can_pay_onchain = invoice.get_address() and self.wallet.can_pay_onchain(invoice.get_outputs(), coins=coins)
-            can_pay_with_new_channel, channel_funding_sat = self.wallet.can_pay_with_new_channel(amount_sat, coins=coins)
+            can_pay_with_new_channel = self.wallet.lnworker.suggest_funding_amount(amount_sat, coins=coins)
             can_pay_with_swap = self.wallet.lnworker.suggest_swap_to_send(amount_sat, coins=coins)
             can_rebalance = self.wallet.lnworker.suggest_rebalance_to_send(amount_sat)
             choices = {}
             if can_rebalance:
                 msg = ''.join([
-                    _('Rebalance channels'), '\n',
-                    _('Funds will be sent between your channels in order to raise your sending capacity.')
+                    _('Rebalance existing channels'), '\n',
+                    _('Move funds between your channels in order to increase your sending capacity.')
                 ])
                 choices[0] = msg
-            if can_pay_onchain:
-                msg = ''.join([
-                    _('Pay onchain'), '\n',
-                    _('Funds will be sent to the invoice fallback address.')
-                ])
-                choices[1] = msg
             if can_pay_with_new_channel:
                 msg = ''.join([
                     _('Open a new channel'), '\n',
                     _('You will be able to pay once the channel is open.')
                 ])
-                choices[2] = msg
+                choices[1] = msg
             if can_pay_with_swap:
                 msg = ''.join([
-                    _('Rebalance your channels with a submarine swap'), '\n',
+                    _('Swap onchain funds for lightning funds'), '\n',
                     _('You will be able to pay once the swap is confirmed.')
+                ])
+                choices[2] = msg
+            if can_pay_onchain:
+                msg = ''.join([
+                    _('Pay onchain'), '\n',
+                    _('Funds will be sent to the invoice fallback address.')
                 ])
                 choices[3] = msg
             if not choices:
@@ -2397,12 +2427,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                     chan1, chan2, delta = can_rebalance
                     self.rebalance_dialog(chan1, chan2, amount_sat=delta)
                 elif r == 1:
-                    self.pay_onchain_dialog(coins, invoice.get_outputs())
+                    amount_sat, min_amount_sat = can_pay_with_new_channel
+                    self.channels_list.new_channel_dialog(amount_sat=amount_sat, min_amount_sat=min_amount_sat)
                 elif r == 2:
-                    self.channels_list.new_channel_dialog(amount_sat=channel_funding_sat)
-                elif r == 3:
                     chan, swap_recv_amount_sat = can_pay_with_swap
                     self.run_swap_dialog(is_reverse=False, recv_amount_sat=swap_recv_amount_sat, channels=[chan])
+                elif r == 3:
+                    self.pay_onchain_dialog(coins, invoice.get_outputs())
             return
 
         # FIXME this is currently lying to user as we truncate to satoshis

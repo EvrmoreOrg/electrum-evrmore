@@ -1516,21 +1516,16 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         
         # Since no lightning, need to trigger this
         # Call twice to put back in original state
-        #self.toggle_receive_qr(None)
-        #self.toggle_receive_qr(None)
+        self.toggle_receive_qr(None)
+        self.toggle_receive_qr(None)
 
     def update_receive_qr_window(self):
         if self.qr_window and self.qr_window.isVisible():
             i = self.receive_tabs.currentIndex()
             if i == 0:
-<<<<<<< HEAD
-                data = self.receive_address_qr.data
-            #elif i == 1:
-=======
                 data = self.receive_URI_qr.data
             elif i == 1:
                 data = self.receive_address_qr.data
->>>>>>> spesmilo-master
             else:
                 data = self.receive_URI_qr.data
             #else:

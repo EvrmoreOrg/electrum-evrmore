@@ -1686,6 +1686,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         new_send_options = ([util.decimal_point_to_base_unit_name(self.get_decimal_point())] if list_rvn else []) + \
                             sorted(selectable_assets)
 
+        if not new_send_options:
+            new_send_options = [util.decimal_point_to_base_unit_name(self.get_decimal_point())]
+
         diff = set(new_send_options) ^ set(self.send_options)
         if self.send_options and not diff:
             return

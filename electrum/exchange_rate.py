@@ -251,9 +251,10 @@ def get_exchanges_and_currencies():
                 for name, klass in exchanges.items():
                     exchange = klass(None, None)
                     await group.spawn(get_currencies_safe(name, exchange))
-    loop = util.get_asyncio_loop()
+    #loop = util.get_asyncio_loop()
     try:
-        loop.run_until_complete(query_all_exchanges_for_their_ccys_over_network())
+        #loop.run_until_complete(query_all_exchanges_for_their_ccys_over_network())
+        asyncio.run(query_all_exchanges_for_their_ccys_over_network())
     except Exception as e:
         pass
     with open(path, 'w', encoding='utf-8') as f:

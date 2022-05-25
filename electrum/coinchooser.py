@@ -308,18 +308,18 @@ class CoinChooserBase(Logger):
         return ret_amt
 
     def _change_outputs(self, tx: PartialTransaction, change_addrs, fee_estimator_numchange,
-                        dust_threshold, asset_divs: Dict[str, int], has_return: bool) -> List[PartialTxOutput]:
-        amounts = self._change_amounts(tx, len(change_addrs), fee_estimator_numchange, asset_divs)
+                        dust_threshold, asset_divs: Dict[str, int], coinbase_vouts: int, has_return: bool) -> List[PartialTxOutput]:
+        
+        amounts = self._change_amounts(tx, max(1, len(change_addrs) - coinbase_vouts), fee_estimator_numchange, asset_divs)
+        
         assert all([t[1] >= 0 for t in amounts])
-        while len(change_addrs) < len(amounts) - (1 if has_return else 0):
-            change_addrs.append(change_addrs[0])
         assert len(change_addrs) >= len(amounts) - (1 if has_return else 0)
         assert all([isinstance(amt, Tuple) for amt in amounts])
         # If change is above dust threshold after accounting for the
         # size of the change output, add it to the transaction.
         amounts = [amount for amount in amounts if amount[1] >= dust_threshold]
         change = [PartialTxOutput.from_address_and_value(addr, Satoshis(amount[1]), amount[0])
-                  for addr, amount in zip(change_addrs, amounts)]
+                  for addr, amount in zip(change_addrs[::-1], amounts)]
         return change
 
     def _construct_tx_from_selected_buckets(self, *, buckets: Sequence[Bucket],
@@ -327,6 +327,7 @@ class CoinChooserBase(Logger):
                                             fee_estimator_w, dust_threshold,
                                             base_weight,
                                             wallet,
+                                            coinbase_vout_count,
                                             asset_divs: Dict[str, int],
                                             has_return: bool) -> Tuple[PartialTransaction, List[PartialTxOutput]]:
         
@@ -338,7 +339,7 @@ class CoinChooserBase(Logger):
 
         # change is sent back to sending address unless specified
         if not change_addrs:
-            change_addrs.append(tx.inputs()[0].address)
+            change_addrs = [tx.inputs()[0].address]
             # note: this is not necessarily the final "first input address"
             # because the inputs had not been sorted at this point
             assert is_address(change_addrs[0])
@@ -356,10 +357,10 @@ class CoinChooserBase(Logger):
             return fee_estimator_w(tx_weight + rvn_count * output_weight +
                                    fee_estimator_assets(assets))
 
-        change = self._change_outputs(tx, change_addrs, fee_estimator_numchange, dust_threshold, asset_divs, has_return)
+        change = self._change_outputs(tx, change_addrs, fee_estimator_numchange, dust_threshold, asset_divs, coinbase_vout_count,has_return)
         tx.add_outputs(change)
 
-        return tx, change
+        return tx, change, change_addrs
 
     def _get_tx_weight(self, buckets: Sequence[Bucket], *, base_weight: int) -> int:
         """Given a collection of buckets, return the total weight of the
@@ -420,8 +421,10 @@ class CoinChooserBase(Logger):
 
         base_weight = base_tx.estimated_weight()
 
+        coinbase_vout_count = 0
         if coinbase_outputs:
             base_weight = PartialTransaction.from_io(inputs[:], outputs[:] + coinbase_outputs, wallet=wallet).estimated_weight()
+            coinbase_vout_count = len(coinbase_outputs)
 
         spent_amount = base_tx.output_value()
 
@@ -474,6 +477,7 @@ class CoinChooserBase(Logger):
                                                             dust_threshold=dust_threshold,
                                                             base_weight=base_weight,
                                                             wallet=wallet,
+                                                            coinbase_vout_count=coinbase_vout_count,
                                                             asset_divs=asset_divs,
                                                             has_return=has_return)
 
@@ -487,7 +491,7 @@ class CoinChooserBase(Logger):
                                             len(b.value.assets) > 0, all_buckets))
 
         # Choose a subset of the buckets
-        scored_candidate = self.choose_buckets(all_buckets, needs_more,
+        scored_candidate, change_addresses = self.choose_buckets(all_buckets, needs_more,
                                                self.penalty_func(base_tx, tx_from_buckets=tx_from_buckets),
                                                coinbase_outputs=coinbase_outputs)
         tx = scored_candidate.tx
@@ -496,10 +500,11 @@ class CoinChooserBase(Logger):
         self.logger.info(f"using buckets: {[bucket.desc for bucket in scored_candidate.buckets]}")
 
         # Replace dummy asset creations
-        for i, output in enumerate(tx._outputs):
+        cnt = 0
+        for output in tx._outputs:
             if output.scriptpubkey[:25] == bytes(25):
-                output.scriptpubkey = bytes.fromhex(address_to_script(change_addrs[i % len(change_addrs)])) + output.scriptpubkey[25:]
-
+                output.scriptpubkey = bytes.fromhex(address_to_script(change_addresses[cnt % len(change_addresses)])) + output.scriptpubkey[25:]
+                cnt += 1
         return tx
 
     def choose_buckets(self, buckets: List[Bucket],
@@ -589,13 +594,13 @@ class CoinChooserRandom(CoinChooserBase):
 
     def choose_buckets(self, buckets, needs_more, penalty_func, coinbase_outputs):
         candidates = self.bucket_candidates_prefer_confirmed(buckets, needs_more)
-        scored_candidates = [penalty_func(cand) for cand in candidates]
-        winner = min(scored_candidates, key=lambda x: x.penalty)
+        scored_candidates_and_change_addrs = [penalty_func(cand) for cand in candidates]
+        winner = min(scored_candidates_and_change_addrs, key=lambda x: x[0].penalty)
         self.logger.info(f"Total number of buckets: {len(buckets)}")
         self.logger.info(f"Num candidates considered: {len(candidates)}. "
-                         f"Winning penalty: {winner.penalty}")
+                         f"Winning penalty: {winner[0].penalty}")
         if coinbase_outputs:
-            winner.tx.add_outputs(coinbase_outputs)
+            winner[0].tx.add_outputs(coinbase_outputs)
         return winner
 
 
@@ -621,7 +626,7 @@ class CoinChooserPrivacy(CoinChooserRandom):
         def penalty(buckets: List[Bucket]) -> ScoredCandidate:
             # Penalize using many buckets (~inputs)
             badness = len(buckets) - 1
-            tx, change_outputs = tx_from_buckets(buckets)
+            tx, change_outputs, change_addresses = tx_from_buckets(buckets)
             change = sum(o.value for o in change_outputs)
             # Penalize change not roughly in output range
             if change == 0:
@@ -635,7 +640,7 @@ class CoinChooserPrivacy(CoinChooserRandom):
                 badness += (change - max_change) / (max_change + 10000)
                 # Penalize large change; 5 BTC excess ~= using 1 more input
                 badness += change / (COIN * 5)
-            return ScoredCandidate(badness, tx, buckets)
+            return ScoredCandidate(badness, tx, buckets), change_addresses
 
         return penalty
 

@@ -1067,8 +1067,7 @@ class Transaction:
         if not txin.is_segwit() and txin.redeem_script:
             if opcodes.OP_CODESEPARATOR in [x[0] for x in script_GetOp(txin.redeem_script)]:
                 raise Exception('OP_CODESEPARATOR black magic is not supported')
-            raise NotImplementedError()
-            #return txin.redeem_script.hex()
+            return txin.redeem_script.hex()
 
         pubkeys = [pk.hex() for pk in txin.pubkeys]
         if txin.script_type in ['p2sh', 'p2wsh', 'p2wsh-p2sh']:

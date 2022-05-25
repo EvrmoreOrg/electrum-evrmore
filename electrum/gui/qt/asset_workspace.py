@@ -1,3 +1,4 @@
+import asyncio
 import time
 from abc import abstractmethod
 from enum import IntEnum
@@ -22,7 +23,7 @@ from electrum.i18n import _
 from electrum.logging import get_logger
 from electrum.ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, base_decode, address_to_script, COIN
 from electrum.transaction import PartialTxOutput, AssetMeta
-from electrum.util import Satoshis, bfh
+from electrum.util import Satoshis, bfh, get_asyncio_loop
 
 
 _logger = get_logger(__name__)
@@ -382,11 +383,12 @@ class AssetCreateWorkspace(QWidget):
             return True
 
     def check_asset_availability(self, asset):
-        def x(result):
-            self.update_screen_based_on_asset_result(asset, result)
-
-        self.parent.run_coroutine_from_thread(self.parent.network.get_meta_for_asset(asset),
-                                              x)
+        def x(task: asyncio.Task):
+            self.update_screen_based_on_asset_result(asset, task.result())
+        
+        loop = get_asyncio_loop()
+        task = loop.create_task(self.parent.network.get_meta_for_asset(asset))
+        task.add_done_callback(x)
 
     def update_screen_based_on_asset_result(self, asset, result):
         if result:

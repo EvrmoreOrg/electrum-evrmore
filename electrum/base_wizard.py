@@ -45,6 +45,7 @@ from .simple_config import SimpleConfig
 from .plugin import Plugins, HardwarePluginLibraryUnavailable
 from .logging import Logger
 from .plugins.hw_wallet.plugin import OutdatedHwFirmwareException, HW_PluginBase
+from .constants import net
 
 if TYPE_CHECKING:
     from .plugin import DeviceInfo, BasePlugin
@@ -149,6 +150,8 @@ class BaseWizard(Logger):
             #('multisig',  _("Multi-signature wallet (advanced)")),
             ('imported',  _("Import Ravencoin addresses or private keys")),
         ]
+        if net.TESTNET:
+            wallet_kinds.insert(1, ('multisig',  _("Multi-signature wallet (advanced)")))
         choices = [pair for pair in wallet_kinds if pair[0] in wallet_types]
         self.choice_dialog(title=title, message=message, choices=choices, run_next=self.on_wallet_type)
 
@@ -420,7 +423,7 @@ class BaseWizard(Logger):
             # For segwit, a custom path is used, as there is no standard at all.
             default_choice_idx = 0
             choices = [
-                ('standard',   'legacy multisig (p2sh)',            normalize_bip32_derivation("m/45'/0")),
+                ('standard',   '(p2sh)',            normalize_bip32_derivation("m/45'/0")),
 
                 # Ravencoin does not current support segwit
 

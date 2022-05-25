@@ -427,8 +427,8 @@ class BaseWizard(Logger):
 
                 # Ravencoin does not current support segwit
 
-                # ('p2wsh-p2sh', 'p2sh-segwit multisig (p2wsh-p2sh)', purpose48_derivation(0, xtype='p2wsh-p2sh')),
-                # ('p2wsh',      'native segwit multisig (p2wsh)',    purpose48_derivation(0, xtype='p2wsh')),
+                #('p2wsh-p2sh', 'p2sh-segwit multisig (p2wsh-p2sh)', purpose48_derivation(0, xtype='p2wsh-p2sh')),
+                #('p2wsh',      'native segwit multisig (p2wsh)',    purpose48_derivation(0, xtype='p2wsh')),
             ]
             # if this is not the first cosigner, pre-select the expected script type,
             # and hide the choices
@@ -563,7 +563,11 @@ class BaseWizard(Logger):
         self.logger.info('Creating keystore...')
         if self.seed_type == 'bip39':
             root_seed = bip39_to_seed(seed, passphrase if passphrase else '')
-            derivation = normalize_bip32_derivation(bip44_derivation(0))
+            if self.wallet_type == 'multisig':
+                derivation = normalize_bip32_derivation("m/45'/0")
+            else:
+                derivation = normalize_bip32_derivation(bip44_derivation(0))
+
             k = keystore.from_bip43_rootseed(root_seed, derivation, xtype='standard', seed=seed, passphrase=passphrase)
         else:
             k = keystore.from_seed(seed, passphrase, self.wallet_type == 'multisig')
@@ -721,7 +725,7 @@ class BaseWizard(Logger):
         self.opt_ext = False #True
         self.opt_slip39 = False
         f = lambda x: self.request_passphrase(x)
-        self.show_seed_dialog(run_next=f, seed_text=seed, electrum_seed_type=seed_type)
+        self.show_seed_dialog(run_next=f, seed_text=seed, electrum_seed_type='bip39')
 
     def request_passphrase(self, opt_passphrase):
         seed = self.seed

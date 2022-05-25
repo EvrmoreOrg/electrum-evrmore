@@ -2307,7 +2307,8 @@ class PartialTransaction(Transaction):
             if sighash & int(SIGHASH.ANYONECANPAY) != 0:
                 txins = var_int(1) + self.serialize_input(txin, preimage_script)
                 # We only need to check the next 2 bits now
-                sighash &= 3
+                if sighash & int(SIGHASH.SINGLE) == 0:
+                    raise NotImplementedError()
             else:
                 txins = var_int(len(inputs))
                 for k, txin in enumerate(inputs):

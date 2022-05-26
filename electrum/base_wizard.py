@@ -214,7 +214,7 @@ class BaseWizard(Logger):
                 ('restore_from_seed', _('I already have a seed')),
                 ('restore_from_key', _('Use a master key')),
             ]
-            if not self.is_kivy:
+            if not self.is_kivy and not self.wallet_type == 'multisig':
                 choices.append(('choose_hw_device',  _('Use a hardware device')))
         else:
             message = _('Add a cosigner to your multi-sig wallet')

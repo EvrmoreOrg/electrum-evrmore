@@ -46,7 +46,7 @@ is a TL;DR::
     sudo pip3 install virtualenv
     ./electrum-env
     
-If you get a protobuf _internal_create_key error, run sudo pip install --upgrade protobuf
+If you get a protobuf _internal_create_key error, run sudo pip install --upgrade protobuf==3.19
 
 Not pure-python dependencies
 ----------------------------

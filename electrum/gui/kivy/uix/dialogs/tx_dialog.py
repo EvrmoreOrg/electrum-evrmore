@@ -339,6 +339,7 @@ class TxDialog(Factory.Popup):
         self.update()
 
     def do_broadcast(self):
+        self.can_broadcast = False
         self.app.broadcast(self.tx)
 
     def show_qr(self):

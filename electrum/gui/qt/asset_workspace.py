@@ -655,7 +655,8 @@ class AssetReissueWorkspace(QWidget):
 
                         self.exec_asset_b.setEnabled(r)
 
-                    self.parent.run_coroutine_from_thread(async_data_get())
+                    loop = get_asyncio_loop()
+                    loop.create_task(async_data_get())
                     return
 
                 r = m.is_reissuable

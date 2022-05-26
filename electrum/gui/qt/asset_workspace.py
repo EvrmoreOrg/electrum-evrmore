@@ -21,7 +21,7 @@ from electrum.gui.qt.amountedit import FreezableLineEdit
 from electrum.gui.qt.util import ComplexLineEdit, HelpLabel, EnterButton, ColorScheme, ChoicesLayout, HelpButtonURL
 from electrum.i18n import _
 from electrum.logging import get_logger
-from electrum.ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, base_decode, address_to_script, COIN
+from electrum.ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, base_decode, base_encode, address_to_script, COIN
 from electrum.transaction import PartialTxOutput, AssetMeta
 from electrum.util import Satoshis, bfh, get_asyncio_loop
 
@@ -367,6 +367,13 @@ class AssetCreateWorkspace(QWidget):
         t = self.asset_amount.text()
         if not t:
             self.asset_amount_warning.setText('')
+            return False
+        try:
+            div = int(self.divisions.text())
+            if not (0 <= div <= 8):
+                raise Exception()
+        except Exception:
+            self.asset_amount_warning.setText('Invalid division amount')
             return False
         v = float(t)
         if v > TOTAL_COIN_SUPPLY_LIMIT_IN_BTC:
@@ -859,6 +866,13 @@ class AssetReissueWorkspace(QWidget):
         if not t:
             self.asset_amount_warning.setText('')
             return False
+        try:
+            div = int(self.divisions.text())
+            if not (0 <= div <= 8):
+                raise Exception()
+        except Exception:
+            self.asset_amount_warning.setText('Invalid division amount')
+            return False
         v = float(t) + self.current_asset_meta.circulation / 100_000_000
         if v > TOTAL_COIN_SUPPLY_LIMIT_IN_BTC:
             self.asset_amount_warning.setText(
@@ -922,7 +936,7 @@ class AssetReissueWorkspace(QWidget):
     def reset_gui(self):
         self.aval_owner_combo.setCurrentIndex(0)
 
-        self.current_asset_meta = None
+        self.current_asset_meta: AssetMeta = None
 
         self.divisions.setFrozen(True)
         self.divisions.setText('')
@@ -984,6 +998,9 @@ class AssetReissueWorkspace(QWidget):
                 data = base_decode(d, base=58)
             elif i == InterpretType.TXID:
                 data = b'\x54\x20' + bfh(d)
+
+        if data and base_encode(data, base=58) == self.current_asset_meta.ipfs_str:
+            data = None
 
         divs = int(self.divisions.text())
         

@@ -1,5 +1,5 @@
 qrcode
-protobuf>=3.12
+protobuf<3.21.0
 # Ran sudo pip install --upgrade protobuf to fix _interal_create_key error
 
 qdarkstyle>=2.7

@@ -25,19 +25,18 @@ _logger = get_logger(__name__)
 # We add null-bytes to the beginning to approximate a full-size tx for the coin-chooser
 
 P2PKH_SCRIPT_SIZE = 25
-DUMMY_BYTES = bytes(P2PKH_SCRIPT_SIZE)
 
-def GENERATE_OWNERSHIP_PLACEHOLDER(asset: str) -> bytes:
-    return create_owner_asset_script(DUMMY_BYTES, asset)
+def GENERATE_OWNERSHIP_PLACEHOLDER(grouping: int, asset: str) -> bytes:
+    return create_owner_asset_script(bytes([grouping] * P2PKH_SCRIPT_SIZE), asset)
 
-def GENERATE_TRANSFER_PLACEHOLDER(asset: str, amount: int, memo: Optional[bytes], expiry: Optional[int]):
-    return create_transfer_asset_script(DUMMY_BYTES, asset, amount, memo=memo, expiry=expiry)
+def GENERATE_TRANSFER_PLACEHOLDER(grouping: int, asset: str, amount: int, memo: Optional[bytes], expiry: Optional[int]):
+    return create_transfer_asset_script(bytes([grouping] * P2PKH_SCRIPT_SIZE), asset, amount, memo=memo, expiry=expiry)
 
-def GENERATE_NEW_PLACEHOLDER(asset: str, amount: int, divisions: int, reissuable: bool, data: Optional[bytes]):
-    return create_new_asset_script(DUMMY_BYTES, asset, amount, divisions, reissuable, data)
+def GENERATE_NEW_PLACEHOLDER(grouping: int, asset: str, amount: int, divisions: int, reissuable: bool, data: Optional[bytes]):
+    return create_new_asset_script(bytes([grouping] * P2PKH_SCRIPT_SIZE), asset, amount, divisions, reissuable, data)
 
-def GENERATE_REISSUE_PLACEHOLDER(asset: str, amount: int, divisions: int, reissuable: bool, data: Optional[bytes]):
-    return create_reissue_asset_script(DUMMY_BYTES, asset, amount, bytes([divisions]), reissuable, data)
+def GENERATE_REISSUE_PLACEHOLDER(grouping: int, asset: str, amount: int, divisions: int, reissuable: bool, data: Optional[bytes]):
+    return create_reissue_asset_script(bytes([grouping] * P2PKH_SCRIPT_SIZE), asset, amount, bytes([divisions]), reissuable, data)
 
 
 class BadAssetScript(Exception): pass

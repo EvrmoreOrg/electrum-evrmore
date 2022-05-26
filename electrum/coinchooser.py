@@ -501,9 +501,19 @@ class CoinChooserBase(Logger):
 
         # Replace dummy asset creations
         cnt = 0
+        grouping_to_address = {}
         for output in tx._outputs:
-            if output.scriptpubkey[:25] == bytes(25):
-                output.scriptpubkey = bytes.fromhex(address_to_script(change_addresses[cnt % len(change_addresses)])) + output.scriptpubkey[25:]
+            # If the first 25 bytes are the same, this is a dummy that needs to be replaced
+            # This is mainly because ownership assets and new assets need to be sent to the same
+            # Address on creation
+            if output.scriptpubkey[:25].count(output.scriptpubkey[0]) == 25:
+                if output.scriptpubkey[0] in grouping_to_address:
+                    address = grouping_to_address[output.scriptpubkey[0]]
+                else:
+                    address = change_addresses[cnt % len(change_addresses)]
+                    grouping_to_address[output.scriptpubkey[0]] = address
+
+                output.scriptpubkey = bytes.fromhex(address_to_script(address)) + output.scriptpubkey[25:]
                 cnt += 1
         return tx
 

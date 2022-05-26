@@ -509,7 +509,7 @@ class AssetCreateWorkspace(QWidget):
         o = self.get_owner()
         if o:
             norm.append(PartialTxOutput(
-                scriptpubkey=GENERATE_TRANSFER_PLACEHOLDER(o, COIN, None, None),
+                scriptpubkey=GENERATE_TRANSFER_PLACEHOLDER(0, o, COIN, None, None),
                 value=Satoshis(COIN),
                 asset=o
             ))
@@ -529,7 +529,7 @@ class AssetCreateWorkspace(QWidget):
                 data = b'\x54\x20' + bfh(d)
         new = [
             PartialTxOutput(
-                scriptpubkey=GENERATE_NEW_PLACEHOLDER(asset, amt, int(self.divisions.text()), 
+                scriptpubkey=GENERATE_NEW_PLACEHOLDER(1, asset, amt, int(self.divisions.text()), 
                                 self.reissuable.isChecked(), data),
                 value=Satoshis(amt),
                 asset=asset)
@@ -538,7 +538,7 @@ class AssetCreateWorkspace(QWidget):
         if not is_unique:
             new.append(
                 PartialTxOutput(
-                    scriptpubkey=GENERATE_OWNERSHIP_PLACEHOLDER(asset + '!'),
+                    scriptpubkey=GENERATE_OWNERSHIP_PLACEHOLDER(1, asset + '!'),
                     value=Satoshis(COIN),
                     asset=asset + '!'
                 )
@@ -963,7 +963,7 @@ class AssetReissueWorkspace(QWidget):
         )
         o = self.get_owner()
         ownr = PartialTxOutput(
-            scriptpubkey=GENERATE_TRANSFER_PLACEHOLDER(o, COIN, None, None),
+            scriptpubkey=GENERATE_TRANSFER_PLACEHOLDER(0, o, COIN, None, None),
             value=Satoshis(COIN),
             asset=o
         )
@@ -986,7 +986,7 @@ class AssetReissueWorkspace(QWidget):
         
         new = [
             PartialTxOutput(
-                scriptpubkey=GENERATE_REISSUE_PLACEHOLDER(asset, amt,
+                scriptpubkey=GENERATE_REISSUE_PLACEHOLDER(1, asset, amt,
                                         divs if divs != self.current_asset_meta.divisions else 0xff,
                                         self.reissuable.isChecked(),
                                         data),

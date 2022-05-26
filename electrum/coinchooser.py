@@ -29,6 +29,7 @@ from decimal import Decimal
 
 from .ravencoin import address_to_script, sha256, COIN, is_address
 from .transaction import Transaction, TxOutput, PartialTransaction, PartialTxInput, PartialTxOutput
+from .assets import P2PKH_SCRIPT_SIZE
 from .util import NotEnoughFunds, Satoshis, RavenValue
 from .logging import Logger
 
@@ -506,7 +507,7 @@ class CoinChooserBase(Logger):
             # If the first 25 bytes are the same, this is a dummy that needs to be replaced
             # This is mainly because ownership assets and new assets need to be sent to the same
             # Address on creation
-            if output.scriptpubkey[:25].count(output.scriptpubkey[0]) == 25:
+            if output.scriptpubkey[:P2PKH_SCRIPT_SIZE].count(output.scriptpubkey[0]) == P2PKH_SCRIPT_SIZE:
                 if output.scriptpubkey[0] in grouping_to_address:
                     address = grouping_to_address[output.scriptpubkey[0]]
                 else:

@@ -311,7 +311,7 @@ class CoinChooserBase(Logger):
     def _change_outputs(self, tx: PartialTransaction, change_addrs, fee_estimator_numchange,
                         dust_threshold, asset_divs: Dict[str, int], coinbase_vouts: int, has_return: bool) -> List[PartialTxOutput]:
         
-        amounts = self._change_amounts(tx, max(1, len(change_addrs) - coinbase_vouts), fee_estimator_numchange, asset_divs)
+        amounts = self._change_amounts(tx, max(1, len(change_addrs) - coinbase_vouts - len(tx.outputs())), fee_estimator_numchange, asset_divs)
         
         assert all([t[1] >= 0 for t in amounts])
         assert len(change_addrs) >= len(amounts) - (1 if has_return else 0)
@@ -358,7 +358,7 @@ class CoinChooserBase(Logger):
             return fee_estimator_w(tx_weight + rvn_count * output_weight +
                                    fee_estimator_assets(assets))
 
-        change = self._change_outputs(tx, change_addrs, fee_estimator_numchange, dust_threshold, asset_divs, coinbase_vout_count,has_return)
+        change = self._change_outputs(tx, change_addrs, fee_estimator_numchange, dust_threshold, asset_divs, coinbase_vout_count, has_return)
         tx.add_outputs(change)
 
         return tx, change, change_addrs

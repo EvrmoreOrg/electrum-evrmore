@@ -481,6 +481,7 @@ class AssetCreateWorkspace(QWidget):
         self.associated_data_interpret = InterpretType.NO_DATA
         self.cost_label.setText('Cost: {} RVN'.format(constants.net.BURN_AMOUNTS.IssueAssetBurnAmount))
         self.refresh_owners()
+        self.aval_owner_combo.setCurrentIndex(0)
 
     def get_owner(self):
         i = self.aval_owner_combo.currentIndex()
@@ -947,6 +948,7 @@ class AssetReissueWorkspace(QWidget):
     def reset_workspace(self):
         self.reset_gui()
         self.refresh_owners()
+        self.aval_owner_combo.setCurrentIndex(0)
         self.last_asset = None
 
     def get_owner(self):

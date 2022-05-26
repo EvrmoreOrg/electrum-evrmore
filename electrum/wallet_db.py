@@ -1087,6 +1087,14 @@ class WalletDB(JsonDB):
         assert isinstance(meta, AssetMeta)
         self.asset[asset] = meta
 
+    @modifier
+    def remove_asset_meta(self, asset: str) -> None:
+        self.asset.pop(asset, None)
+
+    @locked
+    def list_asset_meta(self) -> Iterable[AssetMeta]:
+        return list(self.asset.values())
+
     @locked
     def get_nonstandard_outpoints(self) -> Dict[str, str]:
         return self.nonstandard_outpoints

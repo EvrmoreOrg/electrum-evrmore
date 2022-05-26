@@ -24,7 +24,7 @@
 import threading
 import itertools
 from collections import defaultdict
-from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple, NamedTuple, Sequence, List, Iterable
+from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple, NamedTuple, Sequence, List, Iterable, Union
 
 import asyncio
 from aiorpcx import TaskGroup
@@ -93,7 +93,7 @@ class AddressSynchronizer(Logger):
         self.future_tx = {}  # type: Dict[str, int]  # txid -> wanted height
         # Txs the server claims are mined but still pending verification:
         self.unverified_tx = defaultdict(int)  # type: Dict[str, int]  # txid -> height. Access with self.lock.
-        self.unverified_asset_meta = dict()
+        self.unverified_asset_meta: Dict[str, AssetMeta] = dict()
         # Txs the server claims are in the mempool:
         self.unconfirmed_tx = defaultdict(int)  # type: Dict[str, int]  # txid -> height. Access with self.lock.
         # true when synchronized
@@ -464,7 +464,24 @@ class AddressSynchronizer(Logger):
 
     def recieve_asset_callback(self, asset: str, meta: Dict):
         with self.lock:
-            self.unverified_asset_meta[asset] = meta
+            self.unverified_asset_meta[asset] = AssetMeta(
+                asset,
+                meta['sats_in_circulation'],
+                asset[-1] == '!',
+                meta['reissuable'],
+                meta['divisions'],
+                meta['has_ipfs'],
+                meta.get('ipfs', None),
+                meta['source']['height'],
+                meta.get('source_divisions', dict()).get('height', None),
+                meta.get('source_ipfs', dict()).get('height', None),
+                'dummy',
+                TxOutpoint.from_str(f'{meta["source"]["tx_hash"]}:{meta["source"]["tx_pos"]}'),
+                TxOutpoint.from_str(f'{meta["source_divisions"]["tx_hash"]}:{meta["source_divisions"]["tx_pos"]}') \
+                    if meta.get('source_divisions', None) else None,
+                TxOutpoint.from_str(f'{meta["source_ipfs"]["tx_hash"]}:{meta["source_ipfs"]["tx_pos"]}') \
+                    if meta.get('source_ipfs', None) else None,
+            )
 
     def receive_tx_callback(self, tx_hash: str, tx: Transaction, tx_height: int) -> None:
         self.add_unverified_or_unconfirmed_tx(tx_hash, tx_height)
@@ -683,7 +700,7 @@ class AddressSynchronizer(Logger):
         with self.lock:
             return dict(self.unverified_tx)  # copy
 
-    def get_unverified_asset_metas(self) -> Dict[str, Dict]:
+    def get_unverified_asset_metas(self) -> Dict[str, AssetMeta]:
         with self.lock:
             return dict(self.unverified_asset_meta)
 
@@ -709,6 +726,14 @@ class AddressSynchronizer(Logger):
                         # a status update, that will overwrite it.
                         self.unverified_tx[tx_hash] = tx_height
                         txs.add(tx_hash)
+            for asset_meta in self.db.list_asset_meta():
+                if asset_meta.height > above_height or \
+                    (asset_meta.div_height and asset_meta.div_height > above_height) or \
+                    (asset_meta.ipfs_height and asset_meta.ipfs_height > above_height):
+
+                    self.db.remove_asset_meta(asset_meta.name)
+                    self.unverified_asset_meta[asset_meta.name] = asset_meta
+
         return txs
 
     def get_local_height(self) -> int:

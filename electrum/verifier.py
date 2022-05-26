@@ -148,81 +148,76 @@ class SPV(NetworkJobOnDefaultServer):
                     raise AssetVerification(f"Metadata mismatch: {value} vs {data[key]}")
             return data['type']
 
-        async def parse_and_verify(asset, result):
-            ownr = asset[-1] == '!'
-            height = -1
-            txid_o_div = None
-            txid_o_ipfs = None
-            txid_o = None
-
-            div_height = None
-            ipfs_height = None
-            
-            div_source = result.get('source_divisions', None)
-            ipfs_source = result.get('source_ipfs', None)
-            source = result['source']
+        async def parse_and_verify(asset, result: AssetMeta):
             og = self.wallet.get_asset_meta(asset)
-            if og and og.height > source['height']:
+            if og and og.height > result.height:
                 raise AssetVerification(f"Server is trying to send old asset data")
 
-            if div_source:
-                div_height = div_source['height']
-                prev_txid = div_source['tx_hash']
-                prev_idx = div_source['tx_pos']
-                txid_o_div = TxOutpoint(bfh(prev_txid), prev_idx)
+            if result.source_divisions and result.div_height:
+                div_height = result.div_height
+                prev_txid = result.source_divisions.txid.hex()
+                prev_idx = result.source_divisions.out_idx
                 try:
                     await request_and_verify_metadata_against(asset, div_height, prev_txid, prev_idx,
-                                                          {'divisions': result['divisions']})
+                                                          {'divisions': result.divisions})
                 except Exception as e:
                     self.logger.info(f'Failed to verify metadata for {asset}')
                     self.requested_assets.discard(asset)
                     raise GracefulDisconnect(e) from e
             
-            if ipfs_source:
-                ipfs_height = ipfs_source['height']
-                prev_txid = ipfs_source['tx_hash']
-                prev_idx = ipfs_source['tx_pos']
-                txid_o_ipfs = TxOutpoint(bfh(prev_txid), prev_idx)
+            if result.source_ipfs and result.ipfs_height:
+                ipfs_height = result.ipfs_height
+                prev_txid = result.source_ipfs.txid.hex()
+                prev_idx = result.source_ipfs.out_idx
                 try:
                     await request_and_verify_metadata_against(asset, ipfs_height, prev_txid, prev_idx,
-                                                          {'ipfs': result['ipfs']})
+                                                          {'ipfs': result.ipfs_str})
                 except Exception as e:
                     self.logger.info(f'Failed to verify metadata for {asset}')
                     self.requested_assets.discard(asset)
                     raise GracefulDisconnect(e) from e
             
             d = dict()
-            d['reissuable'] = result['reissuable']
-            d['has_ipfs'] = result['has_ipfs'] and not ipfs_source
-            d['sats_in_circulation'] = result['sats_in_circulation']
+            d['reissuable'] = result.is_reissuable
+            d['has_ipfs'] = result.has_ipfs and not (result.source_ipfs or result.ipfs_height)
+            d['sats_in_circulation'] = result.circulation
             if d['has_ipfs']:
-                d['ipfs'] = result['ipfs']
-            d['divisions'] = result['divisions'] if not div_source else 0xff
-            height = source['height']
-            txid = source['tx_hash']
-            idx = source['tx_pos']
-            txid_o = TxOutpoint(bfh(txid), idx)
+                d['ipfs'] = result.ipfs_str
+            d['divisions'] = result.divisions if not (result.source_divisions or result.div_height) else 0xff
+            height = result.height
+            txid = result.source_outpoint.txid.hex()
+            idx = result.source_outpoint.out_idx
             try:
                 s_type = await request_and_verify_metadata_against(asset, height, txid, idx, d)
             except Exception as e:
                 self.logger.info(f'Failed to verify metadata for {asset}')
                 self.requested_assets.discard(asset)
                 raise GracefulDisconnect(e) from e
-             
-            divs = result['divisions']
-            reis = result['reissuable']
-            ipfs = result['has_ipfs']
-            data = result.get('ipfs', None)
-            circulation = result['sats_in_circulation']
+            
+            assert s_type
 
-            assert txid_o, asset
-            meta = AssetMeta(asset, circulation, ownr, reis, divs, ipfs, data, height, div_height, ipfs_height, s_type, txid_o, txid_o_div, txid_o_ipfs)
+            meta = AssetMeta(
+                asset, 
+                result.circulation,
+                result.is_owner, 
+                result.is_reissuable,
+                result.divisions,
+                result.has_ipfs,
+                result.ipfs_str,
+                result.height,
+                result.div_height,
+                result.ipfs_height,
+                s_type,
+                result.source_outpoint,
+                result.source_divisions,
+                result.source_ipfs
+                )
+            
             self.requested_assets.discard(asset)
             self.wallet.add_verified_asset_meta(asset, meta)
 
         for asset, asset_meta in unverified.items():
-            largest_height = asset_meta['source']['height']
-            prev_height = asset_meta['source_prev']['height'] if 'source_prev' in asset_meta else None
+            largest_height = asset_meta.height
             
             # do not request merkle branch if we already requested it
             if asset in self.requested_assets:
@@ -239,12 +234,21 @@ class SPV(NetworkJobOnDefaultServer):
                     # await self.interface.request_chunk(tx_height, None, can_return_early=True)
                 continue
 
-            if prev_height:
-                prev_header = self.blockchain.read_header(prev_height)
+            if asset_meta.div_height:
+                prev_header = self.blockchain.read_header(asset_meta.div_height)
                 if prev_header is None:
-                    if prev_height < constants.net.max_dgw_checkpoint():
+                    if asset_meta.div_height < constants.net.max_dgw_checkpoint():
                         # FIXME these requests are not counted (self._requests_sent += 1)
-                        await self.taskgroup.spawn(self.interface.request_chunk(prev_height, None, can_return_early=True))
+                        await self.taskgroup.spawn(self.interface.request_chunk(asset_meta.div_height, None, can_return_early=True))
+                        # await self.interface.request_chunk(tx_height, None, can_return_early=True)
+                    continue
+
+            if asset_meta.ipfs_height:
+                prev_header = self.blockchain.read_header(asset_meta.ipfs_height)
+                if prev_header is None:
+                    if asset_meta.ipfs_height < constants.net.max_dgw_checkpoint():
+                        # FIXME these requests are not counted (self._requests_sent += 1)
+                        await self.taskgroup.spawn(self.interface.request_chunk(asset_meta.ipfs_height, None, can_return_early=True))
                         # await self.interface.request_chunk(tx_height, None, can_return_early=True)
                     continue
 

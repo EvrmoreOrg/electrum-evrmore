@@ -49,9 +49,9 @@ class AssetList(MyTreeView):
         IPFS = 2
         REISSUABLE = 3
         DIVISIONS = 4
-        OWNER = 5
+        #OWNER = 5
 
-    filter_columns = [Columns.NAME, Columns.BALANCE, Columns.IPFS, Columns.REISSUABLE, Columns.DIVISIONS]
+    filter_columns = [Columns.NAME, Columns.BALANCE, Columns.IPFS] #, Columns.REISSUABLE, Columns.DIVISIONS]
 
     ROLE_SORT_ORDER = Qt.UserRole + 1000
     ROLE_ASSET_STR = Qt.UserRole + 1001
@@ -98,6 +98,20 @@ class AssetList(MyTreeView):
         else:
             webopen(url)
 
+    def mousePressEvent(self, e: QMouseEvent) -> None:
+        if e.button() != Qt.MouseButton.LeftButton:
+            return super().mousePressEvent(e)
+        idx = self.indexAt(e.pos())
+        if not idx.isValid():
+            return
+        # Get the name from 1st column
+        hm_idx = self.model().mapToSource(self.model().index(idx.row(), 0))
+        data = self.std_model.data(hm_idx)
+        
+        print(data, e.button())
+
+        return super().mousePressEvent(e)
+
     def mouseDoubleClickEvent(self, event: QMouseEvent):
         idx = self.indexAt(event.pos())
         if not idx.isValid():
@@ -109,22 +123,27 @@ class AssetList(MyTreeView):
         if data[:2] == 'Qm':  # If it starts with Qm, it's an IPFS
             url = ipfs_explorer_URL(self.parent.config, 'ipfs', data)
             self.webopen_safe(url)
-        elif bytes.fromhex(data):
-            raw_tx = self.parent._fetch_tx_from_network(data, False)
-            if not raw_tx:
-                self.parent.show_message(_("This transaction is not on the Ravencoin blockchain."))
-                return
-            tx = transaction.Transaction(raw_tx)
-            self.parent.show_transaction(tx)
+        else:
+            try:
+                if len(bytes.fromhex(data)) != 32:
+                    raise Exception()
+                raw_tx = self.parent._fetch_tx_from_network(data, False)
+                if not raw_tx:
+                    self.parent.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                    return
+                tx = transaction.Transaction(raw_tx)
+                self.parent.show_transaction(tx)
+            except Exception:
+                pass
 
     def refresh_headers(self):
         headers = {
             self.Columns.NAME: _('Name'),
-            self.Columns.BALANCE: _('Amount'),
+            self.Columns.BALANCE: _('My Amount'),
             self.Columns.IPFS: _('Asset Data'),
             self.Columns.REISSUABLE: _('Reissuable'),
             self.Columns.DIVISIONS: _('Divisions'),
-            self.Columns.OWNER: _('Owner'),
+            #self.Columns.OWNER: _('Owner'),
         }
         self.update_headers(headers)
 
@@ -142,35 +161,34 @@ class AssetList(MyTreeView):
 
         assets = {}  # type: Dict[str, List[int, Optional[AssetMeta]]]
 
-        for address in addr_list:
-            c, u, x = self.wallet.get_addr_balance(address)
-            balance = c + u + x
+        c, u, x = self.wallet.get_balance()
+        balance = c + u + x
 
-            # Don't display assets we no longer have
-            if len(balance.assets) == 0:
+        for asset, balance in balance.assets.items():
+            # Don't show hidden assets
+            if not self.parent.config.get('show_spam_assets', False):
+                should_continue = False
+                for regex in self.parent.asset_blacklist:
+                    if re.search(regex, asset):
+                        should_continue = True
+                        break
+                for regex in self.parent.asset_whitelist:
+                    if re.search(regex, asset):
+                        should_continue = False
+                        break
+                if should_continue:
+                    continue
+
+            if balance == 0:
                 continue
 
-            for asset, balance in balance.assets.items():
-                # Don't show hidden assets
-                if not self.parent.config.get('show_spam_assets', False):
-                    should_continue = False
-                    for regex in self.parent.asset_blacklist:
-                        if re.search(regex, asset):
-                            should_continue = True
-                            break
-                    for regex in self.parent.asset_whitelist:
-                        if re.search(regex, asset):
-                            should_continue = False
-                            break
-                    if should_continue:
-                        continue
+            if asset not in assets:
+                meta = self.wallet.get_asset_meta(asset)
+                assets[asset] = [balance.value, meta]
+            else:
+                assets[asset][0] += balance.value
 
-                if asset not in assets:
-                    meta = self.wallet.get_asset_meta(asset)
-                    assets[asset] = [balance.value, meta]
-                else:
-                    assets[asset][0] += balance.value
-
+            
         for asset, data in assets.items():
 
             balance = data[0]
@@ -179,7 +197,10 @@ class AssetList(MyTreeView):
             balance_text = self.parent.format_amount(balance, whitespaces=True)
 
             if meta and meta.ipfs_str:
-                raw = base_decode(meta.ipfs_str, base=58)
+                try:
+                    raw = base_decode(meta.ipfs_str, base=58)
+                except Exception:
+                    raw = b''
                 if raw[:2] == b'\x54\x20':
                     ipfs_str = raw[2:].hex()
                 else:
@@ -192,7 +213,7 @@ class AssetList(MyTreeView):
             ownr = str(meta.is_owner) if meta else ''
 
             # create item
-            labels = [asset, balance_text, ipfs_str, is_reis, divs, ownr]
+            labels = [asset, balance_text, ipfs_str, is_reis, divs] #, ownr]
             asset_item = [QStandardItem(e) for e in labels]
             # align text and set fonts
             for i, item in enumerate(asset_item):
@@ -245,9 +266,30 @@ class AssetList(MyTreeView):
             self.parent.to_send_combo.setCurrentIndex(self.parent.send_options.index(asset))
 
         menu.addAction(_('Send {}').format(asset), lambda: send_asset(asset))
-        if ipfs[:2] == 'Qm':
-            url = ipfs_explorer_URL(self.parent.config, 'ipfs', ipfs)
-            menu.addAction(_('View IPFS'), lambda: self.webopen_safe(url))
+        if ipfs:
+            try:
+                raw_ipfs = base_decode(ipfs, base=58)
+            except Exception:
+                raw_ipfs = b''
+            if raw_ipfs[:2] == b'\x12\x20':
+                url = ipfs_explorer_URL(self.parent.config, 'ipfs', ipfs)
+                menu.addAction(_('View IPFS'), lambda: self.webopen_safe(url))
+            else:
+                try:
+                    if len(bytes.fromhex(ipfs)) != 32:
+                        raise Exception()
+                    def open_transaction():
+                        print('called')
+                        raw_tx = self.parent._fetch_tx_from_network(ipfs, False)
+                        if not raw_tx:
+                            self.parent.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                            return
+                        tx = transaction.Transaction(raw_tx)
+                        self.parent.show_transaction(tx)
+                    menu.addAction(_('View Transaction'), open_transaction)
+                except Exception:
+                    pass
+            
         menu.addAction(_('View History'), lambda: self.parent.show_asset(asset))
         menu.addAction(_('Mark as spam'), lambda: self.parent.hide_asset(asset))
 

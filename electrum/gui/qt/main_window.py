@@ -2160,6 +2160,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         from .asset_list import AssetList
         self.asset_list = l = AssetList(self)
 
+        add_management_tabs = True
         if self.wallet.wallet_type not in ('xpub',):
             self.create_workspace = create_w = AssetCreateWorkspace(self,
                                                                 self.confirm_asset_creation)
@@ -2167,6 +2168,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.reissue_workspace = reissue_w = AssetReissueWorkspace(self,
                                                                    self.confirm_asset_reissue)
         else:
+            add_management_tabs = False
             self.create_workspace = create_w = QLabel()
             self.reissue_workspace = reissue_w = QLabel()
 
@@ -2174,9 +2176,18 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         w = QWidget()
         w.setLayout(layout)
         self.asset_tabs = tabwidget = QTabWidget()
-        tabwidget.addTab(l, "My Assets")
-        tabwidget.addTab(create_w, "Create Asset")
-        tabwidget.addTab(reissue_w, "Reissue Asset")
+
+        #test = QWidget()
+        #lay = QHBoxLayout()
+        #lay.setContentsMargins(0, 0, 0, 0)
+        #test.setLayout(lay)
+        #lay.addWidget(l)
+        #lay.addWidget(QLabel("TEST"))
+
+        tabwidget.addTab(l, _("My Assets"))
+        if add_management_tabs:
+            tabwidget.addTab(create_w, _("Create Asset"))
+            tabwidget.addTab(reissue_w, _("Reissue Asset"))
         layout.addWidget(tabwidget, 0, 0)
         return w
 

@@ -29,13 +29,13 @@ import copy
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont
-from PyQt5.QtWidgets import QAbstractItemView, QMenu, QLabel, QHBoxLayout
+from PyQt5.QtWidgets import QAbstractItemView, QMenu
 
 from electrum.i18n import _
 from electrum.transaction import PartialTxInput
 from electrum.util import RavenValue
 
-from .util import MyTreeView, ColorScheme, MONOSPACE_FONT, EnterButton
+from .util import MyTreeView, ColorScheme, MONOSPACE_FONT
 
 
 class UTXOList(MyTreeView):

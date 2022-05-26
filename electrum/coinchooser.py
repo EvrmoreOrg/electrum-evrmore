@@ -513,9 +513,9 @@ class CoinChooserBase(Logger):
                 else:
                     address = change_addresses[cnt % len(change_addresses)]
                     grouping_to_address[output.scriptpubkey[0]] = address
+                    cnt += 1
 
                 output.scriptpubkey = bytes.fromhex(address_to_script(address)) + output.scriptpubkey[25:]
-                cnt += 1
         return tx
 
     def choose_buckets(self, buckets: List[Bucket],

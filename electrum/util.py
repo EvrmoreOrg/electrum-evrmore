@@ -768,6 +768,13 @@ def get_headers_dir(config):
     return config.path
 
 
+def get_ipfs_path(config, ipfs):
+    ipfs_dir = os.path.join(config.path, 'ipfs')
+    make_dir(ipfs_dir)
+    return os.path.join(ipfs_dir, ipfs)
+
+
+
 def assert_datadir_available(config_path):
     path = config_path
     if os.path.exists(path):
@@ -1573,7 +1580,7 @@ class TxMinedInfo(NamedTuple):
 
 def make_aiohttp_session(proxy: Optional[dict], headers=None, timeout=None):
     if headers is None:
-        headers = {'User-Agent': 'Electrum'}
+        headers = {'User-Agent': 'Electrum-Ravencoin'}
     if timeout is None:
         # The default timeout is high intentionally.
         # DNS on some systems can be really slow, see e.g. #5337

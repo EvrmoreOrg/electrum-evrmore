@@ -1105,6 +1105,14 @@ class WalletDB(JsonDB):
         assert isinstance(ipfs_data, IPFSData)
         self.ipfs_information[ipfs_data.ipfs] = ipfs_data
 
+    @modifier
+    def clear_ipfs_info(self):
+        self.ipfs_information.clear()
+
+    @locked
+    def get_ipfs_informations(self):
+        return dict(self.ipfs_information)
+
     @locked
     def get_nonstandard_outpoints(self) -> Dict[str, str]:
         return self.nonstandard_outpoints

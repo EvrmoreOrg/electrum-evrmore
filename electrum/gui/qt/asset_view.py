@@ -27,16 +27,16 @@ import asyncio
 from enum import IntEnum
 from typing import List, Dict, Optional
 import re
+import os
 
-from aiohttp import ClientSession
-
-from PyQt5.QtCore import Qt, QModelIndex
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont, QMouseEvent
+from PyQt5.QtCore import Qt, QModelIndex, pyqtSignal
+from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont, QMouseEvent, QPixmap
 from PyQt5.QtWidgets import (QAbstractItemView, QMenu, QCheckBox, QSplitter, QFrame, QVBoxLayout, 
                                 QLabel, QTextEdit, QWidget, QHBoxLayout, QScrollArea)
 
 from electrum.i18n import _
-from electrum.util import IPFSData, ipfs_explorer_URL, profiler, RavenValue, Satoshis, get_asyncio_loop
+from electrum.network import Network
+from electrum.util import IPFSData, get_ipfs_path, ipfs_explorer_URL, profiler, RavenValue, Satoshis, get_asyncio_loop, make_dir, make_aiohttp_session
 from electrum.ravencoin import COIN, is_address, base_decode
 from electrum.wallet import InternalAddressCorruption
 from electrum.transaction import AssetMeta
@@ -45,8 +45,139 @@ import electrum.transaction as transaction
 from .util import EnterButton, MyTreeView, MONOSPACE_FONT, webopen, QHSeperationLine
 
 
+VIEWABLE_MIMES = ('image/jpeg', 'image/png', 'image/gif', 'image/tiff', 'image/webp', 'image/avif',
+                    'text/plain', 'application/json')
 
-def webopen_safe(parent, url):
+
+def min_num_str(num_str: str) -> str:
+    while (num_str[-1] == '0' or num_str[-1] == '.') and len(num_str) > 1:
+        num_str = num_str[:-1]
+    return num_str
+
+async def try_download_ipfs(parent, ipfs, downloading, url, only_headers=True):
+    network = Network.get_instance()
+    proxy = network.proxy if network else None
+
+    if ipfs in downloading:
+        return
+
+    downloading.add(ipfs)
+
+    ipfs_path = get_ipfs_path(parent.config, ipfs)
+
+    total_downloaded = 0
+    is_rip14 = False
+    try:
+        async with make_aiohttp_session(proxy, None, 10) as session:
+            async with session.get(url) as resp:
+                if only_headers or resp.content_type not in VIEWABLE_MIMES:
+                    info = IPFSData(ipfs, resp.content_type, resp.content_length, False, None)
+                    parent.wallet.add_ipfs_information(info)
+                    downloading.discard(ipfs)
+                    return
+                while True:
+                    chunk = await resp.content.read(1024)
+                    if not chunk:
+                        break
+                    if not is_rip14:
+                        # rip0014 should be right up front
+                        is_rip14 = b'rip0014' in chunk
+                    total_downloaded += len(chunk)
+                    if resp.content_length and total_downloaded > resp.content_length:
+                        break
+                    if total_downloaded > parent.config.get('max_ipfs_size', 1024 * 1024 * 10):
+                        break
+                    
+                    with open(ipfs_path, 'ab') as f:
+                        f.write(chunk)
+    except asyncio.exceptions.TimeoutError:
+        parent.wallet.add_ipfs_information(IPFSData(
+                    ipfs,
+                    None,
+                    None,
+                    False,
+                    None
+                ))
+        downloading.discard(ipfs)
+        return
+    except Exception as e:
+        downloading.discard(ipfs)
+        raise e
+
+    if (resp.content_length and total_downloaded > resp.content_length) or \
+        total_downloaded > parent.config.get('max_ipfs_size', 1024 * 1024 * 10):
+        os.unlink(ipfs_path)
+        parent.show_error(_('The IPFS Gateway gave us bad data!'))
+        downloading.discard(ipfs)
+        return
+
+    info = IPFSData(ipfs, resp.content_type, total_downloaded, True, is_rip14)
+    parent.wallet.add_ipfs_information(info)
+    downloading.discard(ipfs)
+
+
+def try_ask_to_save_all(parent):
+    if not parent.config.get('ask_download_all_ipfs', True):
+        return
+
+    cb = QCheckBox(_('Do not ask again.'))
+    cb_checked = False
+
+    def on_cb(x):
+        nonlocal cb_checked
+        cb_checked = x == Qt.Checked
+
+    cb.stateChanged.connect(on_cb)
+    goto = parent.question(_('Would you like to automatically try to download\n'+
+                            'and display IFPS data in-wallet for all assets?\n'+
+                            '(This can be changed later in settings.)'),
+                            title=_('Automatically Store IPFS data'), checkbox=cb)
+
+    if cb_checked:
+        parent.config.set_key('ask_download_all_ipfs', False)
+    if goto:
+        parent.config.set_key('download_all_ipfs', True, True)
+    
+
+def try_ask_to_save(parent, ipfs, url, viewer):
+    if parent.config.get('download_all_ipfs', False) or not parent.config.get('ask_download_ipfs', True):
+        return
+
+    ipfs_information: IPFSData = parent.wallet.get_ipfs_information(ipfs)
+    if ipfs_information and (ipfs_information.byte_length > parent.config.get('max_ipfs_size', 1024 * 1024 * 10) or \
+                                ipfs_information.mime_type not in VIEWABLE_MIMES):
+        return
+
+    if ipfs in viewer.requested_ipfses:
+        return
+
+    ipfs_path = get_ipfs_path(parent.config, ipfs)
+    if os.path.exists(ipfs_path):
+        return
+
+    cb = QCheckBox(_('Do not ask again.'))
+    cb_checked = False
+
+    def on_cb(x):
+        nonlocal cb_checked
+        cb_checked = x == Qt.Checked
+
+    cb.stateChanged.connect(on_cb)
+    goto = parent.question(_('Would you like to download the data associated with\n{}\n' +
+                            'and allow it to be viewable in-wallet?\n' + 
+                            'Note: this trusts the IPFS gateway to return the\n' + 
+                            'correct file').format(ipfs),
+                            title=_('Store IPFS data'), checkbox=cb)
+
+    if cb_checked:
+        parent.config.set_key('ask_download_ipfs', False)
+    if goto:
+        try_ask_to_save_all(parent)
+        loop = get_asyncio_loop()
+        task = loop.create_task(try_download_ipfs(parent, ipfs, viewer.requested_ipfses, url, False))
+        task.add_done_callback(lambda _: viewer.update_trigger.emit())
+
+def webopen_safe(parent, ipfs, url, viewer):
     show_warn = parent.config.get('show_ipfs_warning', True)
     if show_warn:
         cb = QCheckBox(_("Don't show this message again."))
@@ -70,13 +201,15 @@ def webopen_safe(parent, url):
             parent.config.set_key('show_ipfs_warning', False)
         if goto:
             webopen(url)
+            try_ask_to_save(parent, ipfs, url, viewer)
     else:
         webopen(url)
+        try_ask_to_save(parent, ipfs, url, viewer)
 
 
 def human_readable_size(size, decimal_places=3):
     if not isinstance(size, int):
-        return 'Unknown'
+        return _('Unknown')
     for unit in ['B','KiB','MiB','GiB','TiB']:
         if size < 1024.0:
             break
@@ -104,6 +237,8 @@ class AssetList(MyTreeView):
                          editable_columns=[])
         self.view = view
         self.wallet = self.parent.wallet
+
+        self.first_update = False
 
         self.std_model = QStandardItemModel(self)
         self.setModel(self.std_model)
@@ -147,7 +282,7 @@ class AssetList(MyTreeView):
             raw_ipfs = b''
         if raw_ipfs[:2] == b'\x12\x20':
             url = ipfs_explorer_URL(self.parent.config, 'ipfs', meta.ipfs_str)
-            webopen_safe(self.parent, url)
+            webopen_safe(self.parent, meta.ipfs_str, url, self.view)
         elif raw_ipfs[:2] == b'\x54\x20' and len(raw_ipfs) == 34:
             raw_tx = self.parent._fetch_tx_from_network(raw_ipfs[2:].hex(), False)
             if not raw_tx:
@@ -258,7 +393,7 @@ class AssetList(MyTreeView):
                 raw_ipfs = b''
             if raw_ipfs[:2] == b'\x12\x20':
                 url = ipfs_explorer_URL(self.parent.config, 'ipfs', meta.ipfs_str)
-                menu.addAction(_('View IPFS'), lambda: webopen_safe(self.parent, url))
+                menu.addAction(_('View IPFS'), lambda: webopen_safe(self.parent, meta.ipfs_str, url, self.view))
             elif raw_ipfs[:2] == b'\x54\x20' and len(raw_ipfs) == 34:
                 def open_transaction():
                     raw_tx = self.parent._fetch_tx_from_network(raw_ipfs[2:].hex(), False)
@@ -302,12 +437,16 @@ class MetadataViewer(QFrame):
         'qualifier': _('This is a qualifying asset. It is used to dictate what addresses may receive restricted assets.'),
     }
 
+    update_trigger = pyqtSignal()
+
     def __init__(self, window):
         super().__init__(window)
 
         self.main_window = window
         self.wallet = window.wallet
         self.current_meta = None
+
+        self.update_trigger.connect(lambda: self.update_view(self.current_meta, None))
 
         self.requested_ipfses = set()
 
@@ -330,9 +469,13 @@ class MetadataViewer(QFrame):
         self.ipfs_predicted = QLabel()
         self.ipfs_predicted.setVisible(False)
 
+        self.ipfs_image = QLabel()
+        self.ipfs_image.setVisible(False)
+        self.ipfs_image.setAlignment(Qt.AlignCenter)
+
         def view_ipfs():
             url = ipfs_explorer_URL(window.config, 'ipfs', self.current_meta.ipfs_str)
-            webopen_safe(window, url)
+            webopen_safe(window, self.current_meta.ipfs_str, url, self)
         self.view_ipfs_button = EnterButton(_('View IPFS In Browser'), view_ipfs)
         self.view_ipfs_button.setVisible(False)
         def view_tx():
@@ -350,6 +493,7 @@ class MetadataViewer(QFrame):
         self.ipfs_layout.addWidget(self.ipfs_info)
         self.ipfs_layout.addWidget(self.ipfs_text)
         self.ipfs_layout.addWidget(self.ipfs_predicted)
+        self.ipfs_layout.addWidget(self.ipfs_image)
         self.ipfs_layout.addWidget(self.view_ipfs_button)
         self.ipfs_layout.addWidget(self.view_tx_button)
 
@@ -443,40 +587,12 @@ class MetadataViewer(QFrame):
 
     def update_view(self, confirmed_meta: Optional[AssetMeta], unverified_meta: Optional[AssetMeta]):
 
-        meta = unverified_meta or confirmed_meta
+        meta = confirmed_meta if not self.main_window.config.get('use_mempool_metadata', True) else (unverified_meta or confirmed_meta)
         self.current_meta = meta
 
         async def get_data_on_ipfs(requested_ipfs: str, url: str):
-            if requested_ipfs in self.requested_ipfses:
-                return
-            self.requested_ipfses.add(requested_ipfs)
-            try:
-                async with ClientSession(read_timeout=10) as session:
-                    async with session.get(url) as resp:
-                        # aiohttp discards connection and doesn't download anything else
-                        # if we don't read() before __aexit__
-
-                        self.requested_ipfses.discard(requested_ipfs)
-
-                        self.wallet.add_ipfs_information(IPFSData(
-                            requested_ipfs,
-                            resp.content_type,
-                            resp.content_length,
-                            False,
-                            None
-                        ))
-
-                        if self.current_meta == meta:
-                            self.ipfs_predicted.setText('Predicted Content Type: {}\nPredicted Size: {}'.format(resp.content_type, human_readable_size(resp.content_length)))
-            except asyncio.exceptions.TimeoutError:
-                self.requested_ipfses.discard(requested_ipfs)
-                self.wallet.add_ipfs_information(IPFSData(
-                    requested_ipfs,
-                    None,
-                    None,
-                    False,
-                    None
-                ))
+            await try_download_ipfs(self.main_window, requested_ipfs, self.requested_ipfses, url, not self.main_window.config.get('download_all_ipfs', False))
+            return requested_ipfs
 
         if meta.height > 0:
             self.header.setText('<h3>{}</h3>'.format(_('Asset Metadata')))
@@ -487,7 +603,7 @@ class MetadataViewer(QFrame):
             meta.name,
             pow(10, -meta.divisions),
             meta.is_reissuable,
-            round(meta.circulation / COIN, meta.divisions)
+            min_num_str(str(round(meta.circulation / COIN, meta.divisions)))
         ))
 
         if meta.name[-1] == '!':
@@ -507,10 +623,10 @@ class MetadataViewer(QFrame):
         self.view_ipfs_button.setVisible(False)
         self.view_tx_button.setVisible(False)
         self.ipfs_predicted.setVisible(False)
+        self.ipfs_image.setVisible(False)
+
         if meta.ipfs_str:
             self.ipfs_text.setVisible(True)
-
-            self.ipfs_predicted.setText('Predicted Content Type: {}\nPredicted Size: {}'.format('Unknown', 'Unknown'))
 
             raw_ipfs = base_decode(meta.ipfs_str, base=58)
             if raw_ipfs[:2] == b'\x12\x20':
@@ -518,16 +634,39 @@ class MetadataViewer(QFrame):
                 self.ipfs_text.setText(meta.ipfs_str)
                 self.ipfs_predicted.setVisible(True)
                 self.view_ipfs_button.setVisible(True)
-                
+                self.ipfs_predicted.setText(_('Loading data...'))
+
                 ipfs_data: IPFSData = self.wallet.get_ipfs_information(meta.ipfs_str)
                 if ipfs_data:
-                    print('Using cached information')
-                    self.ipfs_predicted.setText('Predicted Content Type: {}\nPredicted Size: {}'.format(ipfs_data.mime_type, human_readable_size(ipfs_data.byte_length)))
+                    self.ipfs_predicted.setText('Predicted Content Type: {}\nPredicted Size: {}'.format(ipfs_data.mime_type or _('Unknown'), human_readable_size(ipfs_data.byte_length)))
+                    if ipfs_data.is_cached:
+                        if ipfs_data.mime_type and 'image' in ipfs_data.mime_type:
+                            self.ipfs_predicted.setVisible(False)
+
+                            ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
+
+                            if os.path.exists(ipfs_path):
+                                self.ipfs_image.setPixmap(QPixmap(ipfs_path))
+                                self.ipfs_image.setVisible(True)
+                    else:
+                        if meta.ipfs_str not in self.requested_ipfses and \
+                            self.main_window.config.get('download_all_ipfs', False) and \
+                                ipfs_data.mime_type and 'image' in ipfs_data.mime_type:
+                            loop = get_asyncio_loop()
+                            url = ipfs_explorer_URL(self.main_window.config, 'ipfs', meta.ipfs_str)
+                            task = loop.create_task(get_data_on_ipfs(meta.ipfs_str, url))
+                            def maybe_update_view(task: asyncio.Task):
+                                if task.result() == self.current_meta.ipfs_str:
+                                    self.update_trigger.emit()
+                            task.add_done_callback(maybe_update_view)
                 else:
-                    print('Requesting information')
                     loop = get_asyncio_loop()
                     url = ipfs_explorer_URL(self.main_window.config, 'ipfs', meta.ipfs_str)
-                    loop.create_task(get_data_on_ipfs(meta.ipfs_str, url))
+                    task = loop.create_task(get_data_on_ipfs(meta.ipfs_str, url))
+                    def maybe_update_view(task: asyncio.Task):
+                        if task.result() == self.current_meta.ipfs_str:
+                            self.update_trigger.emit()
+                    task.add_done_callback(maybe_update_view)
 
             elif raw_ipfs[:2] == b'\x54\x20':
                 ipfs_text = _('This asset has an associated txid:')
@@ -591,6 +730,7 @@ class MetadataViewer(QFrame):
 class AssetView(QSplitter):
     def __init__(self, window):
         super().__init__(window)
+        self.main_window = window
         self.data_viewer = MetadataViewer(window)
         self.asset_list = AssetList(window, self)
         self.asset_list.setMinimumWidth(300)
@@ -603,4 +743,6 @@ class AssetView(QSplitter):
     def update(self):
         self.asset_list.update()
         if self.data_viewer.current_meta:
-            self.data_viewer.update(self.data_viewer.current_meta, None)
+            new_meta = self.main_window.wallet.get_asset_meta(self.data_viewer.current_meta.name)
+            if new_meta:
+                self.data_viewer.update_view(new_meta, None)

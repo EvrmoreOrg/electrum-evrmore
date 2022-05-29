@@ -701,6 +701,12 @@ class AddressSynchronizer(Logger):
     def get_ipfs_information(self, ipfs: str) -> Optional[IPFSData]:
         return self.db.get_ipfs_information(ipfs)
 
+    def get_ipfs_informations(self) -> Iterable[IPFSData]:
+        return self.db.get_ipfs_informations()
+
+    def clear_ipfs_info(self):
+        self.db.clear_ipfs_info()
+
     def get_unverified_txs(self) -> Dict[str, int]:
         '''Returns a map from tx hash to transaction height'''
         with self.lock:

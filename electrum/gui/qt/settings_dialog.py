@@ -24,6 +24,7 @@
 # SOFTWARE.
 
 import ast
+import os
 from typing import Optional, TYPE_CHECKING
 
 from PyQt5.QtCore import Qt
@@ -34,11 +35,11 @@ from PyQt5.QtWidgets import (QComboBox,  QTabWidget, QDialog,
 
 from electrum.i18n import _, languages
 from electrum import util, coinchooser, paymentrequest
-from electrum.util import base_units_list
+from electrum.util import base_units_list, get_ipfs_path
 
 from electrum.gui import messages
 
-from .util import (ColorScheme, WindowModalDialog, HelpLabel, Buttons,
+from .util import (ColorScheme, EnterButton, WindowModalDialog, HelpLabel, Buttons,
                    CloseButton)
 
 
@@ -68,7 +69,6 @@ class SettingsDialog(QDialog):
         vbox = QVBoxLayout()
         tabs = QTabWidget()
         gui_widgets = []
-        tx_widgets = []
         oa_widgets = []
         asset_widgets = []
 
@@ -247,7 +247,7 @@ class SettingsDialog(QDialog):
             self.app.refresh_amount_edits_signal.emit()
         unit_combo.currentIndexChanged.connect(lambda x: on_unit(x, nz))
 
-        thousandsep_cb = QCheckBox(_("Add thousand separators to bitcoin amounts"))
+        thousandsep_cb = QCheckBox(_("Add thousand separators to ravencoin amounts"))
         thousandsep_cb.setChecked(bool(self.config.get('amt_add_thousands_sep', False)))
         def on_set_thousandsep(v):
             checked = v == Qt.Checked
@@ -381,7 +381,6 @@ class SettingsDialog(QDialog):
             _('This will increase your transaction size and therefore your fee.'))
         tx_custom_message.setChecked(enable_tx_custom_message)
         tx_custom_message.stateChanged.connect(on_msgs)
-        tx_widgets.append((tx_custom_message, None))
 
         block_explorers = sorted(util.block_explorer_info().keys())
         BLOCK_EX_CUSTOM_ITEM = _("Custom URL")
@@ -468,7 +467,6 @@ class SettingsDialog(QDialog):
         ipfs_ex_hbox.addWidget(ipfs_ex_custom_e)
         ipfs_ex_hbox_w = QWidget()
         ipfs_ex_hbox_w.setLayout(ipfs_ex_hbox)
-        tx_widgets.append((ipfs_ex_label, ipfs_ex_hbox_w))
 
         # Fiat Currency
         hist_checkbox = QCheckBox()
@@ -662,9 +660,70 @@ class SettingsDialog(QDialog):
         dev_notifications_cb.stateChanged.connect(on_set_dev_notifications_cb)
         message_widgets.append((dev_notifications_cb, None))
 
+        use_mempool_meta = QCheckBox(_('Use mempool asset metadata'))
+        use_mempool_meta.setChecked(self.config.get('use_mempool_metadata', True))
+        def on_mempoool_change(x):
+            use_mempool_result = x == Qt.Checked
+            if self.config.get('use_mempool_metadata', True) != use_mempool_result:
+                self.config.set_key('use_mempool_metadata', use_mempool_result)
+        use_mempool_meta.stateChanged.connect(on_mempoool_change)
+        use_mempool_meta.setToolTip(_('Mempool data is the most up-to-date, but can be spoofed by electrumx servers.'))
+        asset_widgets.append((use_mempool_meta, None))
+
+
+        download_ipfs = QCheckBox(_('Automatically download and cache IPFS data'))
+        download_ipfs.setChecked(self.config.get('download_all_ipfs', False))
+        def on_download_ipfs_change(x):
+            use_mempool_result = x == Qt.Checked
+            if self.config.get('download_all_ipfs', False) != use_mempool_result:
+                self.config.set_key('download_all_ipfs', use_mempool_result)
+        download_ipfs.stateChanged.connect(on_download_ipfs_change)
+        download_ipfs.setToolTip(_('Attempt to download show ipfs data in-wallet'))
+
+
+        ask_to_download_ipfs = QCheckBox(_('Ask to download ipfs data'))
+        ask_to_download_ipfs.setChecked(self.config.get('ask_download_ipfs', True))
+        def on_ask_download_change(x):
+            use_mempool_result = x == Qt.Checked
+            if self.config.get('ask_download_ipfs', False) != use_mempool_result:
+                self.config.set_key('ask_download_ipfs', use_mempool_result)
+        ask_to_download_ipfs.stateChanged.connect(on_ask_download_change)
+        ask_to_download_ipfs.setToolTip(_('Attempt to download show ipfs data in-wallet'))
+
+
+        msg = _('If IPFS data is greater than this amount, it will not be downloaded.')
+        ipfs_size_info = HelpLabel(_('Max IPFS size (bytes)') + ':', msg)
+        ipfs_size_e = QLineEdit()
+        ipfs_size_e.setText(str(self.config.get('max_ipfs_size', 1024 * 1024 * 10)))
+        def update_ipfs_size():
+            raw = ipfs_size_e.text()
+            try:
+                i = int(raw)
+                self.config.set_key('max_ipfs_size', i, True)
+            except Exception:
+                pass
+        ipfs_size_e.textChanged.connect(update_ipfs_size)
+
+        def clear_ipfs():
+            for ipfs in self.wallet.get_ipfs_informations().keys():
+                ipfs_path = get_ipfs_path(self.config, ipfs)
+                if os.path.exists(ipfs_path):
+                    os.unlink(ipfs_path)
+            self.wallet.clear_ipfs_info()
+
+        ipfs_clear_cache = EnterButton(_('Clear IPFS Cache'), clear_ipfs)
+
+        ipfs_widgets = []
+        ipfs_widgets.append((ipfs_ex_label, ipfs_ex_hbox_w))
+        ipfs_widgets.append((ask_to_download_ipfs, None))
+        ipfs_widgets.append((download_ipfs, None))
+        ipfs_widgets.append((ipfs_size_info, ipfs_size_e))
+        ipfs_widgets.append((ipfs_clear_cache, None))
+
         tabs_info = [
             (gui_widgets, _('Appearance')),
             (asset_widgets, _('Assets')),
+            (ipfs_widgets, _('IPFS')),
             (tx_widgets, _('Transactions')),
             #(invoices_widgets, _('Invoices')),
             #(lightning_widgets, _('Lightning')),

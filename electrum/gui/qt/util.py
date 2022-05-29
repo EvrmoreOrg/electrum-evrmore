@@ -262,7 +262,7 @@ class MessageBoxMixin(object):
 
     def msg_box(self, icon, parent, title, text, *, buttons=QMessageBox.Ok,
                 defaultButton=QMessageBox.NoButton, rich_text=False,
-                checkbox=None):
+                checkbox=None, dont_popup=False):
         parent = parent or self.top_level_window()
         return custom_message_box(icon=icon,
                                   parent=parent,

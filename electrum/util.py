@@ -39,7 +39,6 @@ import urllib.request, urllib.parse, urllib.error
 import builtins
 import json
 import time
-from typing import NamedTuple, Optional
 import ssl
 import ipaddress
 from ipaddress import IPv4Address, IPv6Address
@@ -331,6 +330,14 @@ class Satoshis(object):
 
     def to_bytes(self, length, byteorder, *, signed=False):
         return self.value.to_bytes(length=length, byteorder=byteorder, signed=signed)
+
+
+class IPFSData(NamedTuple):
+    ipfs: str
+    mime_type: Optional[str]
+    byte_length: Optional[int]
+    is_cached: bool
+    is_rip14: Optional[bool]  # true/false/unknown
 
 
 class RavenValue:  # The raw RVN value as well as asset values of a transaction
@@ -1859,13 +1866,6 @@ class OrderedDictWithIndex(OrderedDict):
             self._pos_to_key[pos] = key
         return ret
 
-
-def get_alternate_data(b: bytes) -> Tuple[str, str]:
-    h = b.hex()
-
-    b_n = [(i if (0x20 <= i <= 0x7e or 0xa1 <= i <= 0xff) else 0x2e) for i in b]
-
-    return h, bytearray(b_n).decode('latin-1')
 
 def multisig_type(wallet_type):
     '''If wallet_type is mofn multi-sig, return [m, n],

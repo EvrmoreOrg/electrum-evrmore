@@ -32,7 +32,7 @@ from typing import Dict, Optional, List, Tuple, Set, Iterable, NamedTuple, Seque
 import binascii
 
 from . import util, ravencoin
-from .util import profiler, WalletFileException, multisig_type, TxMinedInfo, bfh, Satoshis, RavenValue
+from .util import IPFSData, profiler, WalletFileException, multisig_type, TxMinedInfo, bfh, Satoshis, RavenValue
 from .invoices import Invoice
 from .keystore import bip44_derivation
 from .transaction import Transaction, TxOutpoint, tx_from_any, PartialTransaction, PartialTxOutput, AssetMeta
@@ -1077,7 +1077,7 @@ class WalletDB(JsonDB):
         return list(sorted(self.asset.keys()))
 
     @locked
-    def get_asset_meta(self, asset: str) -> AssetMeta:
+    def get_asset_meta(self, asset: str) -> Optional[AssetMeta]:
         assert isinstance(asset, str)
         return self.asset.get(asset, None)
 
@@ -1094,6 +1094,16 @@ class WalletDB(JsonDB):
     @locked
     def list_asset_meta(self) -> Iterable[AssetMeta]:
         return list(self.asset.values())
+
+    @locked
+    def get_ipfs_information(self, ipfs: str) -> Optional[IPFSData]:
+        assert isinstance(ipfs, str)
+        return self.ipfs_information.get(ipfs, None)
+
+    @modifier
+    def add_ipfs_information(self, ipfs_data: IPFSData):
+        assert isinstance(ipfs_data, IPFSData)
+        self.ipfs_information[ipfs_data.ipfs] = ipfs_data
 
     @locked
     def get_nonstandard_outpoints(self) -> Dict[str, str]:
@@ -1508,6 +1518,7 @@ class WalletDB(JsonDB):
         self.asset = self.get_dict('asset_meta')                 # type: Dict[str, AssetMeta]
         self.asset_reissue_outpoints = self.get_dict('asset_reissue_points')  # type: Dict[str, Dict[str, str]]
         self.nonstandard_outpoints = self.get_dict('nonstandard_points')  # type: Dict[str, str]
+        self.ipfs_information = self.get_dict('ipfs_information')   # type: Dict[str, IPFSData]
         self.txi = self.get_dict('txi')                          # type: Dict[str, Dict[str, Dict[str, RavenValue]]]
         self.txo = self.get_dict('txo')                          # type: Dict[str, Dict[str, Dict[str, Tuple[RavenValue, bool]]]]
         self.transactions = self.get_dict('transactions')        # type: Dict[str, Transaction]
@@ -1581,7 +1592,16 @@ class WalletDB(JsonDB):
                                    TxOutpoint.from_str('{}:{}'.format(s_d[0], s_d[1])) if s_d else None,
                                    TxOutpoint.from_str('{}:{}'.format(s_i[0], s_i[1])) if s_i else None))
                      for k, (name, amt, ownr, reis, div, ipfs, data, height, div_height, ipfs_height, t, s, s_d, s_i) in items)
-                     
+        
+        elif key == 'ipfs_information':
+            items = v.items()
+            if len(items) != 0:
+                _, t = list(items)[0]
+                if len(t) != 5:
+                    return dict()
+            
+            v = dict((k, IPFSData(ipfs, mime, size, cached, rip14)) for k, (ipfs, mime, size, cached, rip14) in items)
+
         # convert keys to HTLCOwner
         if key == 'log' or (path and path[-1] in ['locked_in', 'fails', 'settles']):
             if "1" in v:

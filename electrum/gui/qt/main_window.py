@@ -1185,7 +1185,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.update_current_request()
         self.invoice_list.update()
         self.address_list.update()
-        self.asset_list.update()
+        self.asset_view.update()
         self.utxo_list.update()
         self.contact_list.update()
         #self.channels_list.update_rows.emit(wallet)
@@ -1233,9 +1233,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
     def hide_asset(self, asset):
         self.asset_blacklist.append('^' + asset + '$')
         self.config.set_key('asset_blacklist', self.asset_blacklist, True)
-        self.asset_list.update()
+        self.asset_view.update()
         self.history_model.refresh('Marked asset as spam')
-        self.history_list.update()
+        self.history_list.hm.refresh('modified asset blacklist', force=True)
 
     def show_channel(self, channel_id):
         from . import channel_details
@@ -2157,8 +2157,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
     def create_assets_tab(self):
 
-        from .asset_list import AssetList
-        self.asset_list = l = AssetList(self)
+        from .asset_view import AssetView
+        self.asset_view = l = AssetView(self)
 
         add_management_tabs = True
         if self.wallet.wallet_type not in ('xpub',):
@@ -2176,13 +2176,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         w = QWidget()
         w.setLayout(layout)
         self.asset_tabs = tabwidget = QTabWidget()
-
-        #test = QWidget()
-        #lay = QHBoxLayout()
-        #lay.setContentsMargins(0, 0, 0, 0)
-        #test.setLayout(lay)
-        #lay.addWidget(l)
-        #lay.addWidget(QLabel("TEST"))
 
         tabwidget.addTab(l, _("My Assets"))
         if add_management_tabs:
@@ -4192,7 +4185,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                             + f' ({len(bad_inputs)}):\n' + msg)
         self.address_list.update()
         self.history_list.update()
-        self.asset_list.update()
+        self.asset_view.update()
 
     def import_addresses(self):
         if not self.wallet.can_import_address():
@@ -4238,7 +4231,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if d.save_whitelist:
             self.config.set_key('asset_whitelist', self.asset_whitelist, True)
         if d.save_whitelist or d.save_blacklist:
-            self.asset_list.update()
+            self.asset_view.update()
             self.history_model.refresh('Changed asset white or black list', True)
         if d.need_restart:
             self.show_warning(_('Please restart Electrum to activate the new GUI settings'), title=_('Success'))

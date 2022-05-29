@@ -862,10 +862,6 @@ class AssetReissueWorkspace(QWidget):
                 return False
 
     def _check_amount(self) -> bool:
-        t = self.asset_amount.text()
-        if not t:
-            self.asset_amount_warning.setText('')
-            return False
         try:
             div = int(self.divisions.text())
             if not (0 <= div <= 8):
@@ -873,6 +869,10 @@ class AssetReissueWorkspace(QWidget):
         except Exception:
             self.asset_amount_warning.setText('Invalid division amount')
             return False
+        t = self.asset_amount.text()
+        if not t:
+            self.asset_amount_warning.setText('')
+            return True
         v = float(t) + self.current_asset_meta.circulation / 100_000_000
         if v > TOTAL_COIN_SUPPLY_LIMIT_IN_BTC:
             self.asset_amount_warning.setText(
@@ -987,7 +987,7 @@ class AssetReissueWorkspace(QWidget):
         norm = [burn, ownr]
 
         asset = o[:-1]
-        amt = int(float(self.asset_amount.text()) * COIN)
+        amt = int(float(self.asset_amount.text() or 0) * COIN)
         d = self.associated_data.text()  # type: str
 
         i = self.associated_data_interpret

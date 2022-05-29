@@ -280,6 +280,7 @@ class Synchronizer(SynchronizerBase):
         self.requested_histories.discard((addr, status))
 
     async def _on_asset_status(self, asset, status):
+        self.logger.info(f'notified of asset {asset}')
         data = self.wallet.db.get_asset_meta(asset)
         if asset_status(data) == status:
             return

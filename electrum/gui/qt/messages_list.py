@@ -34,7 +34,7 @@ from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont, QMouseEvent
 from PyQt5.QtWidgets import QAbstractItemView, QComboBox, QLabel, QMenu, QCheckBox
 
 from electrum.i18n import _
-from electrum.util import ipfs_explorer_URL, profiler, get_alternate_data, make_aiohttp_session
+from electrum.util import ipfs_explorer_URL, profiler, make_aiohttp_session
 from electrum.plugin import run_hook
 from electrum.ravencoin import is_address, base_decode
 from electrum.wallet import InternalAddressCorruption

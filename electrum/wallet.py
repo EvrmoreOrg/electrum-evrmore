@@ -2788,7 +2788,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             fee: int) -> Optional[Tuple[bool, str, str]]:
 
         feerate = Decimal(fee) / tx_size  # sat/byte
-        fee_ratio = Decimal(fee) / invoice_amt.rvn_value.value if invoice_amt.rvn_value.value else 1
+        fee_ratio = Decimal(fee) / invoice_amt.rvn_value.value if invoice_amt.rvn_value.value else (1 if not invoice_amt.assets else 0)
         
         long_warning = None
         short_warning = None

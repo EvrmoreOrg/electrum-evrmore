@@ -25,7 +25,7 @@ from PyQt5.QtWidgets import (QPushButton, QLabel, QMessageBox, QHBoxLayout,
                              QFileDialog, QWidget, QToolButton, QTreeView, QPlainTextEdit,
                              QHeaderView, QApplication, QToolTip, QTreeWidget, QStyledItemDelegate,
                              QMenu, QStyleOptionViewItem, QLayout, QLayoutItem,
-                             QGraphicsEffect, QGraphicsScene, QGraphicsPixmapItem)
+                             QGraphicsEffect, QGraphicsScene, QGraphicsPixmapItem, QFrame)
 
 from electrum.i18n import _, languages
 from electrum.util import FileImportFailed, FileExportFailed, make_aiohttp_session, resource_path
@@ -1133,9 +1133,9 @@ class ColorSchemeItem:
     def _get_color(self, background):
         return self.colors[(int(background) + int(ColorScheme.dark_scheme)) % 2]
 
-    def as_stylesheet(self, background=False):
+    def as_stylesheet(self, background=False, *, invert=False):
         css_prefix = "background-" if background else ""
-        color = self._get_color(background)
+        color = self._get_color(background if not invert else not background)
         return "QWidget {{ {}color:{}; }}".format(css_prefix, color)
 
     def as_color(self, background=False):
@@ -1498,6 +1498,27 @@ class VTabWidget(QtWidgets.QTabWidget):
         w = self.tabBar().width() + size.height()
         self.setFixedWidth(w)
         return super().resizeEvent(e)
+
+
+class QHSeperationLine(QFrame):
+    def __init__(self):
+        super().__init__()
+        self.setMinimumWidth(1)
+        self.setFixedHeight(1)
+        self.setFrameShape(QFrame.HLine)
+        self.setFrameShadow(QFrame.Sunken)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
+        self.setStyleSheet(ColorScheme.GRAY.as_stylesheet(True))
+
+class QVSeperationLine(QFrame):
+    def __init__(self):
+        super().__init__()
+        self.setFixedWidth(1)
+        self.setMinimumHeight(1)
+        self.setFrameShape(QFrame.VLine)
+        self.setFrameShadow(QFrame.Sunken)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
+        self.setStyleSheet(ColorScheme.GRAY.as_stylesheet(True))
 
 
 if __name__ == "__main__":

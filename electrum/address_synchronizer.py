@@ -33,7 +33,7 @@ from .crypto import sha256
 from . import ravencoin, util
 from .assets import pull_meta_from_create_or_reissue_script
 from .ravencoin import COINBASE_MATURITY
-from .util import profiler, bfh, TxMinedInfo, UnrelatedTransactionException, with_lock, OldTaskGroup, RavenValue
+from .util import IPFSData, profiler, bfh, TxMinedInfo, UnrelatedTransactionException, with_lock, OldTaskGroup, RavenValue
 from .transaction import Transaction, TxOutput, TxInput, PartialTxInput, TxOutpoint, PartialTransaction, AssetMeta, \
     is_output_script_p2pk, is_asset_output_script_malformed_or_non_standard
 from .synchronizer import Synchronizer
@@ -695,6 +695,12 @@ class AddressSynchronizer(Logger):
             self.db.add_asset_meta(asset, meta)
         util.trigger_callback('asset_meta')
 
+    def add_ipfs_information(self, data: IPFSData):
+        self.db.add_ipfs_information(data)
+
+    def get_ipfs_information(self, ipfs: str) -> Optional[IPFSData]:
+        return self.db.get_ipfs_information(ipfs)
+
     def get_unverified_txs(self) -> Dict[str, int]:
         '''Returns a map from tx hash to transaction height'''
         with self.lock:
@@ -703,6 +709,10 @@ class AddressSynchronizer(Logger):
     def get_unverified_asset_metas(self) -> Dict[str, AssetMeta]:
         with self.lock:
             return dict(self.unverified_asset_meta)
+
+    def get_unverified_asset_meta(self, asset: str) -> Optional[AssetMeta]:
+        with self.lock:
+            return self.unverified_asset_meta.get(asset, None)
 
     def undo_verifications(self, blockchain: Blockchain, above_height: int) -> Set[str]:
         '''Used by the verifier when a reorg has happened'''

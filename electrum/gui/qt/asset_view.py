@@ -481,6 +481,16 @@ class MetadataViewer(QFrame):
         self.ipfs_image.setVisible(False)
         self.ipfs_image.setAlignment(Qt.AlignCenter)
 
+        self.ipfs_data_text = QTextEdit()
+        
+        def resize_on_text():
+            size = self.ipfs_data_text.document().size().toSize()
+            self.ipfs_data_text.setFixedHeight(min(200, size.height() +  3))
+
+        self.ipfs_data_text.textChanged.connect(resize_on_text)
+        self.ipfs_data_text.setReadOnly(True)
+        self.ipfs_data_text.setVisible(False)
+
         def view_ipfs():
             url = ipfs_explorer_URL(window.config, 'ipfs', self.current_meta.ipfs_str)
             webopen_safe(window, self.current_meta.ipfs_str, url, self)
@@ -502,6 +512,7 @@ class MetadataViewer(QFrame):
         self.ipfs_layout.addWidget(self.ipfs_text)
         self.ipfs_layout.addWidget(self.ipfs_predicted)
         self.ipfs_layout.addWidget(self.ipfs_image)
+        self.ipfs_layout.addWidget(self.ipfs_data_text)
         self.ipfs_layout.addWidget(self.view_ipfs_button)
         self.ipfs_layout.addWidget(self.view_tx_button)
 
@@ -632,6 +643,7 @@ class MetadataViewer(QFrame):
         self.view_tx_button.setVisible(False)
         self.ipfs_predicted.setVisible(False)
         self.ipfs_image.setVisible(False)
+        self.ipfs_data_text.setVisible(False)
 
         if meta.ipfs_str:
             self.ipfs_text.setVisible(True)
@@ -649,23 +661,36 @@ class MetadataViewer(QFrame):
                     self.ipfs_predicted.setText('Predicted Content Type: {}\nPredicted Size: {}'.format(ipfs_data.mime_type or _('Unknown'), human_readable_size(ipfs_data.byte_length)))
                     if ipfs_data.is_cached:
                         if ipfs_data.mime_type and 'image' in ipfs_data.mime_type:
-                            self.ipfs_predicted.setVisible(False)
 
                             ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
 
                             if os.path.exists(ipfs_path):
+                                self.ipfs_predicted.setVisible(False)
                                 # TODO: This should trigger on resize, not just one-off
                                 pixmap = QPixmap(ipfs_path)
                                 if pixmap.width() > self.width() - 50:
                                     pixmap = pixmap.scaled(self.width() - 50, pixmap.height(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation)
                                 self.ipfs_image.setPixmap(pixmap)
                                 self.ipfs_image.setVisible(True)
+
+                        elif ipfs_data.mime_type and 'text' in ipfs_data.mime_type:
+                            self.ipfs_predicted.setVisible(False)
+
+                            ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
+
+                            if os.path.exists(ipfs_path):
+                                self.ipfs_predicted.setVisible(False)
+                                self.ipfs_data_text.setVisible(True)
+                                print('Reading')
+                                with open(ipfs_path, 'r') as f:
+                                    self.ipfs_data_text.setText(f.read())
+
                     elif meta.ipfs_str in self.requested_ipfses:
                         self.ipfs_predicted.setText(_('Loading data...'))
                     else:
                         if meta.ipfs_str not in self.requested_ipfses and \
                             self.main_window.config.get('download_all_ipfs', False) and \
-                                ipfs_data.mime_type and 'image' in ipfs_data.mime_type and \
+                                ipfs_data.mime_type and ('image' in ipfs_data.mime_type or 'text' in ipfs_data.mime_type or 'json' in ipfs_data.mime_type) and \
                                     ipfs_data.byte_length and ipfs_data.byte_length <= self.main_window.config.get('max_ipfs_size', 1024 * 1024 * 10):
                             loop = get_asyncio_loop()
                             url = ipfs_explorer_URL(self.main_window.config, 'ipfs', meta.ipfs_str)

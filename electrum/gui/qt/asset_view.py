@@ -51,7 +51,10 @@ VIEWABLE_MIMES = ('image/jpeg', 'image/png', 'image/gif', 'image/tiff', 'image/w
 
 def min_num_str(num_str: str) -> str:
     while (num_str[-1] == '0' or num_str[-1] == '.') and len(num_str) > 1:
+        should_exit = num_str[-1] == '.'
         num_str = num_str[:-1]
+        if should_exit:
+            break
     return num_str
 
 async def try_download_ipfs(parent, ipfs, downloading, url, only_headers=True, pre_callback=None):

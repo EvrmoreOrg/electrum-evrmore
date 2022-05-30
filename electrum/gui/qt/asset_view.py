@@ -25,6 +25,7 @@
 
 import asyncio
 from enum import IntEnum
+import json
 from typing import List, Dict, Optional
 import re
 import os
@@ -32,7 +33,7 @@ import os
 from PyQt5.QtCore import Qt, QModelIndex, pyqtSignal
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont, QMouseEvent, QPixmap
 from PyQt5.QtWidgets import (QAbstractItemView, QMenu, QCheckBox, QSplitter, QFrame, QVBoxLayout, 
-                                QLabel, QTextEdit, QWidget, QHBoxLayout, QScrollArea)
+                                QLabel, QTextEdit, QWidget, QTreeView, QScrollArea)
 
 from electrum.i18n import _
 from electrum.network import Network
@@ -42,7 +43,7 @@ from electrum.wallet import InternalAddressCorruption
 from electrum.transaction import AssetMeta
 import electrum.transaction as transaction
 
-from .util import EnterButton, MyTreeView, MONOSPACE_FONT, webopen, QHSeperationLine
+from .util import EnterButton, MyTreeView, MONOSPACE_FONT, QJsonModel, webopen, QHSeperationLine
 
 
 VIEWABLE_MIMES = ('image/jpeg', 'image/png', 'image/gif', 'image/tiff', 'image/webp', 'image/avif',
@@ -491,6 +492,11 @@ class MetadataViewer(QFrame):
         self.ipfs_data_text.setReadOnly(True)
         self.ipfs_data_text.setVisible(False)
 
+        self.ipfs_json = QTreeView(window)
+        self.ipfs_json_model = QJsonModel(self.ipfs_json)
+        self.ipfs_json.setModel(self.ipfs_json_model)
+        self.ipfs_json.setVisible(False)
+
         def view_ipfs():
             url = ipfs_explorer_URL(window.config, 'ipfs', self.current_meta.ipfs_str)
             webopen_safe(window, self.current_meta.ipfs_str, url, self)
@@ -513,6 +519,7 @@ class MetadataViewer(QFrame):
         self.ipfs_layout.addWidget(self.ipfs_predicted)
         self.ipfs_layout.addWidget(self.ipfs_image)
         self.ipfs_layout.addWidget(self.ipfs_data_text)
+        self.ipfs_layout.addWidget(self.ipfs_json)
         self.ipfs_layout.addWidget(self.view_ipfs_button)
         self.ipfs_layout.addWidget(self.view_tx_button)
 
@@ -644,6 +651,7 @@ class MetadataViewer(QFrame):
         self.ipfs_predicted.setVisible(False)
         self.ipfs_image.setVisible(False)
         self.ipfs_data_text.setVisible(False)
+        self.ipfs_json.setVisible(False)
 
         if meta.ipfs_str:
             self.ipfs_text.setVisible(True)
@@ -674,8 +682,6 @@ class MetadataViewer(QFrame):
                                 self.ipfs_image.setVisible(True)
 
                         elif ipfs_data.mime_type and 'text' in ipfs_data.mime_type:
-                            self.ipfs_predicted.setVisible(False)
-
                             ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
 
                             if os.path.exists(ipfs_path):
@@ -684,6 +690,17 @@ class MetadataViewer(QFrame):
                                 print('Reading')
                                 with open(ipfs_path, 'r') as f:
                                     self.ipfs_data_text.setText(f.read())
+
+                        elif ipfs_data.mime_type and 'json' in ipfs_data.mime_type:
+                            ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
+
+                            if os.path.exists(ipfs_path):
+                                self.ipfs_predicted.setVisible(False)
+                                self.ipfs_json.setVisible(True)
+                                print('Reading')
+                                with open(ipfs_path, 'r') as f:
+                                    self.ipfs_json_model.load(json.load(f))
+
 
                     elif meta.ipfs_str in self.requested_ipfses:
                         self.ipfs_predicted.setText(_('Loading data...'))

@@ -54,7 +54,7 @@ def min_num_str(num_str: str) -> str:
         num_str = num_str[:-1]
     return num_str
 
-async def try_download_ipfs(parent, ipfs, downloading, url, only_headers=True):
+async def try_download_ipfs(parent, ipfs, downloading, url, only_headers=True, pre_callback=None):
     network = Network.get_instance()
     proxy = network.proxy if network else None
 
@@ -63,15 +63,19 @@ async def try_download_ipfs(parent, ipfs, downloading, url, only_headers=True):
 
     downloading.add(ipfs)
 
+    if pre_callback:
+        pre_callback()
+
     ipfs_path = get_ipfs_path(parent.config, ipfs)
 
     total_downloaded = 0
     is_rip14 = False
     try:
-        async with make_aiohttp_session(proxy, None, 10) as session:
+        async with make_aiohttp_session(proxy, None, 30) as session:
             async with session.get(url) as resp:
-                if only_headers or resp.content_type not in VIEWABLE_MIMES:
-                    info = IPFSData(ipfs, resp.content_type, resp.content_length, False, None)
+                if only_headers or resp.content_type not in VIEWABLE_MIMES or \
+                    (resp.content_length and resp.content_length > parent.config.get('max_ipfs_size', 1024 * 1024 * 10)):
+                    info = IPFSData(ipfs, resp.content_type, resp.content_length, False)
                     parent.wallet.add_ipfs_information(info)
                     downloading.discard(ipfs)
                     return
@@ -79,9 +83,9 @@ async def try_download_ipfs(parent, ipfs, downloading, url, only_headers=True):
                     chunk = await resp.content.read(1024)
                     if not chunk:
                         break
-                    if not is_rip14:
-                        # rip0014 should be right up front
-                        is_rip14 = b'rip0014' in chunk
+                    #if not is_rip14:
+                    #    # rip0014 should be right up front
+                    #    is_rip14 = b'rip0014' in chunk
                     total_downloaded += len(chunk)
                     if resp.content_length and total_downloaded > resp.content_length:
                         break
@@ -95,9 +99,8 @@ async def try_download_ipfs(parent, ipfs, downloading, url, only_headers=True):
                     ipfs,
                     None,
                     None,
-                    False,
-                    None
-                ))
+                    False
+        ))
         downloading.discard(ipfs)
         return
     except Exception as e:
@@ -107,11 +110,11 @@ async def try_download_ipfs(parent, ipfs, downloading, url, only_headers=True):
     if (resp.content_length and total_downloaded > resp.content_length) or \
         total_downloaded > parent.config.get('max_ipfs_size', 1024 * 1024 * 10):
         os.unlink(ipfs_path)
-        parent.show_error(_('The IPFS Gateway gave us bad data!'))
+        parent.show_error_signal.emit(_('The IPFS Gateway gave us bad data!'))
         downloading.discard(ipfs)
         return
 
-    info = IPFSData(ipfs, resp.content_type, total_downloaded, True, is_rip14)
+    info = IPFSData(ipfs, resp.content_type, total_downloaded, True) #, is_rip14)
     parent.wallet.add_ipfs_information(info)
     downloading.discard(ipfs)
 
@@ -144,7 +147,7 @@ def try_ask_to_save(parent, ipfs, url, viewer):
         return
 
     ipfs_information: IPFSData = parent.wallet.get_ipfs_information(ipfs)
-    if ipfs_information and (ipfs_information.byte_length > parent.config.get('max_ipfs_size', 1024 * 1024 * 10) or \
+    if ipfs_information and ipfs_information.byte_length and (ipfs_information.byte_length > parent.config.get('max_ipfs_size', 1024 * 1024 * 10) or \
                                 ipfs_information.mime_type not in VIEWABLE_MIMES):
         return
 
@@ -163,7 +166,7 @@ def try_ask_to_save(parent, ipfs, url, viewer):
         cb_checked = x == Qt.Checked
 
     cb.stateChanged.connect(on_cb)
-    goto = parent.question(_('Would you like to download the data associated with\n{}\n' +
+    goto = parent.question(_('Would you like to try to download the data associated with\n{}\n' +
                             'and allow it to be viewable in-wallet?\n' + 
                             'Note: this trusts the IPFS gateway to return the\n' + 
                             'correct file').format(ipfs),
@@ -174,7 +177,7 @@ def try_ask_to_save(parent, ipfs, url, viewer):
     if goto:
         try_ask_to_save_all(parent)
         loop = get_asyncio_loop()
-        task = loop.create_task(try_download_ipfs(parent, ipfs, viewer.requested_ipfses, url, False))
+        task = loop.create_task(try_download_ipfs(parent, ipfs, viewer.requested_ipfses, url, False, viewer.update_trigger.emit))
         task.add_done_callback(lambda _: viewer.update_trigger.emit())
 
 def webopen_safe(parent, ipfs, url, viewer):
@@ -426,6 +429,8 @@ class AssetList(MyTreeView):
         pass
 
 
+# TODO: This needs serious clean-up/refactoring
+
 class MetadataViewer(QFrame):
 
     TYPE_BLURBS = {
@@ -591,7 +596,7 @@ class MetadataViewer(QFrame):
         self.current_meta = meta
 
         async def get_data_on_ipfs(requested_ipfs: str, url: str):
-            await try_download_ipfs(self.main_window, requested_ipfs, self.requested_ipfses, url, not self.main_window.config.get('download_all_ipfs', False))
+            await try_download_ipfs(self.main_window, requested_ipfs, self.requested_ipfses, url, not self.main_window.config.get('download_all_ipfs', False), self.update_trigger.emit)
             return requested_ipfs
 
         if meta.height > 0:
@@ -646,22 +651,31 @@ class MetadataViewer(QFrame):
                             ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
 
                             if os.path.exists(ipfs_path):
-                                self.ipfs_image.setPixmap(QPixmap(ipfs_path))
+                                # TODO: This should trigger on resize, not just one-off
+                                pixmap = QPixmap(ipfs_path)
+                                if pixmap.width() > self.width() - 50:
+                                    pixmap = pixmap.scaled(self.width() - 50, pixmap.height(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation)
+                                self.ipfs_image.setPixmap(pixmap)
                                 self.ipfs_image.setVisible(True)
+                    elif meta.ipfs_str in self.requested_ipfses:
+                        self.ipfs_predicted.setText(_('Loading data...'))
                     else:
                         if meta.ipfs_str not in self.requested_ipfses and \
                             self.main_window.config.get('download_all_ipfs', False) and \
-                                ipfs_data.mime_type and 'image' in ipfs_data.mime_type:
+                                ipfs_data.mime_type and 'image' in ipfs_data.mime_type and \
+                                    ipfs_data.byte_length and ipfs_data.byte_length <= self.main_window.config.get('max_ipfs_size', 1024 * 1024 * 10):
                             loop = get_asyncio_loop()
                             url = ipfs_explorer_URL(self.main_window.config, 'ipfs', meta.ipfs_str)
+                            print('Get 1')
                             task = loop.create_task(get_data_on_ipfs(meta.ipfs_str, url))
                             def maybe_update_view(task: asyncio.Task):
                                 if task.result() == self.current_meta.ipfs_str:
                                     self.update_trigger.emit()
                             task.add_done_callback(maybe_update_view)
-                else:
+                elif meta.ipfs_str not in self.requested_ipfses:
                     loop = get_asyncio_loop()
                     url = ipfs_explorer_URL(self.main_window.config, 'ipfs', meta.ipfs_str)
+                    print('Get 2')
                     task = loop.create_task(get_data_on_ipfs(meta.ipfs_str, url))
                     def maybe_update_view(task: asyncio.Task):
                         if task.result() == self.current_meta.ipfs_str:

@@ -337,7 +337,7 @@ class IPFSData(NamedTuple):
     mime_type: Optional[str]
     byte_length: Optional[int]
     is_cached: bool
-    is_rip14: Optional[bool]  # true/false/unknown
+    #is_rip14: Optional[bool]  # true/false/unknown
 
 
 class RavenValue:  # The raw RVN value as well as asset values of a transaction

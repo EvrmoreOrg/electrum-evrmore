@@ -1605,10 +1605,10 @@ class WalletDB(JsonDB):
             items = v.items()
             if len(items) != 0:
                 _, t = list(items)[0]
-                if len(t) != 5:
+                if len(t) != 4:
                     return dict()
             
-            v = dict((k, IPFSData(ipfs, mime, size, cached, rip14)) for k, (ipfs, mime, size, cached, rip14) in items)
+            v = dict((k, IPFSData(ipfs, mime, size, cached)) for k, (ipfs, mime, size, cached) in items)
 
         # convert keys to HTLCOwner
         if key == 'log' or (path and path[-1] in ['locked_in', 'fails', 'settles']):

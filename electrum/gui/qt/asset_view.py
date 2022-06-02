@@ -43,7 +43,7 @@ from electrum.wallet import InternalAddressCorruption
 from electrum.transaction import AssetMeta
 import electrum.transaction as transaction
 
-from .util import EnterButton, MyTreeView, MONOSPACE_FONT, QJsonModel, webopen, QHSeperationLine
+from .util import EnterButton, MyTreeView, MONOSPACE_FONT, webopen, QHSeperationLine
 
 
 VIEWABLE_MIMES = ('image/jpeg', 'image/png', 'image/gif', 'image/tiff', 'image/webp', 'image/avif',

@@ -238,12 +238,12 @@ class AssetList(MyTreeView):
     ROLE_SORT_ORDER = Qt.UserRole + 1000
     ROLE_ASSET_STR = Qt.UserRole + 1001
 
-    def __init__(self, parent, view):
-        super().__init__(parent, self.create_menu,
+    def __init__(self, view,):
+        super().__init__(view.main_window, self.create_menu,
                          stretch_column=None,
                          editable_columns=[])
         self.view = view
-        self.wallet = self.parent.wallet
+        self.wallet = self.view.main_window.wallet
 
         self.first_update = False
 
@@ -288,15 +288,15 @@ class AssetList(MyTreeView):
         except Exception:
             raw_ipfs = b''
         if raw_ipfs[:2] == b'\x12\x20':
-            url = ipfs_explorer_URL(self.parent.config, 'ipfs', meta.ipfs_str)
-            webopen_safe(self.parent, meta.ipfs_str, url, self.view)
+            url = ipfs_explorer_URL(self.view.main_window.config, 'ipfs', meta.ipfs_str)
+            webopen_safe(self.view.main_window, meta.ipfs_str, url, self.view)
         elif raw_ipfs[:2] == b'\x54\x20' and len(raw_ipfs) == 34:
-            raw_tx = self.parent._fetch_tx_from_network(raw_ipfs[2:].hex(), False)
+            raw_tx = self.view.main_window._fetch_tx_from_network(raw_ipfs[2:].hex(), False)
             if not raw_tx:
-                self.parent.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                self.view.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
                 return
             tx = transaction.Transaction(raw_tx)
-            self.parent.show_transaction(tx)
+            self.view.main_window.show_transaction(tx)
 
 
     def refresh_headers(self):
@@ -330,13 +330,13 @@ class AssetList(MyTreeView):
 
         for asset in sorted(all_assets):
             # Don't show hidden assets
-            if not self.parent.config.get('show_spam_assets', False):
+            if not self.view.main_window.config.get('show_spam_assets', False):
                 should_continue = False
-                for regex in self.parent.asset_blacklist:
+                for regex in self.view.main_window.asset_blacklist:
                     if re.search(regex, asset):
                         should_continue = True
                         break
-                for regex in self.parent.asset_whitelist:
+                for regex in self.view.main_window.asset_whitelist:
                     if re.search(regex, asset):
                         should_continue = False
                         break
@@ -349,8 +349,8 @@ class AssetList(MyTreeView):
             if asset_confirmed_balance == 0 and asset_unconfirmed_balance == 0:
                 continue
 
-            confirmed_balance_text = self.parent.format_amount(asset_confirmed_balance, whitespaces=True)
-            unconfirmed_balance_text = self.parent.format_amount(asset_unconfirmed_balance, whitespaces=True)
+            confirmed_balance_text = self.view.main_window.format_amount(asset_confirmed_balance, whitespaces=True)
+            unconfirmed_balance_text = self.view.main_window.format_amount(asset_unconfirmed_balance, whitespaces=True)
 
             balance_text = confirmed_balance_text
             if asset_unconfirmed_balance > 0:
@@ -386,8 +386,8 @@ class AssetList(MyTreeView):
         asset = self.model().index(org_idx.row(), self.Columns.NAME).data(self.ROLE_ASSET_STR)
         
         def send_asset(asset):
-            self.parent.show_send_tab()
-            self.parent.to_send_combo.setCurrentIndex(self.parent.send_options.index(asset))
+            self.view.main_window.show_send_tab()
+            self.view.main_window.to_send_combo.setCurrentIndex(self.view.main_window.send_options.index(asset))
 
         menu.addAction(_('Send {}').format(asset), lambda: send_asset(asset))
         
@@ -399,20 +399,20 @@ class AssetList(MyTreeView):
             except Exception:
                 raw_ipfs = b''
             if raw_ipfs[:2] == b'\x12\x20':
-                url = ipfs_explorer_URL(self.parent.config, 'ipfs', meta.ipfs_str)
-                menu.addAction(_('View IPFS'), lambda: webopen_safe(self.parent, meta.ipfs_str, url, self.view))
+                url = ipfs_explorer_URL(self.view.main_window.config, 'ipfs', meta.ipfs_str)
+                menu.addAction(_('View IPFS'), lambda: webopen_safe(self.view.main_window, meta.ipfs_str, url, self.view))
             elif raw_ipfs[:2] == b'\x54\x20' and len(raw_ipfs) == 34:
                 def open_transaction():
-                    raw_tx = self.parent._fetch_tx_from_network(raw_ipfs[2:].hex(), False)
+                    raw_tx = self.view.main_window._fetch_tx_from_network(raw_ipfs[2:].hex(), False)
                     if not raw_tx:
-                        self.parent.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                        self.view.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
                         return
                     tx = transaction.Transaction(raw_tx)
-                    self.parent.show_transaction(tx)
+                    self.view.main_window.show_transaction(tx)
                 menu.addAction(_('View Transaction'), open_transaction)
         
-        menu.addAction(_('View History'), lambda: self.parent.show_asset(asset))
-        menu.addAction(_('Mark as spam'), lambda: self.parent.hide_asset(asset))
+        menu.addAction(_('View History'), lambda: self.view.main_window.show_asset(asset))
+        menu.addAction(_('Mark as spam'), lambda: self.view.main_window.hide_asset(asset))
 
         menu.exec_(self.viewport().mapToGlobal(position))
 
@@ -421,7 +421,7 @@ class AssetList(MyTreeView):
             try:
                 self.wallet.check_address_for_corruption(text)
             except InternalAddressCorruption as e:
-                self.parent.show_error(str(e))
+                self.view.main_window.show_error(str(e))
                 raise
         super().place_text_on_clipboard(text, title=title)
 
@@ -448,11 +448,11 @@ class MetadataViewer(QFrame):
 
     update_trigger = pyqtSignal()
 
-    def __init__(self, window):
-        super().__init__(window)
+    def __init__(self, parent):
+        super().__init__(parent)
 
-        self.main_window = window
-        self.wallet = window.wallet
+        self.main_window = parent.main_window
+        self.wallet = parent.main_window.wallet
         self.current_meta = None
 
         self.update_trigger.connect(lambda: self.update_view(self.current_meta, None))
@@ -492,24 +492,24 @@ class MetadataViewer(QFrame):
         self.ipfs_data_text.setReadOnly(True)
         self.ipfs_data_text.setVisible(False)
 
-        self.ipfs_json = QTreeView(window)
-        self.ipfs_json_model = QJsonModel(self.ipfs_json)
-        self.ipfs_json.setModel(self.ipfs_json_model)
-        self.ipfs_json.setVisible(False)
+        #self.ipfs_json = QTreeView(self)
+        #self.ipfs_json_model = QJsonModel(self.ipfs_json)
+        #self.ipfs_json.setModel(self.ipfs_json_model)
+        #self.ipfs_json.setVisible(False)
 
         def view_ipfs():
-            url = ipfs_explorer_URL(window.config, 'ipfs', self.current_meta.ipfs_str)
-            webopen_safe(window, self.current_meta.ipfs_str, url, self)
+            url = ipfs_explorer_URL(self.main_window.config, 'ipfs', self.current_meta.ipfs_str)
+            webopen_safe(self.main_window, self.current_meta.ipfs_str, url, self)
         self.view_ipfs_button = EnterButton(_('View IPFS In Browser'), view_ipfs)
         self.view_ipfs_button.setVisible(False)
         def view_tx():
             raw_ipfs = base_decode(self.current_meta.ipfs_str, base=58)
-            raw_tx = window._fetch_tx_from_network(raw_ipfs[2:].hex(), False)
+            raw_tx = self.main_window._fetch_tx_from_network(raw_ipfs[2:].hex(), False)
             if not raw_tx:
-                window.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                self.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
                 return
             tx = transaction.Transaction(raw_tx)
-            window.show_transaction(tx)
+            self.main_window.show_transaction(tx)
         self.view_tx_button = EnterButton(_('View Transaction'), view_tx)
         self.view_tx_button.setVisible(False)
 
@@ -519,7 +519,7 @@ class MetadataViewer(QFrame):
         self.ipfs_layout.addWidget(self.ipfs_predicted)
         self.ipfs_layout.addWidget(self.ipfs_image)
         self.ipfs_layout.addWidget(self.ipfs_data_text)
-        self.ipfs_layout.addWidget(self.ipfs_json)
+        #self.ipfs_layout.addWidget(self.ipfs_json)
         self.ipfs_layout.addWidget(self.view_ipfs_button)
         self.ipfs_layout.addWidget(self.view_tx_button)
 
@@ -530,12 +530,12 @@ class MetadataViewer(QFrame):
         self.source_txid.setFixedHeight(50)
         self.source_txid.setVisible(False)
         def view_source_tx():
-            raw_tx = window._fetch_tx_from_network(self.current_meta.source_outpoint.txid.hex(), False)
+            raw_tx = self.main_window._fetch_tx_from_network(self.current_meta.source_outpoint.txid.hex(), False)
             if not raw_tx:
-                window.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                self.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
                 return
             tx = transaction.Transaction(raw_tx)
-            window.show_transaction(tx)
+            self.main_window.show_transaction(tx)
         self.view_source_tx_button = EnterButton(_('View Transaction'), view_source_tx)
         self.view_source_tx_button.setVisible(False)
 
@@ -552,12 +552,12 @@ class MetadataViewer(QFrame):
         self.ipfs_source_txid.setFixedHeight(50)
         self.ipfs_source_txid.setVisible(False)
         def view_ipfs_source_tx():
-            raw_tx = window._fetch_tx_from_network(self.current_meta.source_ipfs.txid.hex(), False)
+            raw_tx = self.main_window._fetch_tx_from_network(self.current_meta.source_ipfs.txid.hex(), False)
             if not raw_tx:
-                window.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                self.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
                 return
             tx = transaction.Transaction(raw_tx)
-            window.show_transaction(tx)
+            self.main_window.show_transaction(tx)
         self.view_ipfs_source_tx_button = EnterButton(_('View Transaction'), view_ipfs_source_tx)
         self.view_ipfs_source_tx_button.setVisible(False)
 
@@ -574,12 +574,12 @@ class MetadataViewer(QFrame):
         self.div_source_txid.setFixedHeight(50)
         self.div_source_txid.setVisible(False)
         def view_div_source_tx():
-            raw_tx = window._fetch_tx_from_network(self.current_meta.source_divisions.txid.hex(), False)
+            raw_tx = self.main_window._fetch_tx_from_network(self.current_meta.source_divisions.txid.hex(), False)
             if not raw_tx:
-                window.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                self.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
                 return
             tx = transaction.Transaction(raw_tx)
-            window.show_transaction(tx)
+            self.main_window.show_transaction(tx)
         self.view_div_source_tx_button = EnterButton(_('View Transaction'), view_div_source_tx)
         self.view_div_source_tx_button.setVisible(False)
 
@@ -651,7 +651,7 @@ class MetadataViewer(QFrame):
         self.ipfs_predicted.setVisible(False)
         self.ipfs_image.setVisible(False)
         self.ipfs_data_text.setVisible(False)
-        self.ipfs_json.setVisible(False)
+        #self.ipfs_json.setVisible(False)
 
         if meta.ipfs_str:
             self.ipfs_text.setVisible(True)
@@ -691,15 +691,15 @@ class MetadataViewer(QFrame):
                                 with open(ipfs_path, 'r') as f:
                                     self.ipfs_data_text.setText(f.read())
 
-                        elif ipfs_data.mime_type and 'json' in ipfs_data.mime_type:
-                            ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
-
-                            if os.path.exists(ipfs_path):
-                                self.ipfs_predicted.setVisible(False)
-                                self.ipfs_json.setVisible(True)
-                                print('Reading')
-                                with open(ipfs_path, 'r') as f:
-                                    self.ipfs_json_model.load(json.load(f))
+                        #elif ipfs_data.mime_type and 'json' in ipfs_data.mime_type:
+                        #    ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
+                        #
+                        #    if os.path.exists(ipfs_path):
+                        #        self.ipfs_predicted.setVisible(False)
+                        #        self.ipfs_json.setVisible(True)
+                        #        print('Reading')
+                        #        with open(ipfs_path, 'r') as f:
+                        #            self.ipfs_json_model.load(json.load(f))
 
 
                     elif meta.ipfs_str in self.requested_ipfses:
@@ -790,8 +790,8 @@ class AssetView(QSplitter):
     def __init__(self, window):
         super().__init__(window)
         self.main_window = window
-        self.data_viewer = MetadataViewer(window)
-        self.asset_list = AssetList(window, self)
+        self.data_viewer = MetadataViewer(self)
+        self.asset_list = AssetList(self)
         self.asset_list.setMinimumWidth(300)
         self.data_viewer.setMinimumWidth(400)
         self.setChildrenCollapsible(False)

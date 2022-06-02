@@ -220,7 +220,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
                         idx=i, line_content=line.strip(), exc=e, is_multiline=True))
                     continue
             outputs.append(output)
-            total += output.value.value
+            total += output.value
         if outputs:
             self.win.set_onchain(True)
         self.win.max_button.setChecked(is_max)

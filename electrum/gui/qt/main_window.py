@@ -1416,7 +1416,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.receive_tabs = VTabWidget()
         self.receive_tabs.setMinimumHeight(ReceiveTabWidget.min_size.height() + 4) # for margins
         self.receive_tabs.addTab(self.receive_URI_widget, read_QIcon("link.png"), _('URI'))
-        self.receive_tabs.addTab(self.receive_address_widget, read_QIcon("bitcoin.png"), _('Address'))
+        self.receive_tabs.addTab(self.receive_address_widget, read_QIcon("ravencoin.png"), _('Address'))
         #self.receive_tabs.addTab(self.receive_lightning_widget, read_QIcon("lightning.png"), _('Lightning'))
         self.receive_tabs.currentChanged.connect(self.update_receive_qr_window)
         self.receive_tabs.setCurrentIndex(self.config.get('receive_tabs_index', 0))

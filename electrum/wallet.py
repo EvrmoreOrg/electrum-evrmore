@@ -1494,6 +1494,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
             if change_addrs and force_same_change_addr:
                 change_addrs = change_addrs[:1]
+                while len(change_addrs) < extra_addresses + 1:  # Minimum amount of needed declaired addresses
+                    change_addrs.append(change_addrs[0])
 
             tx = coin_chooser.make_tx(
                 coins=coins,

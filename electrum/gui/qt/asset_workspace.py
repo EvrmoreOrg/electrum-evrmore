@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import (QMessageBox, QComboBox, QSystemTrayIcon, QTabWidget
 from electrum import constants
 from electrum.assets import GENERATE_NEW_PLACEHOLDER, GENERATE_REISSUE_PLACEHOLDER, GENERATE_TRANSFER_PLACEHOLDER, GENERATE_OWNERSHIP_PLACEHOLDER, is_main_asset_name_good, is_unique_asset_name_good, is_sub_asset_name_good
 from electrum.gui.qt.amountedit import FreezableLineEdit
-from electrum.gui.qt.util import ComplexLineEdit, HelpLabel, EnterButton, ColorScheme, ChoicesLayout, HelpButtonURL
+from electrum.gui.qt.util import ComplexLineEdit, HelpLabel, EnterButton, ColorScheme, ChoicesLayout, HelpButton
 from electrum.i18n import _
 from electrum.logging import get_logger
 from electrum.ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, base_decode, base_encode, address_to_script, COIN
@@ -263,7 +263,7 @@ class AssetCreateWorkspace(QWidget):
 
         top_layout = QHBoxLayout()
         top_layout.addLayout(self.create_options_layout.layout())
-        top_layout.addWidget(HelpButtonURL("https://ravencoin.org/assets/"))
+        top_layout.addWidget(HelpButton("https://ravencoin.org/assets/"))
 
         widgetA = QWidget()
         widgetA.setLayout(top_layout)
@@ -807,7 +807,7 @@ class AssetReissueWorkspace(QWidget):
 
         top_layout = QHBoxLayout()
         top_layout.addWidget(self.aval_owner_combo)
-        top_layout.addWidget(HelpButtonURL("https://ravencoin.org/assets/"))
+        top_layout.addWidget(HelpButton("https://ravencoin.org/assets/"))
         widgetA = QWidget()
         widgetA.setLayout(top_layout)
         widgetC = QWidget()

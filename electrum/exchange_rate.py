@@ -16,7 +16,7 @@ import aiohttp
 from . import util
 from .ravencoin import COIN
 from .i18n import _
-from .util import (ThreadJob, make_dir, log_exceptions, OldTaskGroup,
+from .util import (RavenValue, ThreadJob, make_dir, log_exceptions, OldTaskGroup,
                    make_aiohttp_session, resource_path)
 from .network import Network
 from .simple_config import SimpleConfig
@@ -255,7 +255,7 @@ def get_exchanges_and_currencies():
     try:
         #loop.run_until_complete(query_all_exchanges_for_their_ccys_over_network())
         asyncio.run(query_all_exchanges_for_their_ccys_over_network())
-    except Exception as e:
+    except Exception:
         pass
     with open(path, 'w', encoding='utf-8') as f:
         f.write(json.dumps(d, indent=4, sort_keys=True))
@@ -423,6 +423,8 @@ class FxThread(ThreadJob):
             rate = self.exchange_rate()
         else:
             rate = self.timestamp_rate(timestamp)
+        if isinstance(btc_balance, RavenValue):
+            btc_balance = btc_balance.rvn_value.value
         return '' if rate.is_nan() else "%s %s" % (self.value_str(btc_balance, rate), self.ccy)
 
     def get_fiat_status_text(self, btc_balance, base_unit, decimal_point):

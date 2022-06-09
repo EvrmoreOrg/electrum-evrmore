@@ -681,13 +681,12 @@ class MetadataViewer(QFrame):
                                 self.ipfs_image.setPixmap(pixmap)
                                 self.ipfs_image.setVisible(True)
 
-                        elif ipfs_data.mime_type and 'text/plain' == ipfs_data.mime_type:
+                        elif ipfs_data.mime_type and ('text/plain' == ipfs_data.mime_type or 'json' in ipfs_data.mime_type):
                             ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
 
                             if os.path.exists(ipfs_path):
                                 self.ipfs_predicted.setVisible(False)
                                 self.ipfs_data_text.setVisible(True)
-                                print('Reading')
                                 with open(ipfs_path, 'r') as f:
                                     self.ipfs_data_text.setText(f.read())
 

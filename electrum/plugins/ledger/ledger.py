@@ -544,17 +544,10 @@ class Ledger_KeyStore(Hardware_KeyStore):
         message = message.encode('utf8')
         message_hash = hashlib.sha256(message).hexdigest().upper()
         # prompt for the PIN before displaying the dialog if necessary
-<<<<<<< HEAD
-        client_ledger = self.get_client()
-        client_electrum = self.get_client_electrum()
-        address_path = self.get_derivation_prefix()[2:] + "/%d/%d" % sequence
-        self.handler.show_message("Signing message ...\r\nMessage hash: " + message_hash)
-=======
         client_electrum = self.get_client()
         client_ledger = self.get_client_dongle_object(client=client_electrum)
         address_path = self.get_derivation_prefix()[2:] + "/%d/%d"%sequence
         self.handler.show_message("Signing message ...\r\nMessage hash: "+message_hash)
->>>>>>> 381f2c62bdf8f6fdb0c445ae2323eb0a49184114
         try:
             info = client_ledger.signMessagePrepare(address_path, message)
             pin = ""
@@ -615,13 +608,8 @@ class Ledger_KeyStore(Hardware_KeyStore):
         p2shTransaction = False
         segwitTransaction = False
         pin = ""
-<<<<<<< HEAD
-        client_ledger = self.get_client()  # prompt for the PIN before displaying the dialog if necessary
-        client_electrum = self.get_client_electrum()
-=======
         # prompt for the PIN before displaying the dialog if necessary
         client_electrum = self.get_client()
->>>>>>> 381f2c62bdf8f6fdb0c445ae2323eb0a49184114
         assert client_electrum
         client_ledger = self.get_client_dongle_object(client=client_electrum)
 
@@ -866,13 +854,8 @@ class Ledger_KeyStore(Hardware_KeyStore):
     @test_pin_unlocked
     @set_and_unset_signing
     def show_address(self, sequence, txin_type):
-<<<<<<< HEAD
-        client = self.get_client()
-        address_path = self.get_derivation_prefix()[2:] + "/%d/%d" % sequence
-=======
         client_ledger = self.get_client_dongle_object()
         address_path = self.get_derivation_prefix()[2:] + "/%d/%d"%sequence
->>>>>>> 381f2c62bdf8f6fdb0c445ae2323eb0a49184114
         self.handler.show_message(_("Showing address ..."))
         segwit = is_segwit_script_type(txin_type)
         segwitNative = txin_type == 'p2wpkh'

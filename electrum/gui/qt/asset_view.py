@@ -681,7 +681,7 @@ class MetadataViewer(QFrame):
                                 self.ipfs_image.setPixmap(pixmap)
                                 self.ipfs_image.setVisible(True)
 
-                        elif ipfs_data.mime_type and 'text' in ipfs_data.mime_type:
+                        elif ipfs_data.mime_type and 'text/plain' == ipfs_data.mime_type:
                             ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
 
                             if os.path.exists(ipfs_path):
@@ -707,7 +707,7 @@ class MetadataViewer(QFrame):
                     else:
                         if meta.ipfs_str not in self.requested_ipfses and \
                             self.main_window.config.get('download_all_ipfs', False) and \
-                                ipfs_data.mime_type and ('image' in ipfs_data.mime_type or 'text' in ipfs_data.mime_type or 'json' in ipfs_data.mime_type) and \
+                                ipfs_data.mime_type and ('image' in ipfs_data.mime_type or 'text/plain' == ipfs_data.mime_type or 'json' in ipfs_data.mime_type) and \
                                     ipfs_data.byte_length and ipfs_data.byte_length <= self.main_window.config.get('max_ipfs_size', 1024 * 1024 * 10):
                             loop = get_asyncio_loop()
                             url = ipfs_explorer_URL(self.main_window.config, 'ipfs', meta.ipfs_str)

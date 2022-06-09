@@ -1,5 +1,5 @@
 include LICENCE RELEASE-NOTES AUTHORS
-include README.md
+include README.rst
 include electrum-ravencoin.desktop
 include *.py
 include run_electrum

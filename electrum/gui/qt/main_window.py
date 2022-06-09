@@ -1530,12 +1530,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self.request_list.delete_item(key)
         self.clear_receive_tab()
 
-    def delete_lightning_payreq(self, payreq_key):
-        self.wallet.lnworker.delete_invoice(payreq_key)
-        self.request_list.update()
-        self.invoice_list.update()
-        self.clear_receive_tab()
-
     def sign_payment_request(self, addr):
         alias = self.config.get('alias')
         if alias and self.alias_info:
@@ -2478,7 +2472,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
     def run_swap_dialog(self, is_reverse=None, recv_amount_sat=None, channels=None):
         if not self.network:
-            self.window.show_error(_("You are offline."))
+            self.show_error(_("You are offline."))
             return
         def get_pairs_thread():
             self.network.run_from_another_thread(self.wallet.lnworker.swap_manager.get_pairs())
@@ -2867,6 +2861,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
     def query_choice(self, msg, choices):
         # Needed by QtHandler for hardware wallets
         dialog = WindowModalDialog(self.top_level_window(), title='Question')
+        dialog.setMinimumWidth(400)
         clayout = ChoicesLayout(msg, choices)
         vbox = QVBoxLayout(dialog)
         vbox.addLayout(clayout.layout())
@@ -3542,19 +3537,26 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 mpk_text.setMaximumHeight(150)
                 mpk_text.addCopyButton()
                 run_hook('show_xpub_button', mpk_text, ks)
+                ks_vbox.addWidget(WWLabel(_("Master Public Key")))
+                ks_vbox.addWidget(mpk_text)
 
                 der_path_hbox = QHBoxLayout()
                 der_path_hbox.setContentsMargins(0, 0, 0, 0)
-
                 der_path_hbox.addWidget(WWLabel(_("Derivation path") + ':'))
                 der_path_text = WWLabel(ks.get_derivation_prefix() or _("unknown"))
                 der_path_text.setTextInteractionFlags(Qt.TextSelectableByMouse)
                 der_path_hbox.addWidget(der_path_text)
                 der_path_hbox.addStretch()
-
-                ks_vbox.addWidget(WWLabel(_("Master Public Key")))
-                ks_vbox.addWidget(mpk_text)
                 ks_vbox.addLayout(der_path_hbox)
+
+                bip32fp_hbox = QHBoxLayout()
+                bip32fp_hbox.setContentsMargins(0, 0, 0, 0)
+                bip32fp_hbox.addWidget(QLabel("BIP32 root fingerprint:"))
+                bip32fp_text = WWLabel(ks.get_root_fingerprint() or _("unknown"))
+                bip32fp_text.setTextInteractionFlags(Qt.TextSelectableByMouse)
+                bip32fp_hbox.addWidget(bip32fp_text)
+                bip32fp_hbox.addStretch()
+                ks_vbox.addLayout(bip32fp_hbox)
 
                 ks_stack.addWidget(ks_w)
 

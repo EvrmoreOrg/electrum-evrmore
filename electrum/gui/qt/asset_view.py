@@ -38,7 +38,7 @@ from PyQt5.QtWidgets import (QAbstractItemView, QMenu, QCheckBox, QSplitter, QFr
 
 from electrum.i18n import _
 from electrum.network import Network
-from electrum.util import IPFSData, get_ipfs_path, ipfs_explorer_URL, profiler, RavenValue, Satoshis, get_asyncio_loop, make_dir, make_aiohttp_session
+from electrum.util import IPFSData, get_ipfs_path, ipfs_explorer_URL, profiler, RavenValue, Satoshis, get_asyncio_loop, make_aiohttp_session
 from electrum.ravencoin import COIN, is_address, base_decode
 from electrum.wallet import InternalAddressCorruption
 from electrum.transaction import AssetMeta
@@ -185,6 +185,34 @@ def try_ask_to_save(parent, ipfs, url, viewer):
         task = loop.create_task(try_download_ipfs(parent, ipfs, viewer.requested_ipfses, url, False, viewer.update_trigger.emit))
         task.add_done_callback(lambda _: viewer.update_trigger.emit())
 
+
+def webopen_safe_non_ipfs(parent, url):
+    show_warn = parent.config.get('show_ipfs_warning', True)
+    if show_warn:
+        cb = QCheckBox(_("Don't show this message again."))
+        cb_checked = False
+
+        def on_cb(x):
+            nonlocal cb_checked
+            cb_checked = x == Qt.Checked
+
+        cb.stateChanged.connect(on_cb)
+        goto = parent.question(_('You are about to visit:\n\n'
+                                        '{}\n\n'
+                                        'Please follow safe practices and common sense. If you are unsure '
+                                        'about what\'s on the other end of a url, don\'t '
+                                        'visit it!\n\n'
+                                        'Are you sure you want to continue?').format(url),
+                                    title=_('Warning: External Data'), checkbox=cb)
+
+        if cb_checked:
+            parent.config.set_key('show_ipfs_warning', False)
+        if goto:
+            webopen(url)
+    else:
+        webopen(url)
+
+
 def webopen_safe(parent, ipfs, url, viewer):
     show_warn = parent.config.get('show_ipfs_warning', True)
     if show_warn:
@@ -225,38 +253,127 @@ def human_readable_size(size, decimal_places=3):
     return f"{size:.{decimal_places}f}{unit}"
 
 
+IPFS_ROLE = Qt.UserRole + 100
+TXID_ROLE = Qt.UserRole + 101
+COPYABLE = Qt.UserRole + 102
+KEY_DATA_ROLE = Qt.UserRole + 103
+VALUE_DATA_ROLE = Qt.UserRole + 104
+
+def associateDataOfType(element: QTreeWidgetItem, data: str):
+    try:
+        b58_bytes = base_decode(data, base=58)
+        if b58_bytes[:2] == b'\x12\x20':
+            element.setData(0, IPFS_ROLE, data)
+        elif b58_bytes[:2] == b'\x54\x20':
+            element.setData(0, TXID_ROLE, b58_bytes[2:].hex())
+    except Exception:
+        pass
+
+
 class JsonViewWidget(QTreeWidget):
     MAX_DEPTH = 10
 
-    def __init__(self):
+    class CopyType(IntEnum):
+        NONE = 0x0
+        KEY = 0x2
+        VALUE = 0x1
+        BOTH = int(KEY) + int(VALUE)
+
+    def __init__(self, parent_widget: 'MetadataViewer'):
         QTreeWidget.__init__(self)
+        self.parent_widget = parent_widget
         self.setHeaderLabels([_('JSON Key'), _('JSON Value')])
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.create_menu)
 
-    def create_menu(self):
-        pass
+
+    def create_menu(self, position):
+        item = self.currentItem()
+        if not item:
+            return
+        menu = QMenu()
+
+        has_any = False
+
+        try:
+            ipfs_str = item.data(0, IPFS_ROLE)
+            if ipfs_str:
+                has_any = True
+                url = ipfs_explorer_URL(self.parent_widget.main_window.config, 'ipfs', ipfs_str)
+                menu.addAction(_('View IPFS'), lambda: webopen_safe_non_ipfs(self.parent_widget.main_window, url))
+        except AttributeError:
+            pass
+
+        try:
+            txid_str = item.data(0, TXID_ROLE)
+            if txid_str:
+                has_any = True
+                def open_transaction():
+                    raw_tx = self.parent_widget.main_window._fetch_tx_from_network(txid_str, False)
+                    if not raw_tx:
+                        self.parent_widget.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                        return
+                    tx = transaction.Transaction(raw_tx)
+                    self.parent_widget.main_window.show_transaction(tx)
+                menu.addAction(_('View Transaction'), open_transaction)
+        except AttributeError:
+            pass
+
+        copy_type = int(item.data(0, COPYABLE))
+        if not has_any and copy_type != 0:
+            has_any = True
+
+        if copy_type & int(self.CopyType.KEY):
+            key_str = item.data(0, KEY_DATA_ROLE)
+            menu.addAction(_('Copy Key'), lambda: self.parent_widget.main_window.do_copy(key_str, title=_('JSON Key')))
+
+        if copy_type & int(self.CopyType.VALUE):
+            value_str = item.data(0, VALUE_DATA_ROLE)
+            menu.addAction(_('Copy Value'), lambda: self.parent_widget.main_window.do_copy(value_str, title=_('JSON Value')))
+
+        if not has_any:
+            return
+        
+        menu.exec_(self.viewport().mapToGlobal(position))
 
     def recursivelyAddJson(self, obj, parent: QTreeWidgetItem, counter: int):
         if counter >= self.MAX_DEPTH:
-            parent.addChild(QTreeWidgetItem(['...', '']))
+            item = QTreeWidgetItem(['...', ''])
+            item.setData(0, COPYABLE, self.CopyType.NONE)
+            parent.addChild()
             return
         
         if isinstance(obj, (list, tuple, set)):
             for i, element in enumerate(obj):
                 if isinstance(element, (dict, list, tuple, set)):
                     item = QTreeWidgetItem([str(i), ''])
+                    item.setData(0, COPYABLE, self.CopyType.NONE)
                     self.recursivelyAddJson(element, item, counter+1)
                 else:
-                    item = QTreeWidgetItem([str(i), str(element)])
+                    element_str = str(element)
+                    item = QTreeWidgetItem([str(i), element_str])
+                    item.setData(0, COPYABLE, self.CopyType.VALUE)
+                    item.setData(0, VALUE_DATA_ROLE, element_str)
+                    associateDataOfType(item, element_str)
                 parent.addChild(item)
         elif isinstance(obj, dict):
             for k, v in obj.items():
+                key_str = str(k)
                 if isinstance(v, (dict, list, tuple, set)):
-                    item = QTreeWidgetItem([str(k), ''])
+                    item = QTreeWidgetItem([key_str, ''])
+                    item.setData(0, COPYABLE, self.CopyType.KEY)
+                    item.setData(0, KEY_DATA_ROLE, key_str)
                     self.recursivelyAddJson(v, item, counter+1)
+                    associateDataOfType(item, key_str)
                 else:
-                    item = QTreeWidgetItem([str(k), str(v)])
+                    val_str = str(v)
+                    item = QTreeWidgetItem([key_str, val_str])
+                    item.setData(0, COPYABLE, self.CopyType.BOTH)
+                    item.setData(0, KEY_DATA_ROLE, key_str)
+                    item.setData(0, VALUE_DATA_ROLE, val_str)
+                    associateDataOfType(item, key_str)
+                    associateDataOfType(item, val_str)
+
                 parent.addChild(item)
         else:
             raise ValueError(f'Asset view json recursion is not valid!: {obj.__class__}')
@@ -269,18 +386,35 @@ class JsonViewWidget(QTreeWidget):
             for i, element in enumerate(json):
                 if isinstance(element, (dict, list, tuple, set)):
                     item = QTreeWidgetItem([str(i), ''])
+                    item.setData(0, COPYABLE, self.CopyType.NONE)
                     self.recursivelyAddJson(element, item, 0)
                 else:
-                    item = QTreeWidgetItem([str(i), str(element)])
+                    element_str = str(element)
+                    item = QTreeWidgetItem([str(i), element_str])
+                    item.setData(0, COPYABLE, self.CopyType.VALUE)
+                    item.setData(0, VALUE_DATA_ROLE, element_str)
+                    associateDataOfType(item, element_str)
+
                 self.addTopLevelItem(item)
                 tl_elements.append(item)
         elif isinstance(json, dict):
             for k, v in json.items():
+                key_str = str(k)
                 if isinstance(v, (dict, list, tuple, set)):
-                    item = QTreeWidgetItem([str(k), ''])
+                    item = QTreeWidgetItem([key_str, ''])
+                    item.setData(0, COPYABLE, self.CopyType.KEY)
+                    item.setData(0, KEY_DATA_ROLE, key_str)
                     self.recursivelyAddJson(v, item, 0)
+                    associateDataOfType(item, key_str)
                 else:
-                    item = QTreeWidgetItem([str(k), str(v)])
+                    val_str = str(v)
+                    item = QTreeWidgetItem([key_str, val_str])
+                    item.setData(0, COPYABLE, self.CopyType.BOTH)
+                    item.setData(0, KEY_DATA_ROLE, key_str)
+                    item.setData(0, VALUE_DATA_ROLE, val_str)
+                    associateDataOfType(item, key_str)
+                    associateDataOfType(item, val_str)
+
                 self.addTopLevelItem(item)
                 tl_elements.append(item)
         else:
@@ -571,7 +705,7 @@ class MetadataViewer(QFrame):
         self.ipfs_data_text.setReadOnly(True)
         self.ipfs_data_text.setVisible(False)
 
-        self.ipfs_json = JsonViewWidget()
+        self.ipfs_json = JsonViewWidget(self)
         self.ipfs_json.setVisible(False)
 
         def view_ipfs():
@@ -791,6 +925,7 @@ class MetadataViewer(QFrame):
                                 if task.result() == self.current_meta.ipfs_str:
                                     self.update_trigger.emit()
                             task.add_done_callback(maybe_update_view)
+
                 elif meta.ipfs_str not in self.requested_ipfses:
                     loop = get_asyncio_loop()
                     url = ipfs_explorer_URL(self.main_window.config, 'ipfs', meta.ipfs_str)
@@ -808,6 +943,7 @@ class MetadataViewer(QFrame):
             else:
                 ipfs_text = _('This asset has associated base58:')
                 self.ipfs_text.setText(meta.ipfs_str)
+        
         else:
             ipfs_text = _('This asset has no associated IPFS hash.')
             self.ipfs_text.setVisible(False)

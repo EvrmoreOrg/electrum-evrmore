@@ -33,7 +33,8 @@ import os
 from PyQt5.QtCore import Qt, QModelIndex, pyqtSignal
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QFont, QMouseEvent, QPixmap
 from PyQt5.QtWidgets import (QAbstractItemView, QMenu, QCheckBox, QSplitter, QFrame, QVBoxLayout, 
-                                QLabel, QTextEdit, QWidget, QTreeView, QScrollArea)
+                                QLabel, QTextEdit, QWidget, QTreeWidget, QTreeWidgetItem, QScrollArea,
+                                QHeaderView)
 
 from electrum.i18n import _
 from electrum.network import Network
@@ -223,6 +224,84 @@ def human_readable_size(size, decimal_places=3):
         size /= 1024.0
     return f"{size:.{decimal_places}f}{unit}"
 
+
+class JsonViewWidget(QTreeWidget):
+    MAX_DEPTH = 10
+
+    def __init__(self):
+        QTreeWidget.__init__(self)
+        self.setHeaderLabels([_('JSON Key'), _('JSON Value')])
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.create_menu)
+
+    def create_menu(self):
+        pass
+
+    def recursivelyAddJson(self, obj, parent: QTreeWidgetItem, counter: int):
+        if counter >= self.MAX_DEPTH:
+            parent.addChild(QTreeWidgetItem(['...', '']))
+            return
+        
+        if isinstance(obj, (list, tuple, set)):
+            for i, element in enumerate(obj):
+                if isinstance(element, (dict, list, tuple, set)):
+                    item = QTreeWidgetItem([str(i), ''])
+                    self.recursivelyAddJson(element, item, counter+1)
+                else:
+                    item = QTreeWidgetItem([str(i), str(element)])
+                parent.addChild(item)
+        elif isinstance(obj, dict):
+            for k, v in obj.items():
+                if isinstance(v, (dict, list, tuple, set)):
+                    item = QTreeWidgetItem([str(k), ''])
+                    self.recursivelyAddJson(v, item, counter+1)
+                else:
+                    item = QTreeWidgetItem([str(k), str(v)])
+                parent.addChild(item)
+        else:
+            raise ValueError(f'Asset view json recursion is not valid!: {obj.__class__}')
+
+    def update(self, json):
+        self.clear()
+        
+        tl_elements = []
+        if isinstance(json, (list, tuple, set)):
+            for i, element in enumerate(json):
+                if isinstance(element, (dict, list, tuple, set)):
+                    item = QTreeWidgetItem([str(i), ''])
+                    self.recursivelyAddJson(element, item, 0)
+                else:
+                    item = QTreeWidgetItem([str(i), str(element)])
+                self.addTopLevelItem(item)
+                tl_elements.append(item)
+        elif isinstance(json, dict):
+            for k, v in json.items():
+                if isinstance(v, (dict, list, tuple, set)):
+                    item = QTreeWidgetItem([str(k), ''])
+                    self.recursivelyAddJson(v, item, 0)
+                else:
+                    item = QTreeWidgetItem([str(k), str(v)])
+                self.addTopLevelItem(item)
+                tl_elements.append(item)
+        else:
+            raise ValueError(f'Asset view json top level is not valid!: {json.__class__}')
+
+
+        def recursive_expand(item: QTreeWidgetItem):
+            item.setExpanded(True)
+            for i in range(item.childCount()):
+                recursive_expand(item.child(i))
+
+
+        for element in tl_elements:
+            recursive_expand(element)
+
+        h = self.header()
+        h.setStretchLastSection(False)
+        h.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        h.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+
+        super().update()
 
 class AssetList(MyTreeView):
     class Columns(IntEnum):
@@ -492,10 +571,8 @@ class MetadataViewer(QFrame):
         self.ipfs_data_text.setReadOnly(True)
         self.ipfs_data_text.setVisible(False)
 
-        #self.ipfs_json = QTreeView(self)
-        #self.ipfs_json_model = QJsonModel(self.ipfs_json)
-        #self.ipfs_json.setModel(self.ipfs_json_model)
-        #self.ipfs_json.setVisible(False)
+        self.ipfs_json = JsonViewWidget()
+        self.ipfs_json.setVisible(False)
 
         def view_ipfs():
             url = ipfs_explorer_URL(self.main_window.config, 'ipfs', self.current_meta.ipfs_str)
@@ -519,7 +596,7 @@ class MetadataViewer(QFrame):
         self.ipfs_layout.addWidget(self.ipfs_predicted)
         self.ipfs_layout.addWidget(self.ipfs_image)
         self.ipfs_layout.addWidget(self.ipfs_data_text)
-        #self.ipfs_layout.addWidget(self.ipfs_json)
+        self.ipfs_layout.addWidget(self.ipfs_json)
         self.ipfs_layout.addWidget(self.view_ipfs_button)
         self.ipfs_layout.addWidget(self.view_tx_button)
 
@@ -651,7 +728,7 @@ class MetadataViewer(QFrame):
         self.ipfs_predicted.setVisible(False)
         self.ipfs_image.setVisible(False)
         self.ipfs_data_text.setVisible(False)
-        #self.ipfs_json.setVisible(False)
+        self.ipfs_json.setVisible(False)
 
         if meta.ipfs_str:
             self.ipfs_text.setVisible(True)
@@ -681,7 +758,7 @@ class MetadataViewer(QFrame):
                                 self.ipfs_image.setPixmap(pixmap)
                                 self.ipfs_image.setVisible(True)
 
-                        elif ipfs_data.mime_type and ('text/plain' == ipfs_data.mime_type or 'json' in ipfs_data.mime_type):
+                        elif ipfs_data.mime_type and 'text/plain' == ipfs_data.mime_type:
                             ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
 
                             if os.path.exists(ipfs_path):
@@ -690,16 +767,14 @@ class MetadataViewer(QFrame):
                                 with open(ipfs_path, 'r') as f:
                                     self.ipfs_data_text.setText(f.read())
 
-                        #elif ipfs_data.mime_type and 'json' in ipfs_data.mime_type:
-                        #    ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
-                        #
-                        #    if os.path.exists(ipfs_path):
-                        #        self.ipfs_predicted.setVisible(False)
-                        #        self.ipfs_json.setVisible(True)
-                        #        print('Reading')
-                        #        with open(ipfs_path, 'r') as f:
-                        #            self.ipfs_json_model.load(json.load(f))
-
+                        elif ipfs_data.mime_type and 'json' in ipfs_data.mime_type:
+                            ipfs_path = get_ipfs_path(self.main_window.config, meta.ipfs_str)
+                        
+                            if os.path.exists(ipfs_path):
+                                self.ipfs_predicted.setVisible(False)
+                                self.ipfs_json.setVisible(True)
+                                with open(ipfs_path, 'r') as f:
+                                    self.ipfs_json.update(json.load(f))
 
                     elif meta.ipfs_str in self.requested_ipfses:
                         self.ipfs_predicted.setText(_('Loading data...'))

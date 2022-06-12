@@ -340,7 +340,7 @@ class JsonViewWidget(QTreeWidget):
         if counter >= self.MAX_DEPTH:
             item = QTreeWidgetItem(['...', ''])
             item.setData(0, COPYABLE, self.CopyType.NONE)
-            parent.addChild()
+            parent.addChild(item)
             return
         
         if isinstance(obj, (list, tuple, set)):

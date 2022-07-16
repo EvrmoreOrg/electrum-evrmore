@@ -1007,9 +1007,9 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
                 menu.addAction(_("View log"), lambda: self.parent.invoice_list.show_log(key, log))
             menu.exec_(self.viewport().mapToGlobal(position))
             return
-        tx_hash = tx_item.txid
-        if tx_item.lightning:
-            tx = self.wallet.lnworker.lnwatcher.db.get_transaction(tx_hash)
+        tx_hash = tx_item['txid']
+        if tx_item.get('lightning'):
+            tx = self.wallet.adb.get_transaction(tx_hash)
         else:
             tx = self.wallet.db.get_transaction(tx_hash)
         if not tx:
@@ -1053,7 +1053,7 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
         menu.exec_(self.viewport().mapToGlobal(position))
 
     def remove_local_tx(self, tx_hash: str):
-        num_child_txs = len(self.wallet.get_depending_transactions(tx_hash))
+        num_child_txs = len(self.wallet.adb.get_depending_transactions(tx_hash))
         question = _("Are you sure you want to remove this transaction?")
         if num_child_txs > 0:
             question = (_("Are you sure you want to remove this transaction and {} child transactions?")
@@ -1061,7 +1061,7 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
         if not self.parent.question(msg=question,
                                     title=_("Please confirm")):
             return
-        self.wallet.remove_transaction(tx_hash)
+        self.wallet.adb.remove_transaction(tx_hash)
         self.wallet.save_db()
         # need to update at least: history_list, utxo_list, address_list
         self.parent.need_update.set()

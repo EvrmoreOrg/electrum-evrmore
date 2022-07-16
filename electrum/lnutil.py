@@ -871,7 +871,8 @@ def make_funding_input(local_funding_pubkey: bytes, remote_funding_pubkey: bytes
     c_input._trusted_value_sats = funding_sat
     return c_input
 
-class HTLCOwner(IntFlag):
+
+class HTLCOwner(IntEnum):
     LOCAL = 1
     REMOTE = -LOCAL
 
@@ -882,7 +883,7 @@ class HTLCOwner(IntFlag):
         return HTLCOwner(super().__neg__())
 
 
-class Direction(IntFlag):
+class Direction(IntEnum):
     SENT = -1     # in the context of HTLCs: "offered" HTLCs
     RECEIVED = 1  # in the context of HTLCs: "received" HTLCs
 
@@ -1139,11 +1140,26 @@ class LnFeatures(IntFlag):
     _ln_feature_contexts[OPTION_SUPPORT_LARGE_CHANNEL_OPT] = (LNFC.INIT | LNFC.NODE_ANN)
     _ln_feature_contexts[OPTION_SUPPORT_LARGE_CHANNEL_REQ] = (LNFC.INIT | LNFC.NODE_ANN)
 
-    OPTION_TRAMPOLINE_ROUTING_REQ = 1 << 24
-    OPTION_TRAMPOLINE_ROUTING_OPT = 1 << 25
+    # This is still a temporary number. Also used by Eclair.
+    OPTION_TRAMPOLINE_ROUTING_REQ = 1 << 148
+    OPTION_TRAMPOLINE_ROUTING_OPT = 1 << 149
 
     _ln_feature_contexts[OPTION_TRAMPOLINE_ROUTING_REQ] = (LNFC.INIT | LNFC.NODE_ANN | LNFC.INVOICE)
     _ln_feature_contexts[OPTION_TRAMPOLINE_ROUTING_OPT] = (LNFC.INIT | LNFC.NODE_ANN | LNFC.INVOICE)
+
+    # allow old Electrum wallets to pay us with trampoline
+    OPTION_TRAMPOLINE_ROUTING_REQ_COMPAT_ELECTRUM = 1 << 24
+    OPTION_TRAMPOLINE_ROUTING_OPT_COMPAT_ELECTRUM = 1 << 25
+
+    _ln_feature_contexts[OPTION_TRAMPOLINE_ROUTING_REQ_COMPAT_ELECTRUM] = (LNFC.INVOICE)
+    _ln_feature_contexts[OPTION_TRAMPOLINE_ROUTING_OPT_COMPAT_ELECTRUM] = (LNFC.INVOICE)
+
+    # allow old Phoenix wallets to pay us with trampoline
+    OPTION_TRAMPOLINE_ROUTING_REQ_COMPAT_ECLAIR = 1 << 50
+    OPTION_TRAMPOLINE_ROUTING_OPT_COMPAT_ECLAIR = 1 << 51
+
+    _ln_feature_contexts[OPTION_TRAMPOLINE_ROUTING_REQ_COMPAT_ECLAIR] = (LNFC.INVOICE)
+    _ln_feature_contexts[OPTION_TRAMPOLINE_ROUTING_OPT_COMPAT_ECLAIR] = (LNFC.INVOICE)
 
     OPTION_SHUTDOWN_ANYSEGWIT_REQ = 1 << 26
     OPTION_SHUTDOWN_ANYSEGWIT_OPT = 1 << 27
@@ -1156,10 +1172,6 @@ class LnFeatures(IntFlag):
 
     _ln_feature_contexts[OPTION_CHANNEL_TYPE_REQ] = (LNFC.INIT | LNFC.NODE_ANN)
     _ln_feature_contexts[OPTION_CHANNEL_TYPE_OPT] = (LNFC.INIT | LNFC.NODE_ANN)
-
-    # temporary
-    OPTION_TRAMPOLINE_ROUTING_REQ_ECLAIR = 1 << 50
-    OPTION_TRAMPOLINE_ROUTING_OPT_ECLAIR = 1 << 51
 
     def validate_transitive_dependencies(self) -> bool:
         # for all even bit set, set corresponding odd bit:

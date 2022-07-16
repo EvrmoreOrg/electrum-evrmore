@@ -163,15 +163,14 @@ class AddressList(MyTreeView):
         self.refresh_headers()
         fx = self.parent.fx
         set_address = None
-        addresses_beyond_gap_limit = self.wallet.get_all_known_addresses_beyond_gap_limit()
-        # We only care about ravencoin for addresses for now
+        self.addresses_beyond_gap_limit = self.wallet.get_all_known_addresses_beyond_gap_limit()
         for address in addr_list:
             c, u, x = self.wallet.get_addr_balance(address)
-            balance = c.rvn_value.value + u.rvn_value.value + x.rvn_value.value
-            is_used_and_empty = self.wallet.is_used(address) and balance == 0
+            balance = c + u + x
+            is_used_and_empty = self.wallet.adb.is_used(address) and balance == RavenValue()
             if self.show_used == AddressUsageStateFilter.UNUSED and (balance or is_used_and_empty):
                 continue
-            if self.show_used == AddressUsageStateFilter.FUNDED and balance == 0:
+            if self.show_used == AddressUsageStateFilter.FUNDED and balance == RavenValue():
                 continue
             if self.show_used == AddressUsageStateFilter.USED_AND_EMPTY and not is_used_and_empty:
                 continue
@@ -199,8 +198,6 @@ class AddressList(MyTreeView):
             address_path_str = self.wallet.get_address_path_str(address)
             if address_path_str is not None:
                 address_item[self.Columns.TYPE].setToolTip(address_path_str)
-            if address in addresses_beyond_gap_limit:
-                address_item[self.Columns.ADDRESS].setBackground(ColorScheme.RED.as_color(True))
             # add item
             count = self.std_model.rowCount()
             self.std_model.insertRow(count, address_item)
@@ -218,9 +215,10 @@ class AddressList(MyTreeView):
         self.proxy.setDynamicSortFilter(True)
 
     def refresh_row(self, key, row):
+        assert row is not None
         address = key
         label = self.wallet.get_label(address)
-        num = self.wallet.get_address_history_len(address)
+        num = self.wallet.adb.get_address_history_len(address)
         c, u, x = self.wallet.get_addr_balance(address)
         balance = c.rvn_value + u.rvn_value + x.rvn_value
         balance_text = self.parent.format_amount(balance, whitespaces=True)
@@ -239,6 +237,8 @@ class AddressList(MyTreeView):
         address_item[self.Columns.NUM_TXS].setText("%d"%num)
         c = ColorScheme.BLUE.as_color(True) if self.wallet.is_frozen_address(address) else self._default_bg_brush
         address_item[self.Columns.ADDRESS].setBackground(c)
+        if address in self.addresses_beyond_gap_limit:
+            address_item[self.Columns.ADDRESS].setBackground(ColorScheme.RED.as_color(True))
 
     def create_menu(self, position):
         from electrum.wallet import Multisig_Wallet

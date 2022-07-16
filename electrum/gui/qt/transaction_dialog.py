@@ -54,7 +54,8 @@ from .util import (MessageBoxMixin, read_QIcon, Buttons, icon_path,
                    char_width_in_lineedit, TRANSACTION_FILE_EXTENSION_FILTER_SEPARATE,
                    TRANSACTION_FILE_EXTENSION_FILTER_ONLY_COMPLETE_TX,
                    TRANSACTION_FILE_EXTENSION_FILTER_ONLY_PARTIAL_TX,
-                   BlockingWaitingDialog, getSaveFileName, ColorSchemeItem)
+                   BlockingWaitingDialog, getSaveFileName, ColorSchemeItem,
+                   get_iconname_qrcode)
 
 from .fee_slider import FeeSlider, FeeComboBox
 from .confirm_tx_dialog import TxEditor
@@ -245,7 +246,7 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
 
     def do_broadcast(self):
         self.main_window.push_top_level_window(self)
-        self.main_window.save_pending_invoice()
+        self.main_window.send_tab.save_pending_invoice()
         try:
             self.main_window.broadcast_transaction(self.tx)
         finally:
@@ -276,8 +277,7 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
         action.triggered.connect(lambda: self.copy_to_clipboard(tx=gettx()))
         menu.addAction(action)
 
-        qr_icon = "qrcode_white.png" if ColorScheme.dark_scheme else "qrcode.png"
-        action = QAction(read_QIcon(qr_icon), _("Show as QR code"), self)
+        action = QAction(read_QIcon(get_iconname_qrcode()), _("Show as QR code"), self)
         action.triggered.connect(lambda: self.show_qr(tx=gettx()))
         menu.addAction(action)
 
@@ -453,7 +453,7 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
             item = lnworker_history[txid]
             ln_amount = item['amount_msat'] / 1000
             if amount is None:
-                tx_mined_status = self.wallet.lnworker.lnwatcher.get_tx_height(txid)
+                tx_mined_status = self.wallet.lnworker.lnwatcher.adb.get_tx_height(txid)
         else:
             ln_amount = None
         self.broadcast_button.setEnabled(tx_details.can_broadcast)
@@ -639,11 +639,11 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
                 prevout_hash = txin.prevout.txid.hex()
                 prevout_n = txin.prevout.out_idx
                 cursor.insertText(prevout_hash + ":%-4d " % prevout_n, ext)
-                addr = self.wallet.get_txin_address(txin)
+                addr = self.wallet.adb.get_txin_address(txin)
                 if addr is None:
                     addr = ''
                 cursor.insertText(addr, text_format(addr))
-                txin_value = self.wallet.get_txin_value(txin)
+                txin_value = self.wallet.adb.get_txin_value(txin)
                 if txin_value is not None:
                     cursor.insertText(format_amount(txin_value), ext)
             cursor.insertBlock()

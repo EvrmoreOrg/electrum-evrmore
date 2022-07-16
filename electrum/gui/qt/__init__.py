@@ -28,7 +28,7 @@ import signal
 import sys
 import traceback
 import threading
-from typing import Optional, TYPE_CHECKING, List
+from typing import Optional, TYPE_CHECKING, List, Sequence
 
 from electrum import GuiImportError
 
@@ -98,14 +98,14 @@ class BaseElectrumGui:
         pass
 
 class OpenFileEventFilter(QObject):
-    def __init__(self, windows):
+    def __init__(self, windows: Sequence[ElectrumWindow]):
         self.windows = windows
         super(OpenFileEventFilter, self).__init__()
 
     def eventFilter(self, obj, event):
         if event.type() == QtCore.QEvent.FileOpen:
             if len(self.windows) >= 1:
-                self.windows[0].pay_to_URI(event.url().toString())
+                self.windows[0].handle_payment_identifier(event.url().toString())
                 return True
         return False
 
@@ -119,9 +119,6 @@ class QElectrumApplication(QApplication):
     update_fiat_signal = pyqtSignal()
     alias_received_signal = pyqtSignal()
 
-
-class QNetworkUpdatedSignalObject(QObject):
-    network_updated_signal = pyqtSignal(str, object)
 
 
 class ElectrumGui(BaseElectrumGui, Logger):
@@ -160,7 +157,6 @@ class ElectrumGui(BaseElectrumGui, Logger):
         self.network_dialog = None
         self.lightning_dialog = None
         self.watchtower_dialog = None
-        self.network_updated_signal_obj = QNetworkUpdatedSignalObject()
         self._num_wizards_in_progress = 0
         self._num_wizards_lock = threading.Lock()
         self.dark_icon = self.config.get("dark_icon", True)
@@ -269,7 +265,6 @@ class ElectrumGui(BaseElectrumGui, Logger):
             self.network_dialog.close()
             self.network_dialog.clean_up()
             self.network_dialog = None
-        self.network_updated_signal_obj = None
         if self.lightning_dialog:
             self.lightning_dialog.close()
             self.lightning_dialog = None
@@ -316,14 +311,13 @@ class ElectrumGui(BaseElectrumGui, Logger):
 
     def show_network_dialog(self):
         if self.network_dialog:
-            self.network_dialog.on_update()
+            self.network_dialog.on_event_network_updated()
             self.network_dialog.show()
             self.network_dialog.raise_()
             return
         self.network_dialog = NetworkDialog(
             network=self.daemon.network,
-            config=self.config,
-            network_updated_signal_obj=self.network_updated_signal_obj)
+            config=self.config)
         self.network_dialog.show()
 
     def _create_window_for_wallet(self, wallet):
@@ -408,7 +402,7 @@ class ElectrumGui(BaseElectrumGui, Logger):
                 self.start_new_window(path, uri=None, force_wizard=True)
             return
         if uri:
-            window.pay_to_URI(uri)
+            window.handle_payment_identifier(uri)
         window.bring_to_top()
         window.setWindowState(window.windowState() & ~QtCore.Qt.WindowMinimized | QtCore.Qt.WindowActive)
 

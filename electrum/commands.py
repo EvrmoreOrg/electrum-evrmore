@@ -861,9 +861,9 @@ class Commands:
                 continue
             if change and not wallet.is_change(addr):
                 continue
-            if unused and wallet.is_used(addr):
+            if unused and wallet.adb.is_used(addr):
                 continue
-            if funded and wallet.is_empty(addr):
+            if funded and wallet.adb.is_empty(addr):
                 continue
             item = addr
             if labels or balance:
@@ -992,7 +992,7 @@ class Commands:
                 return False
         amount = satoshis(amount)
         expiration = int(expiration) if expiration else None
-        key = wallet.create_request(amount, memo, expiration, addr, True)
+        key = wallet.create_request(amount, memo, expiration, addr)
         req = wallet.get_request(key)
         return wallet.export_request(req)
 
@@ -1000,7 +1000,7 @@ class Commands:
     async def addtransaction(self, tx, wallet: Abstract_Wallet = None):
         """ Add a transaction to the wallet history """
         tx = Transaction(tx)
-        if not wallet.add_transaction(tx):
+        if not wallet.adb.add_transaction(tx):
             return False
         wallet.save_db()
         return tx.txid()
@@ -1015,9 +1015,9 @@ class Commands:
         wallet.sign_payment_request(address, alias, alias_addr, password)
 
     @command('w')
-    async def rmrequest(self, address, wallet: Abstract_Wallet = None):
+    async def delete_request(self, address, wallet: Abstract_Wallet = None):
         """Remove a payment request"""
-        return wallet.remove_payment_request(address)
+        return wallet.delete_request(address)
 
     @command('w')
     async def clear_requests(self, wallet: Abstract_Wallet = None):
@@ -1075,11 +1075,11 @@ class Commands:
         """
         if not is_hash256_str(txid):
             raise Exception(f"{repr(txid)} is not a txid")
-        height = wallet.get_tx_height(txid).height
+        height = wallet.adb.get_tx_height(txid).height
         if height != TX_HEIGHT_LOCAL:
             raise Exception(f'Only local transactions can be removed. '
                             f'This tx has height: {height} != {TX_HEIGHT_LOCAL}')
-        wallet.remove_transaction(txid)
+        wallet.adb.remove_transaction(txid)
         wallet.save_db()
 
     @command('wn')
@@ -1092,7 +1092,7 @@ class Commands:
         if not wallet.db.get_transaction(txid):
             raise Exception("Transaction not in wallet.")
         return {
-            "confirmations": wallet.get_tx_height(txid).conf,
+            "confirmations": wallet.adb.get_tx_height(txid).conf,
         }
 
     @command('')
@@ -1396,9 +1396,104 @@ class Commands:
     def getassetdata(self, name):
         return self.network.run_from_another_thread(self.network.get_meta_for_asset(name))
 
-    @command('n')
-    def getserverpeers(self):
-        return self.network.interface.session.send_request('server.peers.subscribe')
+    @command('wl')
+    async def import_channel_backup(self, encrypted, wallet: Abstract_Wallet = None):
+        return wallet.lnworker.import_channel_backup(encrypted)
+
+    @command('wnl')
+    async def get_channel_ctx(self, channel_point, iknowwhatimdoing=False, wallet: Abstract_Wallet = None):
+        """ return the current commitment transaction of a channel """
+        if not iknowwhatimdoing:
+            raise Exception("WARNING: this command is potentially unsafe.\n"
+                            "To proceed, try again, with the --iknowwhatimdoing option.")
+        txid, index = channel_point.split(':')
+        chan_id, _ = channel_id_from_funding_tx(txid, int(index))
+        chan = wallet.lnworker.channels[chan_id]
+        tx = chan.force_close_tx()
+        return tx.serialize()
+
+    @command('wnl')
+    async def get_watchtower_ctn(self, channel_point, wallet: Abstract_Wallet = None):
+        """ return the local watchtower's ctn of channel. used in regtests """
+        return await self.network.local_watchtower.sweepstore.get_ctn(channel_point, None)
+
+    @command('wnl')
+    async def rebalance_channels(self, from_scid, dest_scid, amount, wallet: Abstract_Wallet = None):
+        """
+        Rebalance channels.
+        If trampoline is used, channels must be with diferent trampolines.
+        """
+        from .lnutil import ShortChannelID
+        from_scid = ShortChannelID.from_str(from_scid)
+        dest_scid = ShortChannelID.from_str(dest_scid)
+        from_channel = wallet.lnworker.get_channel_by_scid(from_scid)
+        dest_channel = wallet.lnworker.get_channel_by_scid(dest_scid)
+        amount_sat = satoshis(amount)
+        success, log = await wallet.lnworker.rebalance_channels(from_channel, dest_channel, amount_sat * 1000)
+        return {
+            'success': success,
+            'log': [x.formatted_tuple() for x in log]
+        }
+
+    @command('wnpl')
+    async def normal_swap(self, onchain_amount, lightning_amount, password=None, wallet: Abstract_Wallet = None):
+        """
+        Normal submarine swap: send on-chain BTC, receive on Lightning
+        Note that your funds will be locked for 24h if you do not have enough incoming capacity.
+        """
+        sm = wallet.lnworker.swap_manager
+        if lightning_amount == 'dryrun':
+            await sm.get_pairs()
+            onchain_amount_sat = satoshis(onchain_amount)
+            lightning_amount_sat = sm.get_recv_amount(onchain_amount_sat, is_reverse=False)
+            txid = None
+        elif onchain_amount == 'dryrun':
+            await sm.get_pairs()
+            lightning_amount_sat = satoshis(lightning_amount)
+            onchain_amount_sat = sm.get_send_amount(lightning_amount_sat, is_reverse=False)
+            txid = None
+        else:
+            lightning_amount_sat = satoshis(lightning_amount)
+            onchain_amount_sat = satoshis(onchain_amount)
+            txid = await wallet.lnworker.swap_manager.normal_swap(
+                lightning_amount_sat=lightning_amount_sat,
+                expected_onchain_amount_sat=onchain_amount_sat,
+                password=password,
+            )
+        return {
+            'txid': txid,
+            'lightning_amount': format_satoshis(lightning_amount_sat),
+            'onchain_amount': format_satoshis(onchain_amount_sat),
+        }
+
+    @command('wnl')
+    async def reverse_swap(self, lightning_amount, onchain_amount, wallet: Abstract_Wallet = None):
+        """Reverse submarine swap: send on Lightning, receive on-chain
+        """
+        sm = wallet.lnworker.swap_manager
+        if onchain_amount == 'dryrun':
+            await sm.get_pairs()
+            lightning_amount_sat = satoshis(lightning_amount)
+            onchain_amount_sat = sm.get_recv_amount(lightning_amount_sat, is_reverse=True)
+            success = None
+        elif lightning_amount == 'dryrun':
+            await sm.get_pairs()
+            onchain_amount_sat = satoshis(onchain_amount)
+            lightning_amount_sat = sm.get_send_amount(onchain_amount_sat, is_reverse=True)
+            success = None
+        else:
+            lightning_amount_sat = satoshis(lightning_amount)
+            claim_fee = sm.get_claim_fee()
+            onchain_amount_sat = satoshis(onchain_amount) + claim_fee
+            success = await wallet.lnworker.swap_manager.reverse_swap(
+                lightning_amount_sat=lightning_amount_sat,
+                expected_onchain_amount_sat=onchain_amount_sat,
+            )
+        return {
+            'success': success,
+            'lightning_amount': format_satoshis(lightning_amount_sat),
+            'onchain_amount': format_satoshis(onchain_amount_sat),
+        }
 
 
 def eval_bool(x: str) -> bool:
@@ -1610,9 +1705,8 @@ def get_parser():
     subparsers = parser.add_subparsers(dest='cmd', metavar='<command>')
     # gui
     parser_gui = subparsers.add_parser('gui', description="Run Electrum's Graphical User Interface.", help="Run GUI (default)")
-    # TODO: Are ravencoin urls a thing?
-    # parser_gui.add_argument("url", nargs='?', default=None, help="bitcoin URI (or bip70 file)")
-    parser_gui.add_argument("-g", "--gui", dest="gui", help="select graphical user interface", choices=['qt', 'kivy', 'text', 'stdio'])
+    #parser_gui.add_argument("url", nargs='?', default=None, help="bitcoin URI (or bip70 file)")
+    parser_gui.add_argument("-g", "--gui", dest="gui", help="select graphical user interface", choices=['qt'])#, 'kivy', 'text', 'stdio', 'qml'])
     parser_gui.add_argument("-m", action="store_true", dest="hide_gui", default=False, help="hide GUI on startup")
     parser_gui.add_argument("-L", "--lang", dest="language", default=None, help="default language used in GUI")
     parser_gui.add_argument("--daemon", action="store_true", dest="daemon", default=False, help="keep daemon running after GUI is closed")

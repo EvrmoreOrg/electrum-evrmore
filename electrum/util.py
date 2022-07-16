@@ -157,8 +157,14 @@ class NoDynamicFeeEstimates(Exception):
 
 
 class InvalidPassword(Exception):
+    def __init__(self, message: Optional[str] = None):
+        self.message = message
+
     def __str__(self):
-        return _("Incorrect password")
+        if self.message is None:
+            return _("Incorrect password")
+        else:
+            return str(self.message)
 
 
 class AddTransactionException(Exception):
@@ -730,7 +736,7 @@ def profiler(func):
         t0 = time.time()
         o = func(*args, **kw_args)
         t = time.time() - t0
-        _profiler_logger.debug(f"{name} {t:,.4f}")
+        _profiler_logger.debug(f"{name} {t:,.4f} sec")
         return o
 
     return lambda *args, **kw_args: do_profile(args, kw_args)
@@ -742,7 +748,8 @@ def android_ext_dir():
 
 
 def android_backup_dir():
-    d = os.path.join(android_ext_dir(), 'org.electrum.electrum')
+    pkgname = get_android_package_name()
+    d = os.path.join(android_ext_dir(), pkgname)
     if not os.path.exists(d):
         os.mkdir(d)
     return d
@@ -816,6 +823,26 @@ def get_new_wallet_name(wallet_folder: str) -> str:
         else:
             break
     return filename
+
+
+def is_android_debug_apk() -> bool:
+    is_android = 'ANDROID_DATA' in os.environ
+    if not is_android:
+        return False
+    from jnius import autoclass
+    pkgname = get_android_package_name()
+    build_config = autoclass(f"{pkgname}.BuildConfig")
+    return bool(build_config.DEBUG)
+
+
+def get_android_package_name() -> str:
+    is_android = 'ANDROID_DATA' in os.environ
+    assert is_android
+    from jnius import autoclass
+    from android.config import ACTIVITY_CLASS_NAME
+    activity = autoclass(ACTIVITY_CLASS_NAME).mActivity
+    pkgname = str(activity.getPackageName())
+    return pkgname
 
 
 def assert_bytes(*args):
@@ -1422,7 +1449,7 @@ def create_bip21_uri(addr, amount_sat: Optional[int], message: Optional[str],
     return str(urllib.parse.urlunparse(p))
 
 
-def maybe_extract_bolt11_invoice(data: str) -> Optional[str]:
+def maybe_extract_lightning_payment_identifier(data: str) -> Optional[str]:
     data = data.strip()  # whitespaces
     data = data.lower()
     if data.startswith(LIGHTNING_URI_SCHEME + ':ln'):
@@ -1431,6 +1458,14 @@ def maybe_extract_bolt11_invoice(data: str) -> Optional[str]:
     if data.startswith('ln'):
         return data
     return None
+
+
+def is_uri(data: str) -> bool:
+    data = data.lower()
+    if (data.startswith(LIGHTNING_URI_SCHEME + ":") or
+            data.startswith(BITCOIN_BIP21_URI_SCHEME + ':')):
+        return True
+    return False
 
 
 # Python bug (http://bugs.python.org/issue1927) causes raw_input
@@ -1961,10 +1996,10 @@ class CallbackManager:
         self.callbacks = defaultdict(list)  # note: needs self.callback_lock
         self.asyncio_loop = None
 
-    def register_callback(self, callback, events):
+    def register_callback(self, func, events):
         with self.callback_lock:
             for event in events:
-                self.callbacks[event].append(callback)
+                self.callbacks[event].append(func)
 
     def unregister_callback(self, callback):
         with self.callback_lock:
@@ -1985,19 +2020,50 @@ class CallbackManager:
         for callback in callbacks:
             # FIXME: if callback throws, we will lose the traceback
             if asyncio.iscoroutinefunction(callback):
-                asyncio.run_coroutine_threadsafe(callback(event, *args), self.asyncio_loop)
+                asyncio.run_coroutine_threadsafe(callback(*args), self.asyncio_loop)
             elif get_running_loop() == self.asyncio_loop:
                 # run callback immediately, so that it is guaranteed
                 # to have been executed when this method returns
-                callback(event, *args)
+                callback(*args)
             else:
-                self.asyncio_loop.call_soon_threadsafe(callback, event, *args)
+                self.asyncio_loop.call_soon_threadsafe(callback, *args)
 
 
 callback_mgr = CallbackManager()
 trigger_callback = callback_mgr.trigger_callback
 register_callback = callback_mgr.register_callback
 unregister_callback = callback_mgr.unregister_callback
+_event_listeners = defaultdict(set)  # type: Dict[str, Set[str]]
+
+
+class EventListener:
+
+    def _list_callbacks(self):
+        for c in self.__class__.__mro__:
+            classpath = f"{c.__module__}.{c.__name__}"
+            for method_name in _event_listeners[classpath]:
+                method = getattr(self, method_name)
+                assert callable(method)
+                assert method_name.startswith('on_event_')
+                yield method_name[len('on_event_'):], method
+
+    def register_callbacks(self):
+        for name, method in self._list_callbacks():
+            _logger.info(f'registering callback {method}')
+            register_callback(method, [name])
+
+    def unregister_callbacks(self):
+        for name, method in self._list_callbacks():
+            _logger.info(f'unregistering callback {method}')
+            unregister_callback(method)
+
+
+def event_listener(func):
+    classname, method_name = func.__qualname__.split('.')
+    assert method_name.startswith('on_event_')
+    classpath = f"{func.__module__}.{classname}"
+    _event_listeners[classpath].add(method_name)
+    return func
 
 _NetAddrType = TypeVar("_NetAddrType")
 

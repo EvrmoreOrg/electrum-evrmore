@@ -1583,7 +1583,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             freeze_locktime=None,
             for_swap=False,
             locking_script_overrides=None,
-            force_same_change_addr=False) -> PartialTransaction:
+        ) -> PartialTransaction:
 
         if not coins and not inputs:  # any bitcoin tx must have at least 1 input by consensus
             raise NotEnoughFunds()
@@ -1666,12 +1666,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             
             # change address. if empty, coin_chooser will set it
             change_addrs = self.get_change_addresses_for_new_transaction(change_addr or old_change_addrs,
-                                extra_addresses=extra_addresses if not force_same_change_addr else 0)
-
-            if change_addrs and force_same_change_addr:
-                change_addrs = change_addrs[:1]
-                while len(change_addrs) < extra_addresses + 1:  # Minimum amount of needed declaired addresses
-                    change_addrs.append(change_addrs[0])
+                                extra_addresses=extra_addresses)
 
             tx = coin_chooser.make_tx(
                 coins=coins,

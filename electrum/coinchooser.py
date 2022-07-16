@@ -231,11 +231,6 @@ class CoinChooserBase(Logger):
             remaining = change_amount_asset
             amounts = []
 
-            # Last change output.  Round down to maximum precision but lose
-            # no more than 10**max_dp_to_round_for_privacy
-            # e.g. a max of 2 decimal places means losing 100 satoshis to fees
-            N = int(pow(10, min(0, zeroes[0])))
-            amount = (remaining // N) * N
             amounts.append(amount)
 
             assert sum(amounts) == change_amount_asset
@@ -304,7 +299,7 @@ class CoinChooserBase(Logger):
 
         assert sum(amounts) <= change_amount_rvn
 
-        ret_amt += [(None, amount) for amount in amounts]
+        ret_amt += [(None, amount) for amount in amounts if amount > 0]
 
         return ret_amt
 
@@ -314,7 +309,11 @@ class CoinChooserBase(Logger):
         amounts = self._change_amounts(tx, max(1, len(change_addrs) - coinbase_vouts - len(tx.outputs())), fee_estimator_numchange, asset_divs)
         
         assert all([t[1] >= 0 for t in amounts])
-        assert len(change_addrs) >= len(amounts) - (1 if has_return else 0)
+
+        # Let the amounts sort themselves out and force change addrs accordingly
+        while len(change_addrs) < len(amounts):
+            change_addrs.append(change_addrs[0])
+
         assert all([isinstance(amt, Tuple) for amt in amounts])
         # If change is above dust threshold after accounting for the
         # size of the change output, add it to the transaction.

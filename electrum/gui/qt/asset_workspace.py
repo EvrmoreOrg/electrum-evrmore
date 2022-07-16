@@ -410,7 +410,7 @@ class AssetCreateWorkspace(QWidget):
     def refresh_owners(self):
         confirmed, unconfirmed, _ = self.parent.wallet.get_balance()
         owned_assets = confirmed.assets
-        in_mempool = self.parent.wallet.get_assets_in_mempool()
+        in_mempool = self.parent.wallet.adb.get_assets_in_mempool()
         owners = [n for n in owned_assets.keys() if
                   n[-1] == '!' and owned_assets.get(n, 0) != 0]
         indexes_in_mempool = set()
@@ -590,7 +590,7 @@ class AssetReissueWorkspace(QWidget):
                 self.reset_gui()
             else:
                 asset = self.aval_owner_options[i]
-                m = self.current_asset_meta = self.parent.wallet.get_asset_meta(asset)
+                m = self.current_asset_meta = self.parent.wallet.adb.get_asset_meta(asset)
 
                 if not m:
                     # Edge case where we have the ownership asset, but not the normal asset
@@ -885,7 +885,7 @@ class AssetReissueWorkspace(QWidget):
     def refresh_owners(self):
         confirmed, unconfirmed, _ = self.parent.wallet.get_balance()
         owned_assets = confirmed.assets
-        in_mempool = self.parent.wallet.get_assets_in_mempool()
+        in_mempool = self.parent.wallet.adb.get_assets_in_mempool()
 
         owners = [n for n in owned_assets.keys() if
                   n[-1] == '!' and owned_assets.get(n, 0) != 0]
@@ -897,7 +897,7 @@ class AssetReissueWorkspace(QWidget):
             if i == 0:
                 continue
             asset = new_aval_owner_options[i]
-            meta = self.parent.wallet.get_asset_meta(asset)  # type: AssetMeta
+            meta = self.parent.wallet.adb.get_asset_meta(asset)  # type: AssetMeta
             if not meta:
                 continue
             else:

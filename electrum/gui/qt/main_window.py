@@ -472,19 +472,21 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
 
     @qt_event_listener
     def on_event_gossip_db_loaded(self, *args):
-        self.channels_list.gossip_db_loaded.emit(*args)
+        pass
+        # self.channels_list.gossip_db_loaded.emit(*args)
 
     @qt_event_listener
     def on_event_channels_updated(self, *args):
         wallet = args[0]
         if wallet == self.wallet:
-            self.channels_list.update_rows.emit(*args)
+            pass
+            #self.channels_list.update_rows.emit(*args)
 
     @qt_event_listener
     def on_event_channel(self, *args):
         wallet = args[0]
         if wallet == self.wallet:
-            self.channels_list.update_single_row.emit(*args)
+            # self.channels_list.update_single_row.emit(*args)
             self.update_status()
 
     @qt_event_listener
@@ -528,7 +530,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         self.update_console()
         self.receive_tab.do_clear()
         self.receive_tab.request_list.update()
-        self.channels_list.update()
+        #self.channels_list.update()
         self.tabs.show()
         self.init_geometry()
         if self.config.get('hide_gui') and self.gui_object.tray.isVisible():
@@ -1132,8 +1134,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         self.contact_list.update()
         #self.channels_list.update_rows.emit(wallet)
         self.update_completions()
-        self.refresh_send_tab()
-        if self.wallet.wallet_type not in ('imported, xpub'):
+        #self.refresh_send_tab()
+        if self.wallet.wallet_type not in ('imported, xpub', 'hw'):
             self.create_workspace.refresh_owners()
             self.reissue_workspace.refresh_owners()
 
@@ -1652,7 +1654,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         tabwidget.addTab(internal_tab, _("Create Swap"))
         tabwidget.addTab(w5, _("My Swaps"))
         return tabwidget
-
+    '''
     def create_assets_tab(self):
 
         from .asset_view import AssetView
@@ -1772,7 +1774,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         )
 
         self.create_workspace.reset_workspace()
-
+    '''
     def get_asset_from_spend_tab(self) -> Optional[str]:
         combo_index = self.to_send_combo.currentIndex()
         if combo_index != 0:

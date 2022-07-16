@@ -119,12 +119,12 @@ class UTXOList(MyTreeView):
             coins = [self._utxo_dict[x] for x in self._spend_set]
             coins = self._filter_frozen_coins(coins)
             amount = sum((x.value_sats() for x in coins), RavenValue())
-            amount_str = self.parent.format_amount_and_units(amount.rvn_value.value)
+            amount_str = self.parent.format_amount_and_units(amount)
             num_outputs_str = _("{} outputs available ({} total)").format(len(coins), len(self._utxo_dict))
             self.parent.set_coincontrol_msg(_("Coin control active") + f': {num_outputs_str}, {amount_str}')
         else:
             self.parent.set_coincontrol_msg(None)
-        self.parent.refresh_send_tab()
+        #self.parent.refresh_send_tab()
 
     def refresh_row(self, key, row):
         assert row is not None

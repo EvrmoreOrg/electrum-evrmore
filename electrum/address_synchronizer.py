@@ -925,6 +925,12 @@ class AddressSynchronizer(Logger, EventListener):
         received, sent = self.get_addr_io(address)
         return sum([v for height, v, is_cb in received.values()])
 
+    def get_assets_in_mempool(self) -> Set[str]:
+        ret_val = set()
+        _, unconfirmed, _ = self.get_balance(self.get_addresses())
+        ret_val.update(unconfirmed.assets.keys())
+        return ret_val
+
     @with_local_height_cached
     def get_balance(self, domain, *, excluded_addresses: Set[str] = None,
                     excluded_coins: Set[str] = None) -> Tuple[RavenValue, RavenValue, RavenValue]:

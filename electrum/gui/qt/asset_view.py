@@ -478,7 +478,7 @@ class AssetList(MyTreeView):
         asset = self.model().index(idx.row(), self.Columns.NAME).data(self.ROLE_ASSET_STR)
         
         unverified_meta = self.wallet.get_unverified_asset_meta(asset)
-        meta = self.wallet.get_asset_meta(asset)
+        meta = self.wallet.adb.get_asset_meta(asset)
         if unverified_meta or meta:
             self.view.data_viewer.update_view(meta, unverified_meta)
 
@@ -491,7 +491,7 @@ class AssetList(MyTreeView):
 
         asset = self.model().index(idx.row(), self.Columns.NAME).data(self.ROLE_ASSET_STR)
 
-        meta = self.wallet.get_asset_meta(asset)
+        meta = self.wallet.adb.get_asset_meta(asset)
 
         if not meta or not meta.ipfs_str:
             return
@@ -604,7 +604,7 @@ class AssetList(MyTreeView):
 
         menu.addAction(_('Send {}').format(asset), lambda: send_asset(asset))
         
-        meta: AssetMeta = self.wallet.get_asset_meta(asset)
+        meta: AssetMeta = self.wallet.adb.get_asset_meta(asset)
 
         if meta and meta.ipfs_str:
             try:
@@ -1012,6 +1012,6 @@ class AssetView(QSplitter):
     def update(self):
         self.asset_list.update()
         if self.data_viewer.current_meta:
-            new_meta = self.main_window.wallet.get_asset_meta(self.data_viewer.current_meta.name)
+            new_meta = self.main_window.wallet.adb.get_asset_meta(self.data_viewer.current_meta.name)
             if new_meta:
                 self.data_viewer.update_view(new_meta, None)

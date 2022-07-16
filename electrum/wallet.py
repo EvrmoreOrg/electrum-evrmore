@@ -1110,7 +1110,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                 for conf, v in reversed(sorted(confs_and_values)):
                     vsum += v
                     # TODO: Only RVN, invoice requests currently do not have assets
-                    if vsum.rvn_value.value >= invoice_amt:
+                    if vsum.rvn_value.value >= invoice_amt.rvn_value.value:
                         conf_needed = min(conf_needed, conf) if conf_needed is not None else conf
                         break
                 else:

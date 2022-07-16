@@ -280,7 +280,7 @@ class Synchronizer(SynchronizerBase):
 
     async def _on_asset_status(self, asset, status):
         self.logger.info(f'notified of asset {asset}')
-        data = self.wallet.db.get_asset_meta(asset)
+        data = self.adb.db.get_asset_meta(asset)
         if asset_status(data) == status:
             return
         if (asset, status) in self.requested_asset_metas:
@@ -303,7 +303,7 @@ class Synchronizer(SynchronizerBase):
 
         else:
             self._stale_histories.pop(asset, asyncio.Future()).cancel()
-            self.wallet.recieve_asset_callback(asset, result)
+            self.adb.recieve_asset_callback(asset, result)
 
         self.requested_asset_metas.discard((asset, status))
 
@@ -359,7 +359,7 @@ class Synchronizer(SynchronizerBase):
         for addr in random_shuffled_copy(self.adb.get_addresses()):
             await self._add_address(addr)
         # Ensure we have asset meta
-        assets = sum(self.wallet.get_balance(), RavenValue()).assets.keys()
+        assets = self.adb.get_assets()
         for asset in assets:
             await self._add_asset(asset)
         # main loop

@@ -25,7 +25,7 @@ from electrum.logging import Logger
 from electrum.lnaddr import lndecode, LnInvoiceException
 from electrum.lnurl import decode_lnurl, request_lnurl, callback_lnurl, LNURLError, LNURL6Data
 
-from .amountedit import AmountEdit, BTCAmountEdit, SizedFreezableLineEdit
+from .amountedit import AmountEdit, RVNAmountEdit, SizedFreezableLineEdit
 from .util import WaitingDialog, HelpLabel, MessageBoxMixin, EnterButton
 from .confirm_tx_dialog import ConfirmTxDialog
 from .transaction_dialog import PreviewTxDialog
@@ -71,7 +71,7 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         grid.setColumnStretch(3, 1)
 
         from .paytoedit import PayToEdit
-        self.amount_e = BTCAmountEdit(self.window.get_decimal_point)
+        self.amount_e = RVNAmountEdit(self.window.get_decimal_point)
         self.payto_e = PayToEdit(self)
         msg = (_("Recipient of the funds.") + "\n\n"
                + _("You may enter a Bitcoin address, a label from your list of contacts "

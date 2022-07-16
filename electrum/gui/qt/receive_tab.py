@@ -9,14 +9,14 @@ from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtWidgets import (QComboBox, QLabel, QVBoxLayout, QGridLayout, QLineEdit,
                              QHBoxLayout, QPushButton, QWidget, QSizePolicy)
 
-from electrum.bitcoin import is_address
+from electrum.ravencoin import is_address
 from electrum.i18n import _
 from electrum.util import InvoiceError
 from electrum.invoices import PR_DEFAULT_EXPIRATION_WHEN_CREATING
 from electrum.invoices import PR_EXPIRED, pr_expiration_values
 from electrum.logging import Logger
 
-from .amountedit import AmountEdit, BTCAmountEdit, SizedFreezableLineEdit
+from .amountedit import AmountEdit, RVNAmountEdit, SizedFreezableLineEdit
 from .qrcodewidget import QRCodeWidget
 from .util import read_QIcon, ColorScheme, HelpLabel, WWLabel, MessageBoxMixin, MONOSPACE_FONT
 from .util import ButtonsTextEdit
@@ -47,7 +47,7 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
         grid.addWidget(QLabel(_('Description')), 0, 0)
         grid.addWidget(self.receive_message_e, 0, 1, 1, 4)
 
-        self.receive_amount_e = BTCAmountEdit(self.window.get_decimal_point)
+        self.receive_amount_e = RVNAmountEdit(self.window.get_decimal_point)
         grid.addWidget(QLabel(_('Requested amount')), 1, 0)
         grid.addWidget(self.receive_amount_e, 1, 1)
 

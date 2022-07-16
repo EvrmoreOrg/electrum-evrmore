@@ -79,7 +79,7 @@ from electrum.lnaddr import lndecode
 from .asset_workspace import AssetCreateWorkspace, AssetReissueWorkspace
 
 from .exception_window import Exception_Hook
-from .amountedit import BTCAmountEdit
+from .amountedit import RVNAmountEdit
 from .qrcodewidget import QRDialog
 from .qrtextedit import ShowQRTextEdit, ScanQRTextEdit, ScanShowQRTextEdit
 from .transaction_dialog import show_transaction

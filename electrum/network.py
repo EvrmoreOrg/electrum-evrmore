@@ -32,7 +32,7 @@ import socket
 import json
 import sys
 import asyncio
-from typing import NamedTuple, Optional, Sequence, List, Dict, Tuple, TYPE_CHECKING, Iterable, Set, Any
+from typing import NamedTuple, Optional, Sequence, List, Dict, Tuple, TYPE_CHECKING, Iterable, Set, Any, TypeVar
 import traceback
 import concurrent
 from concurrent import futures
@@ -64,6 +64,8 @@ from .i18n import _
 from .logging import get_logger, Logger
 
 if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
     from .channel_db import ChannelDB
     from .lnrouter import LNPathFinder
     from .lnworker import LNGossip
@@ -77,6 +79,8 @@ _logger = get_logger(__name__)
 NUM_TARGET_CONNECTED_SERVERS = 10
 NUM_STICKY_SERVERS = 4
 NUM_RECENT_SERVERS = 20
+
+T = TypeVar('T')
 
 
 def parse_servers(result: Sequence[Tuple[str, str, List[str]]]) -> Dict[str, dict]:
@@ -348,7 +352,7 @@ class Network(Logger, NetworkRetryManager[ServerAddr]):
         if self.config.get('run_watchtower', False):
             from . import lnwatcher
             self.local_watchtower = lnwatcher.WatchTower(self)
-            self.local_watchtower.start_network(self)
+            self.local_watchtower.adb.start_network(self)
             asyncio.ensure_future(self.local_watchtower.start_watching())
 
     def has_internet_connection(self) -> bool:
@@ -382,7 +386,7 @@ class Network(Logger, NetworkRetryManager[ServerAddr]):
             self.path_finder = None
 
     @classmethod
-    def run_from_another_thread(cls, coro, *, timeout=None):
+    def run_from_another_thread(cls, coro: 'Coroutine[Any, Any, T]', *, timeout=None) -> T:
         loop = util.get_asyncio_loop()
         assert util.get_running_loop() != loop, 'must not be called from asyncio thread'
         fut = asyncio.run_coroutine_threadsafe(coro, loop)
@@ -924,13 +928,15 @@ class Network(Logger, NetworkRetryManager[ServerAddr]):
             self.logger.info(f"unexpected txid for broadcast_transaction [DO NOT TRUST THIS MESSAGE]: {out} != {tx.txid()}")
             raise TxBroadcastHashMismatch(_("Server returned unexpected transaction ID."))
 
-    async def try_broadcasting(self, tx, name):
+    async def try_broadcasting(self, tx, name) -> bool:
         try:
             await self.broadcast_transaction(tx)
         except Exception as e:
             self.logger.info(f'error: could not broadcast {name} {tx.txid()}, {str(e)}')
+            return False
         else:
             self.logger.info(f'success: broadcasting {name} {tx.txid()}')
+            return True
 
     @staticmethod
     def sanitize_tx_broadcast_response(server_msg) -> str:
@@ -1305,9 +1311,15 @@ class Network(Logger, NetworkRetryManager[ServerAddr]):
             await asyncio.sleep(0.1)
 
     @classmethod
-    async def _send_http_on_proxy(cls, method: str, url: str, params: str = None,
-                                  body: bytes = None, json: dict = None, headers=None,
-                                  on_finish=None, timeout=None):
+    async def async_send_http_on_proxy(
+            cls, method: str, url: str, *,
+            params: dict = None,
+            body: bytes = None,
+            json: dict = None,
+            headers=None,
+            on_finish=None,
+            timeout=None,
+    ):
         async def default_on_finish(resp: ClientResponse):
             resp.raise_for_status()
             return await resp.text()
@@ -1340,7 +1352,7 @@ class Network(Logger, NetworkRetryManager[ServerAddr]):
             loop = network.asyncio_loop
         else:
             loop = util.get_asyncio_loop()
-        coro = asyncio.run_coroutine_threadsafe(cls._send_http_on_proxy(method, url, **kwargs), loop)
+        coro = asyncio.run_coroutine_threadsafe(cls.async_send_http_on_proxy(method, url, **kwargs), loop)
         # note: _send_http_on_proxy has its own timeout, so no timeout here:
         return coro.result()
 

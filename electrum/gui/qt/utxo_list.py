@@ -127,6 +127,7 @@ class UTXOList(MyTreeView):
         self.parent.refresh_send_tab()
 
     def refresh_row(self, key, row):
+        assert row is not None
         utxo = self._utxo_dict[key]
         utxo_item = [self.std_model.item(row, col) for col in self.Columns]
         address = utxo.address

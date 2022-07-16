@@ -35,12 +35,12 @@ from PyQt5.QtWidgets import (QComboBox,  QTabWidget, QDialog,
 
 from electrum.i18n import _, languages
 from electrum import util, coinchooser, paymentrequest
-from electrum.util import base_units_list, get_ipfs_path
+from electrum.util import base_units_list, event_listener
 
 from electrum.gui import messages
 
-from .util import (ColorScheme, EnterButton, WindowModalDialog, HelpLabel, Buttons,
-                   CloseButton)
+from .util import (ColorScheme, WindowModalDialog, HelpLabel, Buttons,
+                   CloseButton, QtEventListener)
 
 
 if TYPE_CHECKING:
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from .main_window import ElectrumWindow
 
 
-class SettingsDialog(QDialog):
+class SettingsDialog(QDialog, QtEventListener):
 
     def __init__(self, window: 'ElectrumWindow', config: 'SimpleConfig'):
         QDialog.__init__(self)
@@ -62,8 +62,8 @@ class SettingsDialog(QDialog):
         self.save_whitelist = False
         self.fx = window.fx
         self.wallet = window.wallet
-        
-        util.register_callback(self.on_network_callback, ['alias_received'])
+
+        self.register_callbacks()
         self.app.alias_received_signal.connect(self.set_alias_color)
 
         vbox = QVBoxLayout()
@@ -752,10 +752,10 @@ class SettingsDialog(QDialog):
         vbox.addStretch(1)
         vbox.addLayout(Buttons(CloseButton(self)))
         self.setLayout(vbox)
-        
-    def on_network_callback(self, cb):
-        if cb == 'alias_received':
-            self.app.alias_received_signal.emit()
+
+    @event_listener
+    def on_event_alias_received(self):
+        self.app.alias_received_signal.emit()
 
     def set_alias_color(self):
         if not self.config.get('alias'):
@@ -773,3 +773,11 @@ class SettingsDialog(QDialog):
         self.config.set_key('alias', alias, True)
         if alias:
             self.wallet.contacts.fetch_openalias(self.config)
+
+    def closeEvent(self, event):
+        self.unregister_callbacks()
+        try:
+            self.app.alias_received_signal.disconnect(self.set_alias_color)
+        except TypeError:
+            pass  # 'method' object is not connected
+        event.accept()

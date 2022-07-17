@@ -117,6 +117,10 @@ class TxOutput:
         self.asset = asset
 
     @property
+    def raven_value(self) -> RavenValue:
+        return RavenValue(0, {self.asset: self._value}) if self.asset else RavenValue(self._value)
+
+    @property
     def value(self) -> Union[int, str]:
         return self._value
 

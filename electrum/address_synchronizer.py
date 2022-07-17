@@ -832,12 +832,12 @@ class AddressSynchronizer(Logger, EventListener):
             delta += v
         return delta
 
-    def get_tx_fee(self, txid: str) -> Optional[int]:
+    def get_tx_fee(self, txid: str) -> Optional[RavenValue]:
         """ Returns tx_fee or None. Use server fee only if tx is unconfirmed and not mine"""
         # check if stored fee is available
         fee = self.db.get_tx_fee(txid, trust_server=False)
         if fee is not None:
-            return fee
+            return RavenValue(fee)
         # delete server-sent fee for confirmed txns
         confirmed = self.get_tx_height(txid).conf > 0
         if confirmed:
@@ -851,14 +851,15 @@ class AddressSynchronizer(Logger, EventListener):
             assert num_ismine_inputs <= num_all_inputs, (num_ismine_inputs, num_all_inputs)
             # trust server if tx is unconfirmed and not mine
             if num_ismine_inputs < num_all_inputs:
-                return None if confirmed else self.db.get_tx_fee(txid, trust_server=True)
+                fee_int = self.db.get_tx_fee(txid, trust_server=True)
+                return None if confirmed or fee_int is None else RavenValue(fee_int)
         # lookup tx and deserialize it.
         # note that deserializing is expensive, hence above hacks
         tx = self.db.get_transaction(txid)
         if not tx:
             return None
         # compute fee if possible
-        v_in = v_out = 0
+        v_in = v_out = RavenValue()
         with self.lock, self.transaction_lock:
             for txin in tx.inputs():
                 addr = self.get_txin_address(txin)
@@ -868,13 +869,13 @@ class AddressSynchronizer(Logger, EventListener):
                 elif v_in is not None:
                     v_in += value
             for txout in tx.outputs():
-                v_out += txout.value
+                v_out += txout.raven_value
         if v_in is not None:
             fee = v_in - v_out
         else:
             fee = None
         # save result
-        self.db.add_tx_fee_we_calculated(txid, fee)
+        self.db.add_tx_fee_we_calculated(txid, fee.rvn_value.value if fee else None)
         self.db.add_num_inputs_to_tx(txid, len(tx.inputs()))
         return fee
 

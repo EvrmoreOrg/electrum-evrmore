@@ -151,7 +151,7 @@ def try_ask_to_save(parent, ipfs, url, viewer):
     if parent.config.get('download_all_ipfs', False) or not parent.config.get('ask_download_ipfs', True):
         return
 
-    ipfs_information: IPFSData = parent.wallet.get_ipfs_information(ipfs)
+    ipfs_information: IPFSData = parent.wallet.adb.get_ipfs_information(ipfs)
     if ipfs_information and ipfs_information.byte_length and (ipfs_information.byte_length > parent.config.get('max_ipfs_size', 1024 * 1024 * 10) or \
                                 ipfs_information.mime_type not in VIEWABLE_MIMES):
         return
@@ -477,7 +477,7 @@ class AssetList(MyTreeView):
         # Get the name from 1st column
         asset = self.model().index(idx.row(), self.Columns.NAME).data(self.ROLE_ASSET_STR)
         
-        unverified_meta = self.wallet.get_unverified_asset_meta(asset)
+        unverified_meta = self.wallet.adb.get_unverified_asset_meta(asset)
         meta = self.wallet.adb.get_asset_meta(asset)
         if unverified_meta or meta:
             self.view.data_viewer.update_view(meta, unverified_meta)
@@ -875,7 +875,7 @@ class MetadataViewer(QFrame):
                 self.view_ipfs_button.setVisible(True)
                 self.ipfs_predicted.setText(_('Loading data...'))
 
-                ipfs_data: IPFSData = self.wallet.get_ipfs_information(meta.ipfs_str)
+                ipfs_data: IPFSData = self.wallet.adb.get_ipfs_information(meta.ipfs_str)
                 if ipfs_data:
                     self.ipfs_predicted.setText('Predicted Content Type: {}\nPredicted Size: {}'.format(ipfs_data.mime_type or _('Unknown'), human_readable_size(ipfs_data.byte_length)))
                     if ipfs_data.is_cached:

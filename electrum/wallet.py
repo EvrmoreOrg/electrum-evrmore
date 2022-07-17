@@ -261,7 +261,7 @@ class TxWalletDelta(NamedTuple):
     is_relevant: bool  # "related to wallet?"
     is_any_input_ismine: bool
     is_all_input_ismine: bool
-    delta: int
+    delta: RavenValue
     fee: Optional[int]
 
 class TxWalletDetails(NamedTuple):
@@ -715,7 +715,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
         """
         is_relevant = False  # "related to wallet?"
         num_input_ismine = 0
-        v_in = v_in_mine = v_out = v_out_mine = 0
+        v_in = v_in_mine = v_out = v_out_mine = RavenValue()
         with self.lock, self.transaction_lock:
             for txin in tx.inputs():
                 addr = self.adb.get_txin_address(txin)
@@ -730,9 +730,9 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                 elif v_in is not None:
                     v_in += value
             for txout in tx.outputs():
-                v_out += txout.value
+                v_out += txout.raven_value
                 if self.is_mine(txout.address):
-                    v_out_mine += txout.value
+                    v_out_mine += txout.raven_value
                     is_relevant = True
         delta = v_out_mine - v_in_mine
         if v_in is not None:
@@ -746,7 +746,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             is_any_input_ismine=num_input_ismine > 0,
             is_all_input_ismine=num_input_ismine == len(tx.inputs()),
             delta=delta,
-            fee=fee,
+            fee=fee.rvn_value.value if fee else None,
         )
 
     def get_tx_info(self, tx: Transaction) -> TxWalletDetails:
@@ -754,7 +754,8 @@ class Abstract_Wallet(ABC, Logger, EventListener):
         is_relevant = tx_wallet_delta.is_relevant
         is_any_input_ismine = tx_wallet_delta.is_any_input_ismine
         is_swap = self.is_swap_tx(tx)
-        fee = tx_wallet_delta.fee
+        fee_int = tx_wallet_delta.fee
+        fee = RavenValue(fee_int) if fee_int else None
         exp_n = None
         can_broadcast = False
         can_bump = False
@@ -786,7 +787,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                         fee = self.adb.get_tx_fee(tx_hash)
                     if fee and self.network and self.config.has_fee_mempool():
                         size = tx.estimated_size()
-                        fee_per_byte = fee / size
+                        fee_per_byte = fee.rvn_value.value / size
                         exp_n = self.config.fee_to_depth(fee_per_byte)
                     can_bump = (is_any_input_ismine or is_swap) and not tx.is_final()
                     can_dscancel = (is_any_input_ismine and not tx.is_final()
@@ -811,7 +812,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
         if is_relevant:
             if tx_wallet_delta.is_all_input_ismine:
                 assert fee is not None
-                amount = tx_wallet_delta.delta + RavenValue(fee)
+                amount = tx_wallet_delta.delta + fee
             else:
                 amount = tx_wallet_delta.delta
         else:
@@ -830,7 +831,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             can_dscancel=can_dscancel,
             can_save_as_local=can_save_as_local,
             amount=amount,
-            fee=fee,
+            fee=fee.rvn_value.value if fee else None,
             tx_mined_status=tx_mined_status,
             mempool_depth_bytes=exp_n,
             can_remove=can_remove,

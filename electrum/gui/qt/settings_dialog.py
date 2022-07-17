@@ -705,7 +705,7 @@ class SettingsDialog(QDialog, QtEventListener):
         ipfs_size_e.textChanged.connect(update_ipfs_size)
 
         def clear_ipfs():
-            for ipfs in self.wallet.get_ipfs_informations().keys():
+            for ipfs in self.wallet.adb.get_ipfs_informations().keys():
                 ipfs_path = get_ipfs_path(self.config, ipfs)
                 if os.path.exists(ipfs_path):
                     os.unlink(ipfs_path)

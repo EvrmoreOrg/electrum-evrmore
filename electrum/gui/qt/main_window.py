@@ -3294,8 +3294,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         if d.need_restart:
             self.show_warning(_('Please restart Electrum to activate the new GUI settings'), title=_('Success'))
         vis = self.config.get('enable_op_return_messages', False)
-        self.op_return_label.setVisible(vis)
-        self.op_return_e.setVisible(vis)
+        self.send_tab.op_return_label.setVisible(vis)
+        self.send_tab.op_return_e.setVisible(vis)
         #self.asset_memo_label.setVisible(vis and self.to_send_combo.currentIndex() != 0)
         #self.asset_memo_e.setVisible(vis and self.to_send_combo.currentIndex() != 0)
 

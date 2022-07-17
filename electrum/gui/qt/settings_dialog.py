@@ -35,12 +35,12 @@ from PyQt5.QtWidgets import (QComboBox,  QTabWidget, QDialog,
 
 from electrum.i18n import _, languages
 from electrum import util, coinchooser, paymentrequest
-from electrum.util import base_units_list, event_listener
+from electrum.util import base_units_list, event_listener, get_ipfs_path
 
 from electrum.gui import messages
 
 from .util import (ColorScheme, WindowModalDialog, HelpLabel, Buttons,
-                   CloseButton, QtEventListener)
+                   CloseButton, QtEventListener, EnterButton)
 
 
 if TYPE_CHECKING:

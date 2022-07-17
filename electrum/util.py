@@ -489,6 +489,9 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
         else:
             raise ValueError('RavenValue required')
 
+    def __ge__(self, other):
+        return not self.__lt__(other)
+
     def __copy__(self):
         return RavenValue(self.__rvn_value, self.__asset_value)
 

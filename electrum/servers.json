@@ -5,33 +5,7 @@
     "t": "50001",
     "version": "1.10"
   },
-  "electrum1.rvn.rocks": {
-    "pruning": "-",
-    "s": "50002",
-    "version": "1.10"
-  },
-  "electrum2.rvn.rocks": {
-    "pruning": "-",
-    "s": "50002",
-    "version": "1.10"
-  },
-  "electrum.ravencoin.foundation": {
-    "pruning": "-",
-    "s": "50002",
-    "version": "1.10"
-  },
-  "aethyn.com": {
-    "purning": "-",
-    "s": "50002",
-    "t": "50001",
-    "version": "1.10"
-  },
   "rvn-dashboard.com": {
-    "pruning": "-",
-    "s": "50002",
-    "version": "1.10"
-  },
-  "elex.rvn.works": {
     "pruning": "-",
     "s": "50002",
     "version": "1.10"

@@ -183,7 +183,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         self.asset_whitelist = self.wallet.config.get('asset_whitelist', [])
 
         # Tracks sendable things
-        self.send_options = []  # type: List[str]
+        self.send_options = ['RVN']  # type: List[str]
 
         Exception_Hook.maybe_setup(config=self.config, wallet=self.wallet)
 
@@ -217,6 +217,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         # Circular dependencies ensue: TODO: Fix
         self.utxo_list = None
         self.send_tab = self.create_send_tab()
+        self.update_sendable_and_send_tab()
         self.receive_tab = self.create_receive_tab()
         self.addresses_tab = self.create_addresses_tab()
         self.utxo_tab = self.create_utxo_tab()
@@ -1134,7 +1135,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         self.contact_list.update()
         #self.channels_list.update_rows.emit(wallet)
         self.update_completions()
-        #self.refresh_send_tab()
+        self.update_sendable_and_send_tab()
         if self.wallet.wallet_type not in ('imported, xpub', 'hw'):
             self.create_workspace.refresh_owners()
             self.reissue_workspace.refresh_owners()
@@ -1839,6 +1840,39 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
     def create_send_tab(self):
         from .send_tab import SendTab
         return SendTab(self)
+
+    def update_sendable_and_send_tab(self):
+        # Don't interrupt if we don't need to
+        coins = self.get_manually_selected_coins() if self.utxo_list else None
+        if coins:
+            selected_value = sum((x.value_sats() for x in coins), RavenValue())
+            list_rvn = selected_value.rvn_value > 0
+            selectable_assets = list(selected_value.assets.keys())
+        else:
+            list_rvn, selectable_assets = self.wallet.get_non_frozen_assets()
+
+        new_send_options = ([util.decimal_point_to_base_unit_name(self.get_decimal_point())] if list_rvn else []) + \
+                            sorted(selectable_assets)
+
+        if not new_send_options:
+            new_send_options = [util.decimal_point_to_base_unit_name(self.get_decimal_point())]
+
+        diff = set(new_send_options) ^ set(self.send_options)
+        if self.send_options and not diff:
+            return
+
+        current_selection = self.get_asset_from_spend_tab()
+        self.send_tab.to_send_combo.clear()
+        self.send_options = new_send_options
+        self.send_tab.to_send_combo.addItems(self.send_options)
+        if current_selection:
+            self.send_tab.to_send_combo.setCurrentIndex(self.send_options.index(current_selection))
+
+    def get_asset_from_spend_tab(self) -> Optional[str]:
+        combo_index = self.send_tab.to_send_combo.currentIndex()
+        if combo_index != 0:
+            return self.send_options[combo_index]
+        return None
 
     def get_contact_payto(self, key):
         _type, label = self.contacts.get(key)

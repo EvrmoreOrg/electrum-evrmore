@@ -600,7 +600,7 @@ class AssetList(MyTreeView):
         
         def send_asset(asset):
             self.view.main_window.show_send_tab()
-            self.view.main_window.to_send_combo.setCurrentIndex(self.view.main_window.send_options.index(asset))
+            self.view.main_window.send_tab.to_send_combo.setCurrentIndex(self.view.main_window.send_options.index(asset))
 
         menu.addAction(_('Send {}').format(asset), lambda: send_asset(asset))
         

@@ -1085,6 +1085,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
         """
         outputs = invoice.get_outputs()
         if not outputs:  # e.g. lightning-only
+            print(1)
             return False, None, []
         invoice_amounts = defaultdict(RavenValue)  # type: Dict[bytes, RavenValue]  # scriptpubkey -> value_sats
         for txo in outputs:  # type: PartialTxOutput
@@ -1109,8 +1110,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                 vsum = RavenValue()
                 for conf, v in reversed(sorted(confs_and_values)):
                     vsum += v
-                    # TODO: Only RVN, invoice requests currently do not have assets
-                    if vsum.rvn_value.value >= invoice_amt.rvn_value.value:
+                    if vsum >= invoice_amt:
                         conf_needed = min(conf_needed, conf) if conf_needed is not None else conf
                         break
                 else:
@@ -1656,7 +1656,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                     lower_bound = base_tx_fee + round(size * relayfeerate)
                     lower_bound = lower_bound if not is_local else 0
                     return int(max(lower_bound, original_fee_estimator(size)))
-                txi = base_tx.inputs()
+                txi = base_tx.inputs() + inputs
                 txo = list(filter(lambda o: not self.is_change(o.address), base_tx.outputs()))
                 old_change_addrs = [o.address for o in base_tx.outputs() if self.is_change(o.address)]
             else:
@@ -1664,7 +1664,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                 txo = []
                 old_change_addrs = []
             
-            # change address. if empty, coin_chooser will set it
+            # change address(es). if empty, coin_chooser will set it to input address
             change_addrs = self.get_change_addresses_for_new_transaction(change_addr or old_change_addrs,
                                 extra_addresses=extra_addresses)
 

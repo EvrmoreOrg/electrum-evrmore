@@ -7,9 +7,11 @@ from decimal import Decimal
 from typing import Optional, TYPE_CHECKING, Sequence, List
 from urllib.parse import urlparse
 
-from PyQt5.QtCore import pyqtSignal, QPoint
+from PyQt5.QtCore import pyqtSignal, QPoint, QRegExp
+from PyQt5.QtGui import QRegExpValidator
 from PyQt5.QtWidgets import (QLabel, QVBoxLayout, QGridLayout,
-                             QHBoxLayout, QCompleter, QWidget, QToolTip)
+                             QHBoxLayout, QCompleter, QWidget, QToolTip,
+                             QComboBox)
 
 from electrum import util, paymentrequest
 from electrum import lnutil
@@ -70,8 +72,12 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         grid.setSpacing(8)
         grid.setColumnStretch(3, 1)
 
+        # Let user choose to send RVN or Asset
+        self.to_send_combo = QComboBox()
+        self.amount_e = RVNAmountEdit(self.window.get_decimal_point,
+                                        lambda: self.window.send_options[self.to_send_combo.currentIndex()][:4])
+
         from .paytoedit import PayToEdit
-        self.amount_e = RVNAmountEdit(self.window.get_decimal_point)
         self.payto_e = PayToEdit(self)
         msg = (_("Recipient of the funds.") + "\n\n"
                + _("You may enter a Ravencoin address, a label from your list of contacts "
@@ -100,19 +106,80 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         self.message_e = SizedFreezableLineEdit(width=700)
         grid.addWidget(self.message_e, 2, 1, 1, -1)
 
+        op_return_vis = self.config.get('enable_op_return_messages', False)
+        self.op_return_e = SizedFreezableLineEdit(width=700)
+        
+        msg = _('OP_RETURN message.') + '\n\n' \
+              + _('A 40 byte maximum message of arbitrary data encoded in utf8 or read from hex.') + ' ' \
+              + _('This message is associated with the transaction as a whole') + '\n\n' \
+              + _('This will increase your fee slightly.')
+        self.op_return_label = HelpLabel(_('OP_RETURN (utf8)'), msg)
+        self.op_return_label.setVisible(op_return_vis)
+        self.op_return_e.setVisible(op_return_vis)
+
+        def update_text_with_proper_length():
+            raw_text = self.op_return_e.text()
+            try:
+                if len(raw_text) <= 1:
+                    raise ValueError()
+                text_to_test = raw_text
+                if len(raw_text) % 2 == 1:
+                    text_to_test = raw_text[:-1]
+                bytes.fromhex(text_to_test)
+                self.op_return_e.setText(raw_text[:80])
+                self.op_return_label.setText('OP_RETURN (hex)')
+            except ValueError:
+                utf8_bytes = raw_text.encode('utf8')
+                while (len(utf8_bytes) > 40):
+                    utf8_bytes = utf8_bytes[:-1]
+                    try:
+                        raw_text = utf8_bytes.decode('utf8')
+                    except ValueError:
+                        continue
+                self.op_return_e.setText(raw_text)
+                self.op_return_label.setText('OP_RETURN (utf8)')
+        self.op_return_e.textChanged.connect(update_text_with_proper_length)
+
+
+        grid.addWidget(self.op_return_label, 3, 0)
+        grid.addWidget(self.op_return_e, 3, 1, 1, -1)
+
+
+        def on_to_send():
+            vis = self.config.get('enable_op_return_messages', False)
+
+            i = self.to_send_combo.currentIndex()
+            self.fiat_send_e.setVisible(i == 0)
+            #self.asset_memo_e.setVisible(vis and i != 0)
+            #self.asset_memo_label.setVisible(vis and i != 0)
+            if i == 0:
+                reg = QRegExp('^[0-9]{0,11}\\.([0-9]{1,8})$')
+            else:
+                meta = self.window.wallet.adb.get_asset_meta(self.window.send_options[i])
+                divs = meta.divisions if meta else 0
+                if divs == 0:
+                    reg = QRegExp('^[1-9][0-9]{0,10}$')
+                else:
+                    reg = QRegExp('^[0-9]{0,11}\\.([0-9]{1,' + str(divs) + '})$')
+            validator = QRegExpValidator(reg)
+            self.amount_e.setValidator(validator)
+
+        self.to_send_combo.currentIndexChanged.connect(on_to_send)
+
         msg = (_('The amount to be received by the recipient.') + ' '
                + _('Fees are paid by the sender.') + '\n\n'
                + _('The amount will be displayed in red if you do not have enough funds in your wallet.') + ' '
                + _('Note that if you have frozen some of your addresses, the available funds will be lower than your total balance.') + '\n\n'
                + _('Keyboard shortcut: type "!" to send all your coins.'))
         amount_label = HelpLabel(_('Amount'), msg)
-        grid.addWidget(amount_label, 3, 0)
-        grid.addWidget(self.amount_e, 3, 1)
+        grid.addWidget(amount_label, 4, 0)
+        grid.addWidget(self.amount_e, 4, 1)
+        grid.addWidget(self.to_send_combo, 4, 3)
 
         self.fiat_send_e = AmountEdit(self.fx.get_currency if self.fx else '')
         if not self.fx or not self.fx.is_enabled():
             self.fiat_send_e.setVisible(False)
-        grid.addWidget(self.fiat_send_e, 3, 2)
+        grid.addWidget(self.fiat_send_e, 4, 2)
         self.amount_e.frozen.connect(
             lambda: self.fiat_send_e.setFrozen(self.amount_e.isReadOnly()))
 
@@ -121,7 +188,7 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         self.max_button = EnterButton(_("Max"), self.spend_max)
         self.max_button.setFixedWidth(100)
         self.max_button.setCheckable(True)
-        grid.addWidget(self.max_button, 3, 3)
+        grid.addWidget(self.max_button, 4, 4)
 
         self.save_button = EnterButton(_("Save"), self.do_save_invoice)
         self.send_button = EnterButton(_("Pay") + "...", self.do_pay_or_get_invoice)

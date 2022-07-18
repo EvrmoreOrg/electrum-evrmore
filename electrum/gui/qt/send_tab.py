@@ -19,7 +19,7 @@ from electrum.plugin import run_hook
 from electrum.i18n import _
 from electrum.util import (get_asyncio_loop, bh2u,
                            InvalidBitcoinURI, maybe_extract_lightning_payment_identifier, NotEnoughFunds,
-                           NoDynamicFeeEstimates, InvoiceError, parse_max_spend)
+                           NoDynamicFeeEstimates, InvoiceError, parse_max_spend, RavenValue)
 from electrum.invoices import PR_PAID, Invoice
 from electrum.transaction import Transaction, PartialTxInput, PartialTransaction, PartialTxOutput
 from electrum.network import TxBroadcastError, BestEffortRequestFailed
@@ -295,11 +295,11 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
             outputs=outputs,
             fee=fee_est,
             is_sweep=is_sweep)
-        output_values = [x.value for x in outputs]
+        output_values = [x.raven_value for x in outputs]
         if any(parse_max_spend(outval) for outval in output_values):
             output_value = '!'
         else:
-            output_value = sum(output_values)
+            output_value = sum(output_values, RavenValue())
         conf_dlg = ConfirmTxDialog(window=self.window, make_tx=make_tx, output_value=output_value, is_sweep=is_sweep)
         if conf_dlg.not_enough_funds:
             # Check if we had enough funds excluding fees,

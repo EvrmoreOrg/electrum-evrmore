@@ -1422,7 +1422,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             fee = self.adb.get_tx_fee(tx_hash)
             if fee is not None:
                 size = tx.estimated_size()
-                fee_per_byte = fee / size
+                fee_per_byte = fee.rvn_value.value / size
                 extra.append(format_fee_satoshis(fee_per_byte) + ' sat/b')
             if fee is not None and height in (TX_HEIGHT_UNCONF_PARENT, TX_HEIGHT_UNCONFIRMED) \
                     and self.config.has_fee_mempool():
@@ -2256,7 +2256,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
         # set script_type first, as later checks might rely on it:
         txin.script_type = self.get_txin_type(address)
 
-        possible_p2pk = self.get_nonstandard_outpoints()
+        possible_p2pk = self.adb.get_nonstandard_outpoints()
         if txin.script_type == 'p2pkh' and txin.prevout.to_str() in possible_p2pk:
             pubkey = bfh(possible_p2pk.get(txin.prevout.to_str()))
             txin.script_type = get_script_type_from_output_script(pubkey)

@@ -1092,7 +1092,7 @@ class Transaction:
             asset, amt = list(a.items())[0]
             script = guess_asset_script_for_vin(bfh(script), asset, amt, txin, wallet)
         if wallet:
-            script = wallet.get_nonstandard_outpoints().get(txin.prevout.to_str(), script)
+            script = wallet.adb.get_nonstandard_outpoints().get(txin.prevout.to_str(), script)
         if txin_locking_script_overrides:
             _logger.debug('Trying to override')
             script = txin_locking_script_overrides.get(txin.prevout.to_str(), script)

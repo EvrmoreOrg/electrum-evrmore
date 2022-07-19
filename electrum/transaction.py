@@ -1237,11 +1237,13 @@ class Transaction:
         return cls.estimated_output_size_for_script(script)
 
     @classmethod
-    def estimated_output_size_for_address_with_asset(cls, address: str, asset: str) -> int:
-        """Return an estimate of serialized output size in bytes."""
-        script = ravencoin.address_to_script(address)
-        est_raw = cls.estimated_output_size_for_script(script)
-        return est_raw + 1 + 1 + 3 + 1 + 1 + len(asset) + 8 + 1
+    def estimated_additional_size_for_asset(cls, base_size: int, asset: str) -> int:
+        old_var_int_len = len(var_int(base_size)) // 2
+        # type (t)ransfer for change
+        # change addresses internal length is always < 0x4c
+        additional_bytes = len(b'\xc00rvnt0%b00000000\x75' % asset.encode('ascii')) // 2
+        new_var_int_len = len(var_int(base_size + additional_bytes)) // 2
+        return new_var_int_len - old_var_int_len + additional_bytes
 
     @classmethod
     def estimated_output_size_for_script(cls, script: str) -> int:

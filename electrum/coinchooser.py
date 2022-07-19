@@ -206,17 +206,20 @@ class CoinChooserBase(Logger):
         output_amounts_rvn = [t[1] for t in output_amounts if not t[0]]
         ret_amt = []
 
+        assets_change = []
+
         # Each asset has a maximum of 1 vout amount
         for asset, divisions in asset_divisions.items():     
             change_amount_asset = tx.get_fee().assets.get(asset, Satoshis(0)).value
             # For assets, only use the exact change
             if change_amount_asset > 0:
+                assets_change.append(asset)
                 ret_amt += [(asset, change_amount_asset)]
 
         if not output_amounts_rvn:
             # Append an amount for the vout after our transaction fee
             output_amounts_rvn = [max(0, tx.get_fee().rvn_value.value -
-                                  fee_estimator_numchange(1, asset_divisions.keys()))]
+                                  fee_estimator_numchange(1, assets_change))]
 
         # Don't split change of less than 0.02 BTC
         max_change_rvn = max(max([o for o in output_amounts_rvn]) * 1.25, 0.02 * COIN)
@@ -230,7 +233,7 @@ class CoinChooserBase(Logger):
             # i.e. what should be going in our vouts
             n = n1
             change_amount_rvn = max(0, tx.get_fee().rvn_value.value -
-                                    fee_estimator_numchange(n1, asset_divisions.keys()))
+                                    fee_estimator_numchange(n1, assets_change))
             if change_amount_rvn // n1 <= max_change_rvn:
                 break
 
@@ -322,15 +325,10 @@ class CoinChooserBase(Logger):
         # This takes a count of change outputs and returns a tx fee
         output_weight = 4 * Transaction.estimated_output_size_for_address(change_addrs[0])
 
-        def fee_estimator_assets(assets: List[str]) -> int:
-            weight = 0
-            for asset in assets:
-                weight += 4 * Transaction.estimated_output_size_for_address_with_asset(change_addrs[0], asset)
-            return weight
-
-        def fee_estimator_numchange(rvn_count: int, assets: List[str]) -> int:
-            return fee_estimator_w(tx_weight + rvn_count * output_weight +
-                                   fee_estimator_assets(assets))
+        def fee_estimator_numchange(change_count: int, assets: List[str]) -> int:
+            base_byte_length = Transaction.estimated_output_size_for_address(change_addrs[0])
+            asset_weight = 4 * sum(Transaction.estimated_additional_size_for_asset(base_byte_length, a) for a in assets)
+            return fee_estimator_w(tx_weight + change_count * output_weight + asset_weight)
 
         change = self._change_outputs(tx, change_addrs, fee_estimator_numchange, dust_threshold, asset_divs, coinbase_vout_count, has_return)
         tx.add_outputs(change)

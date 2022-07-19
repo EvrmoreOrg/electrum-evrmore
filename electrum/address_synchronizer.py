@@ -596,7 +596,7 @@ class AddressSynchronizer(Logger, EventListener):
             delta = tx_deltas[tx_hash]
             tx_mined_status = self.get_tx_height(tx_hash)
             fee = self.get_tx_fee(tx_hash)
-            history.append((tx_hash, tx_mined_status, delta, fee))
+            history.append((tx_hash, tx_mined_status, delta, fee.rvn_value.value if fee else None))
         history.sort(key = lambda x: self.get_txpos(x[0]))
         # 3. add balance
         h2 = []

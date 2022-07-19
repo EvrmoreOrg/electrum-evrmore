@@ -642,7 +642,8 @@ class SettingsDialog(QDialog, QtEventListener):
 
         def on_set_show_spam(v):
             window.config.set_key('show_spam_assets', v == Qt.Checked, save=True)
-            window.asset_list.update()
+            window.asset_view.update()
+            window.history_list.update()
             window.history_model.refresh('Toggled show spam assets', True)
 
         show_spam_cb.stateChanged.connect(on_set_show_spam)

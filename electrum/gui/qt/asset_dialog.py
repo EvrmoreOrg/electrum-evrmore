@@ -25,7 +25,7 @@ class AssetDialog(WindowModalDialog):
 
         vbox.addWidget(QLabel(_("Asset:")))
         self.addr_e = ButtonsLineEdit(self.asset)
-        self.addr_e.addCopyButton(self.app)
+        self.addr_e.addCopyButton()
         self.addr_e.setReadOnly(True)
         vbox.addWidget(self.addr_e)
 

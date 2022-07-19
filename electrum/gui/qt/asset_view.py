@@ -720,6 +720,7 @@ class MetadataViewer(QFrame):
                 self.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
                 return
             tx = transaction.Transaction(raw_tx)
+            
             self.main_window.show_transaction(tx)
         self.view_tx_button = EnterButton(_('View Transaction'), view_tx)
         self.view_tx_button.setVisible(False)

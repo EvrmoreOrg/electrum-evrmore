@@ -115,12 +115,13 @@ class InvoiceList(MyTreeView):
             status_str = item.get_status_str(status)
             message = item.message
             amount = item.get_amount_sat()
-            a = amount.assets
-            if a:
-                asset_str, amount = list(a.items())[0]
-            else:
-                asset_str = ""
-                amount = amount.rvn_value
+            asset_str = ""
+            if amount:
+                a = amount.assets
+                if a:
+                    asset_str, amount = list(a.items())[0]
+                else:
+                    amount = amount.rvn_value
             timestamp = item.time or 0
             date_str = format_time(timestamp) if timestamp else _('Unknown')
             amount_str = self.parent.format_amount(amount, whitespaces=True)

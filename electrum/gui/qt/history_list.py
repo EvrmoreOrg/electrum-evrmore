@@ -1007,8 +1007,8 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
                 menu.addAction(_("View log"), lambda: self.parent.invoice_list.show_log(key, log))
             menu.exec_(self.viewport().mapToGlobal(position))
             return
-        tx_hash = tx_item['txid']
-        if tx_item.get('lightning'):
+        tx_hash = tx_item.txid
+        if tx_item.lightning:
             tx = self.wallet.adb.get_transaction(tx_hash)
         else:
             tx = self.wallet.db.get_transaction(tx_hash)
@@ -1030,6 +1030,8 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
             menu.addAction(_("Edit {}").format(label), lambda p=persistent: self.edit(QModelIndex(p)))
         menu.addAction(_("View Transaction"), lambda: self.show_transaction(tx_item, tx))
         channel_id = tx_item.channel_id
+        if tx_item.asset_name != 'RVN':
+            menu.addAction(_('Mark as spam'), lambda: self.parent.hide_asset(tx_item.asset_name))
         if channel_id:
             menu.addAction(_("View Channel"), lambda: self.parent.show_channel(bytes.fromhex(channel_id)))
         if is_unconfirmed and tx:

@@ -1241,7 +1241,7 @@ class Transaction:
         old_var_int_len = len(var_int(base_size)) // 2
         # type (t)ransfer for change
         # change addresses internal length is always < 0x4c
-        additional_bytes = len(b'\xc00rvnt0%b00000000\x75' % asset.encode('ascii')) // 2
+        additional_bytes = len(b'\xc00rvnt0%b00000000\x75' % asset.encode('ascii'))
         new_var_int_len = len(var_int(base_size + additional_bytes)) // 2
         return new_var_int_len - old_var_int_len + additional_bytes
 

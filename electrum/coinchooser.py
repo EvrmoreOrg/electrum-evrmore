@@ -207,26 +207,9 @@ class CoinChooserBase(Logger):
         ret_amt = []
 
         # Each asset has a maximum of 1 vout amount
-        for asset, divisions in asset_divisions.items():
-            output_amounts_asset = [t[1] for t in output_amounts if t[0] == asset]
-            minimum_division = 10 ** -divisions
-            # Don't split change of less than min div or less than 0.02 BTC
-            max_change_asset = max(max([o for o in output_amounts_asset]) * 1.25,
-                                   max(minimum_division * COIN, 0.02 * COIN))
-
+        for asset, divisions in asset_divisions.items():     
             change_amount_asset = tx.get_fee().assets.get(asset, Satoshis(0)).value
-
-            # Get a handle on the precision of the output amounts; round our
-            # change to look similar
-            def trailing_zeroes(val):
-                s = str(val)
-                return len(s) - len(s.rstrip('0'))
-
-            zeroes = [trailing_zeroes(i) for i in output_amounts_asset]
-            min_zeroes = min(zeroes)
-
-            zeroes = [min_zeroes]
-
+            # For assets, only use the exact change
             ret_amt += [(asset, change_amount_asset)]
 
         if not output_amounts_rvn:

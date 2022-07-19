@@ -150,15 +150,15 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
             self.receive_address_e, self.receive_address_qr, self.receive_address_help)
         self.receive_URI_widget = ReceiveTabWidget(self,
             self.receive_URI_e, self.receive_URI_qr, self.receive_URI_help)
-        self.receive_lightning_widget = ReceiveTabWidget(self,
-            self.receive_lightning_e, self.receive_lightning_qr, self.receive_lightning_help)
+        #self.receive_lightning_widget = ReceiveTabWidget(self,
+        #    self.receive_lightning_e, self.receive_lightning_qr, self.receive_lightning_help)
 
         from .util import VTabWidget
         self.receive_tabs = VTabWidget()
         self.receive_tabs.setMinimumHeight(ReceiveTabWidget.min_size.height() + 4) # for margins
+        self.receive_tabs.addTab(self.receive_address_widget, read_QIcon("ravencoin.png"), _('Address'))
         self.receive_tabs.addTab(self.receive_URI_widget, read_QIcon("link.png"), _('URI'))
-        self.receive_tabs.addTab(self.receive_address_widget, read_QIcon("bitcoin.png"), _('Address'))
-        self.receive_tabs.addTab(self.receive_lightning_widget, read_QIcon("lightning.png"), _('Lightning'))
+        #self.receive_tabs.addTab(self.receive_lightning_widget, read_QIcon("lightning.png"), _('Lightning'))
         self.receive_tabs.currentChanged.connect(self.update_receive_qr_window)
         self.receive_tabs.setCurrentIndex(self.config.get('receive_tabs_index', 0))
         self.receive_tabs.currentChanged.connect(lambda i: self.config.set_key('receive_tabs_index', i))
@@ -201,7 +201,7 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
         b = self.config.get('receive_qr_visible', False)
         self.receive_URI_widget.update_visibility(b)
         self.receive_address_widget.update_visibility(b)
-        self.receive_lightning_widget.update_visibility(b)
+        #self.receive_lightning_widget.update_visibility(b)
 
     def update_current_request(self):
         key = self.request_list.get_current_key()

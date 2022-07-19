@@ -227,17 +227,7 @@ class CoinChooserBase(Logger):
 
             zeroes = [min_zeroes]
 
-            # Calculate change; randomize it a bit if using more than 1 output
-            remaining = change_amount_asset
-            amounts = []
-
-            amounts.append(amount)
-
-            assert sum(amounts) == change_amount_asset
-
-            amounts = [a for a in amounts if a > 0]
-
-            ret_amt += [(asset, amount) for amount in amounts]
+            ret_amt += [(asset, change_amount_asset)]
 
         if not output_amounts_rvn:
             # Append an amount for the vout after our transaction fee

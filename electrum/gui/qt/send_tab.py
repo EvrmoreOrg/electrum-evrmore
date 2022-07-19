@@ -17,7 +17,7 @@ from electrum import util, paymentrequest
 from electrum import lnutil
 from electrum.plugin import run_hook
 from electrum.i18n import _
-from electrum.util import (get_asyncio_loop, bh2u,
+from electrum.util import (UserFacingException, get_asyncio_loop, bh2u,
                            InvalidBitcoinURI, maybe_extract_lightning_payment_identifier, NotEnoughFunds,
                            NoDynamicFeeEstimates, InvoiceError, parse_max_spend, RavenValue)
 from electrum.invoices import PR_PAID, Invoice
@@ -351,7 +351,7 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         return text
 
     def get_frozen_balance_str(self) -> Optional[str]:
-        frozen_bal = sum(self.wallet.get_frozen_balance())
+        frozen_bal = sum(self.wallet.get_frozen_balance(), RavenValue())
         if not frozen_bal:
             return None
         return self.format_amount_and_units(frozen_bal)
@@ -639,15 +639,32 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
 
     def pay_multiple_invoices(self, invoices):
         outputs = []
+        asset: Optional[str] = None
         for invoice in invoices:
-            outputs += invoice.outputs
-        self.pay_onchain_dialog(self.window.get_coins(), outputs)
+            invoice_outputs: Optional[List[PartialTxOutput]] = invoice.outputs
+            for output in invoice_outputs:
+                if output.asset is not None:
+                    if asset is None:
+                        asset = output.asset
+                    elif asset != output.asset:
+                        raise UserFacingException(_('Only one asset at a time is currently supported.'))
+            outputs += invoice_outputs
+        self.pay_onchain_dialog(self.window.get_coins(asset=asset), outputs)
 
     def do_pay_invoice(self, invoice: 'Invoice'):
         if invoice.is_lightning():
+            raise UserFacingException(_('Lightning is currently not supported'))
             self.pay_lightning_invoice(invoice)
         else:
-            self.pay_onchain_dialog(self.window.get_coins(), invoice.outputs)
+            asset: Optional[str] = None
+            invoice_outputs: Optional[List[PartialTxOutput]] = invoice.outputs
+            for output in invoice_outputs:
+                if output.asset is not None:
+                    if asset is None:
+                        asset = output.asset
+                    elif asset != output.asset:
+                        raise UserFacingException(_('Only one asset at a time is currently supported.'))
+            self.pay_onchain_dialog(self.window.get_coins(asset=asset), invoice.outputs)
 
     def read_outputs(self) -> List[PartialTxOutput]:
         if self.payment_request:

@@ -1621,8 +1621,8 @@ class Abstract_Wallet(ABC, Logger, EventListener):
 
         # If we have the minimum asset division amount, plug that into the coinchooser,
         # Otherwise, assume 8.
-        asset_divs = {asset: self.get_asset_meta(asset).divisions
-                        if asset in self.get_assets() else 8
+        asset_divs = {asset: self.adb.get_asset_meta(asset).divisions
+                        if asset in self.adb.get_assets() else 8
                         for asset in assets}
 
         extra_addresses = len(assets) + (len(coinbase_outputs) if coinbase_outputs else 0)

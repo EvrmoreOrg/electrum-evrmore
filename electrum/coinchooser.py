@@ -210,7 +210,8 @@ class CoinChooserBase(Logger):
         for asset, divisions in asset_divisions.items():     
             change_amount_asset = tx.get_fee().assets.get(asset, Satoshis(0)).value
             # For assets, only use the exact change
-            ret_amt += [(asset, change_amount_asset)]
+            if change_amount_asset > 0:
+                ret_amt += [(asset, change_amount_asset)]
 
         if not output_amounts_rvn:
             # Append an amount for the vout after our transaction fee

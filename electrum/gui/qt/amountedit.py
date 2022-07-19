@@ -98,8 +98,8 @@ class AmountEdit(SizedFreezableLineEdit):
 
 class RVNAmountEdit(AmountEdit):
 
-    def __init__(self, decimal_point, is_int=False, parent=None):
-        AmountEdit.__init__(self, self._base_unit, is_int, parent)
+    def __init__(self, decimal_point, asset_base_unit=None, is_int=False, parent=None):
+        AmountEdit.__init__(self, asset_base_unit or self._base_unit, is_int, parent)
         self.decimal_point = decimal_point
 
     def _base_unit(self):
@@ -131,7 +131,7 @@ class RVNAmountEdit(AmountEdit):
 
 class PayToAmountEdit(RVNAmountEdit):
     def __init__(self, decimal_point, asset_base_unit, is_int=False, parent=None):
-        AmountEdit.__init__(self, asset_base_unit, is_int, parent)
+        RVNAmountEdit.__init__(self, decimal_point, asset_base_unit, is_int, parent)
         self.decimal_point = lambda: decimal_point() if asset_base_unit() in base_units_list else 8
 
 

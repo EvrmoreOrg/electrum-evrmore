@@ -4,14 +4,14 @@
 
 from typing import Optional, TYPE_CHECKING
 
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QFont, QRegExpValidator
+from PyQt5.QtCore import Qt, QSize, QRegExp
 from PyQt5.QtWidgets import (QComboBox, QLabel, QVBoxLayout, QGridLayout, QLineEdit,
                              QHBoxLayout, QPushButton, QWidget, QSizePolicy)
 
 from electrum.ravencoin import is_address
 from electrum.i18n import _
-from electrum.util import InvoiceError
+from electrum.util import InvoiceError, decimal_point_to_base_unit_name
 from electrum.invoices import PR_DEFAULT_EXPIRATION_WHEN_CREATING
 from electrum.invoices import PR_EXPIRED, pr_expiration_values
 from electrum.logging import Logger
@@ -47,7 +47,8 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
         grid.addWidget(QLabel(_('Description')), 0, 0)
         grid.addWidget(self.receive_message_e, 0, 1, 1, 4)
 
-        self.receive_amount_e = RVNAmountEdit(self.window.get_decimal_point)
+        self.asset_requested = SizedFreezableLineEdit(width=400)
+        self.receive_amount_e = RVNAmountEdit(self.window.get_decimal_point, lambda: (self.asset_requested.text()[:4] or decimal_point_to_base_unit_name(self.window.get_decimal_point())))
         grid.addWidget(QLabel(_('Requested amount')), 1, 0)
         grid.addWidget(self.receive_amount_e, 1, 1)
 
@@ -58,6 +59,20 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
 
         self.window.connect_fields(self.receive_amount_e, self.fiat_receive_e)
 
+        # This regex is not strict
+        # All asset names are valid under this,
+        # But there are some invalid asset names that this allows
+        #self.asset_requested.setValidator(QRegExpValidator(QRegExp('/^(?=.{0,31}$)(\#|\$)?[A-Z0-9._]+(\/\#?[A-Z0-9._]+)*(\#[-A-Za-z0-9@$%&*()\[\\\]{}_.?:]+)?(\~[A-Za-z0-9_]+)?$/')))
+        
+        # Currently this doesn't do anything lol
+        # Just a placebo for the end user
+        def update_receive_and_fiat():
+            self.receive_amount_e.update()
+            self.fiat_receive_e.setVisible(not bool(self.asset_requested.text().strip()))
+        self.asset_requested.textChanged.connect(update_receive_and_fiat)
+        grid.addWidget(QLabel(_('Asset')), 2, 0)
+        grid.addWidget(self.asset_requested, 2, 1, 1, 4)
+        
         self.expires_combo = QComboBox()
         evl = sorted(pr_expiration_values.items())
         evl_keys = [i[0] for i in evl]
@@ -77,18 +92,18 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
             _('This information is seen by the recipient if you send them a signed payment request.'),
             '\n\n',
             _('For on-chain requests, the address gets reserved until expiration. After that, it might get reused.'), ' ',
-            _('The bitcoin address never expires and will always be part of this electrum wallet.'), ' ',
-            _('You can reuse a bitcoin address any number of times but it is not good for your privacy.'),
+            _('The ravencoin address never expires and will always be part of this electrum wallet.'), ' ',
+            _('You can reuse a ravencoin address any number of times but it is not good for your privacy.'),
             '\n\n',
             _('For Lightning requests, payments will not be accepted after the expiration.'),
         ])
-        grid.addWidget(HelpLabel(_('Expires after') + ' (?)', msg), 2, 0)
-        grid.addWidget(self.expires_combo, 2, 1)
+        grid.addWidget(HelpLabel(_('Expires after') + ' (?)', msg), 3, 0)
+        grid.addWidget(self.expires_combo, 3, 1)
         self.expires_label = QLineEdit('')
         self.expires_label.setReadOnly(1)
         self.expires_label.setFocusPolicy(Qt.NoFocus)
         self.expires_label.hide()
-        grid.addWidget(self.expires_label, 2, 1)
+        grid.addWidget(self.expires_label, 3, 1)
 
         self.clear_invoice_button = QPushButton(_('Clear'))
         self.clear_invoice_button.clicked.connect(self.do_clear)
@@ -342,6 +357,7 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
         # clear request fields
         self.receive_amount_e.setText('')
         self.receive_message_e.setText('')
+        self.asset_requested.setText('')
         # copy to clipboard
         r = self.wallet.get_request(key)
         content = r.lightning_invoice if r.is_lightning() else r.get_address()

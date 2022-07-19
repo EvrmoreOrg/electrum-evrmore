@@ -27,7 +27,7 @@ from electrum.logging import Logger
 from electrum.lnaddr import lndecode, LnInvoiceException
 from electrum.lnurl import decode_lnurl, request_lnurl, callback_lnurl, LNURLError, LNURL6Data
 
-from .amountedit import AmountEdit, RVNAmountEdit, SizedFreezableLineEdit
+from .amountedit import AmountEdit, PayToAmountEdit, SizedFreezableLineEdit
 from .util import WaitingDialog, HelpLabel, MessageBoxMixin, EnterButton
 from .confirm_tx_dialog import ConfirmTxDialog
 from .transaction_dialog import PreviewTxDialog
@@ -74,7 +74,7 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
 
         # Let user choose to send RVN or Asset
         self.to_send_combo = QComboBox()
-        self.amount_e = RVNAmountEdit(self.window.get_decimal_point,
+        self.amount_e = PayToAmountEdit(self.window.get_decimal_point,
                                         lambda: self.window.send_options[self.to_send_combo.currentIndex()][:4])
 
         from .paytoedit import PayToEdit
@@ -123,6 +123,7 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
                 if len(raw_text) <= 1:
                     raise ValueError()
                 text_to_test = raw_text
+                # Ignore last character of odd (user typing)
                 if len(raw_text) % 2 == 1:
                     text_to_test = raw_text[:-1]
                 bytes.fromhex(text_to_test)
@@ -147,6 +148,7 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
 
         def on_to_send():
             vis = self.config.get('enable_op_return_messages', False)
+            self.amount_e.update()
 
             i = self.to_send_combo.currentIndex()
             self.fiat_send_e.setVisible(i == 0)
@@ -160,9 +162,10 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
                 if divs == 0:
                     reg = QRegExp('^[1-9][0-9]{0,10}$')
                 else:
-                    reg = QRegExp('^[0-9]{0,11}\\.([0-9]{1,' + str(divs) + '})$')
+                    reg = QRegExp(f'^[0-9]{{0,11}}\\.([0-9]{{1,{divs}}})$')
             validator = QRegExpValidator(reg)
             self.amount_e.setValidator(validator)
+            print('triggered')
 
         self.to_send_combo.currentIndexChanged.connect(on_to_send)
 

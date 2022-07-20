@@ -293,6 +293,23 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         if run_hook('abort_send', self):
             return
         is_sweep = bool(external_keypairs)
+        
+        op_return_raw: str = self.op_return_e.text()
+        if len(op_return_raw) > 0:
+            try:
+                op_return_encoded = bytes.fromhex(op_return_raw)
+            except ValueError:
+                op_return_encoded = op_return_raw.encode('utf8')
+
+            outputs.append(
+                PartialTxOutput(
+                    value=0,
+                    scriptpubkey=
+                    b'\x6a' +
+                    len(op_return_encoded).to_bytes(1, 'big', signed=False) +
+                    op_return_encoded
+                ))
+
         make_tx = lambda fee_est: self.wallet.make_unsigned_transaction(
             coins=inputs,
             outputs=outputs,

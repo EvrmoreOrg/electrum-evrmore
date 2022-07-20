@@ -420,7 +420,6 @@ class Blockchain(Logger):
             raise Exception("insufficient proof of work: %s vs target %s" % (int('0x' + _powhash, 16), target))
 
     def verify_chunk(self, start_height: int, data: bytes) -> None:
-
         raw = []
         p = 0
         s = start_height
@@ -437,6 +436,8 @@ class Blockchain(Logger):
                 expected_header_hash = self.get_hash(s)
             except MissingHeader:
                 expected_header_hash = None
+            if len(raw) not in (POST_KAWPOW_HEADER_SIZE, PRE_KAWPOW_HEADER_SIZE):
+                raise Exception('Invalid header length: {}'.format(len(raw)))
             header = deserialize_header(raw, s)
             headers[header.get('block_height')] = header
             
@@ -455,8 +456,11 @@ class Blockchain(Logger):
             self.verify_header(header, prev_hash, target, expected_header_hash)
             prev_hash = hash_header(header)
             s += 1
-        if len(raw) not in (POST_KAWPOW_HEADER_SIZE, PRE_KAWPOW_HEADER_SIZE):
-            raise Exception('Invalid header length: {}'.format(len(raw)))
+
+        # DGW must be received in correct chunk sizes to be valid with our checkpoints
+        if start_height >= constants.net.DGW_CHECKPOINTS_START:
+            assert start_height % constants.net.DGW_CHECKPOINTS_SPACING == 0, 'dgw chunk not from start'
+            assert s - start_height == constants.net.DGW_CHECKPOINTS_SPACING, 'dgw chunk not correct size'
 
     @with_lock
     def path(self):

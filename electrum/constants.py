@@ -119,7 +119,7 @@ class RavencoinMainnet(AbstractNet):
     CHECKPOINTS = read_json('checkpoints.json', [])
     DGW_CHECKPOINTS = read_json('checkpoints_dgw.json', [])
     DGW_CHECKPOINTS_SPACING = 2016
-    DGW_CHECKPOINTS_START = 168 * DGW_CHECKPOINTS_SPACING  #338_688
+    DGW_CHECKPOINTS_START = 168 * DGW_CHECKPOINTS_SPACING  #338_688, DGW starts at 338_778
 
     XPRV_HEADERS = {
         'standard': 0x0488ade4,  # xprv

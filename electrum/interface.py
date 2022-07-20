@@ -623,7 +623,7 @@ class Interface(Logger):
             raise Exception(f"{repr(height)} is not a block height")
 
         # For chunks within DGW checkpoints, we need to reset to start of 2016 chunks
-        if constants.net.DGW_CHECKPOINTS_START <= height <= constants.net.max_dgw_checkpoint() + 2016:
+        if constants.net.DGW_CHECKPOINTS_START <= height <= constants.net.max_dgw_checkpoint() + constants.net.DGW_CHECKPOINTS_SPACING:
             #print(f'interface request chunk, setting height from {height}')
             height = (height // constants.net.DGW_CHECKPOINTS_SPACING) * constants.net.DGW_CHECKPOINTS_SPACING
 

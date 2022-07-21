@@ -1689,69 +1689,91 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             #       forever. see #5433
             # note: Actually, it might be the case that not all UTXOs from the wallet are
             #       being spent if the user manually selected UTXOs.
-            
-            # Prioritize static "inputs", if not enough for fee, use the coins for backup
-            # Otherwise, just use coins
-
-            coins = list(coins)
             for (_,i) in i_max:
-                # Set to 0 here to properly calculate non-max amount
                 outputs[i].value = 0
-
-            amount = RavenValue(-1)
-            coins_used = []
-            added_output = False
-            while True:
-                sendable = sum(map(lambda c: c.value_sats(), (inputs or coins) + coins_used), RavenValue())
-                tx = PartialTransaction.from_io(list(inputs or coins) + coins_used, list(outputs))
-                fee = fee_estimator(tx.estimated_size())
-                amount = sendable - tx.output_value() - RavenValue(fee)
-                if not inputs or amount.rvn_value.value > 0:
-                    # We do not have any inputs -> this was from our coins
-                    break
-                # If we have inputs -> implies sweep -> shouldn't need a lot because just for fee
-                if len(coins) > 0:
-                    coins_used.append(coins.pop())
-                    # If none is in counts of each, we already have a RVN output
-                    if not added_output and None not in counts_of_each:
-                        added_output = True
-                        # is an asset script pub key
-                        scriptpubkey = standardize_script(outputs[0].scriptpubkey)
-                        outputs.append(PartialTxOutput(scriptpubkey=scriptpubkey, value=0))
-                        # Does not matter what weight we put, because the excess gets appended to last outpoint of same type
-                        i_max.append((1, len(i_max)))
-                        counts_of_each[None] = 1
-                        i_max_sum[None] = 1
-                else:
-                    break
-
-            # Only RVN is neccissary
-            if amount.rvn_value.value <= 0:
-                raise NotEnoughFunds()
             
-            distr_amount = defaultdict(lambda: 0)
-            current_count = defaultdict(lambda: 0)
-            for (weight, i) in i_max:
-                asset_name = outputs[i].asset
-                if asset_name is None:
-                    val = int((amount.rvn_value.value/i_max_sum[None]) * weight)
-                else:
-                    val = int((amount.assets[asset_name].value/i_max_sum[asset_name]) * weight)
+            if None in counts_of_each:
+                # Max spend RVN
+                spendable_coins = list(coins if inputs else [])
+                coins_to_spend = list(inputs or coins)
+                total_amount = RavenValue(-1)
 
-                distr_amount[asset_name] += val
-                if current_count[asset_name] == counts_of_each[asset_name]:
-                    if not asset_name:
-                        val += (amount.rvn_value.value - distr_amount[asset_name])
+                initial = True
+                while total_amount.rvn_value.value <= 0:
+                    if not initial:
+                        # If our forced inputs are not enough, suppliment with others
+                        if not spendable_coins:
+                            raise NotEnoughFunds()
+                        coins_to_spend.append(spendable_coins.pop())
+                    sendable: RavenValue = sum(map(lambda c: c.value_sats(), coins_to_spend), RavenValue())
+                    tx = PartialTransaction.from_io(list(coins_to_spend), list(outputs))
+                    fee = fee_estimator(tx.estimated_size())
+                    total_amount = sendable - tx.output_value() - RavenValue(fee)
+                    initial = False
+
+                distr_amount = defaultdict(lambda: 0)
+                current_count = defaultdict(lambda: 0)
+                for (weight, i) in i_max:
+                    asset_name = outputs[i].asset
+                    if asset_name is None:
+                        val = int((total_amount.rvn_value.value/i_max_sum[None]) * weight)
                     else:
-                        val += (amount.assets[asset_name].value - distr_amount[asset_name])
+                        val = int((total_amount.assets[asset_name].value/i_max_sum[asset_name]) * weight)
 
-                outputs[i].value = val
-                if asset_name:
-                    # We must re-generate the script with the correct value
-                    outputs[i].scriptpubkey = replace_amount_in_transfer_asset_script(outputs[i].scriptpubkey, val)
+                    distr_amount[asset_name] += val
 
-            tx = PartialTransaction.from_io(list(inputs or coins) + coins_used, list(outputs))
+                    # (x,i) = i_max[-1]
+                    # If last add extras
+                    if current_count[asset_name] == counts_of_each[asset_name]:
+                        if not asset_name:
+                            val += (total_amount.rvn_value.value - distr_amount[asset_name])
+                        else:
+                            val += (total_amount.assets[asset_name].value - distr_amount[asset_name])
 
+                    outputs[i].value = val
+                    if asset_name:
+                        # We must re-generate the script with the correct value
+                        outputs[i].scriptpubkey = replace_amount_in_transfer_asset_script(outputs[i].scriptpubkey, val)
+
+                tx = PartialTransaction.from_io(list(coins_to_spend), list(outputs))
+            else:
+                # No max RVN;
+                # Treat as standard tx with change
+                # There will be no change for assets
+                change_addrs = self.get_change_addresses_for_new_transaction(change_addr)
+                sendable: RavenValue = sum(map(lambda c: c.value_sats(), inputs or coins), RavenValue())
+                distr_amount = defaultdict(lambda: 0)
+                current_count = defaultdict(lambda: 0)
+                for (weight, i) in i_max:
+                    asset_name = outputs[i].asset
+                    val = int((sendable.assets[asset_name].value/i_max_sum[asset_name]) * weight)
+
+                    distr_amount[asset_name] += val
+
+                    # (x,i) = i_max[-1]
+                    # If last add extras
+                    if current_count[asset_name] == counts_of_each[asset_name]:
+                        val += (sendable.assets[asset_name].value - distr_amount[asset_name])
+
+                    outputs[i].value = val
+                    if asset_name:
+                        # We must re-generate the script with the correct value
+                        outputs[i].scriptpubkey = replace_amount_in_transfer_asset_script(outputs[i].scriptpubkey, val)
+
+                coin_chooser = coinchooser.get_coin_chooser(self.config)
+                tx = coin_chooser.make_tx(
+                    coins=coins,
+                    inputs=inputs,
+                    outputs=list(outputs),
+                    change_addrs=change_addrs,
+                    fee_estimator_vb=fee_estimator,
+                    dust_threshold=self.dust_threshold(),
+                    asset_divs=asset_divs,
+                    coinbase_outputs=coinbase_outputs,
+                    wallet=self,
+                    freeze_locktime=freeze_locktime,
+                    for_swap=for_swap)
+            
         if locking_script_overrides:
             tx._prevout_overrides = locking_script_overrides
 

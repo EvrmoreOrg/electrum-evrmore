@@ -198,7 +198,7 @@ class Invoice(StoredObject):
             if not (0 <= value.rvn_value <= TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN * 1000):
                 raise InvoiceError(f"amount is out-of-bounds: {value!r} msat")
         elif isinstance(value.rvn_value, str):
-            if value != '!':
+            if value.rvn_value != '!':
                 raise InvoiceError(f"unexpected amount: {value!r}")
         else:
             raise InvoiceError(f"unexpected amount: {value!r}")
@@ -271,5 +271,5 @@ class Invoice(StoredObject):
 
 
 def get_id_from_onchain_outputs(outputs: List[PartialTxOutput], *, timestamp: int) -> str:
-    outputs_str = "\n".join(f"{txout.scriptpubkey.hex()}, {txout.value}" for txout in outputs)
+    outputs_str = "\n".join(f"{txout.scriptpubkey.hex()}, {txout.value}, {str(txout.asset)}" for txout in outputs)
     return sha256d(outputs_str + "%d" % timestamp).hex()[0:10]

@@ -505,8 +505,8 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
 
     def to_json(self):
         d = {
-            'RVN': self.rvn_value.value,
-            'ASSETS': {k: v.value for k, v in self.assets.items()},
+            'RVN': self.rvn_value if isinstance(self.rvn_value, str) else self.rvn_value.value,
+            'ASSETS': {k: v if isinstance(v, str) else v.value for k, v in self.assets.items()},
         }
         return d
 

@@ -1552,7 +1552,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
 
         norm, new = self.reissue_workspace.get_output()
 
-        self.pay_onchain_dialog(
+        self.send_tab.pay_onchain_dialog(
             list(set(self.get_coins(asset=self.reissue_workspace.get_owner()))),
             norm,
             coinbase_outputs=new,
@@ -1598,7 +1598,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
 
         norm, new = self.create_workspace.get_output()
 
-        self.pay_onchain_dialog(
+        self.send_tab.pay_onchain_dialog(
             list(set(self.get_coins(asset=self.create_workspace.get_owner()))),
             norm,
             coinbase_outputs=new,
@@ -1700,7 +1700,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
 
     def get_asset_from_spend_tab(self) -> Optional[str]:
         combo_index = self.send_tab.to_send_combo.currentIndex()
-        if combo_index != 0:
+        if combo_index > 0:
             return self.send_options[combo_index]
         return None
 

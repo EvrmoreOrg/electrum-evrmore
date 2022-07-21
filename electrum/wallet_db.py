@@ -1015,9 +1015,13 @@ class WalletDB(JsonDB):
         if not self._is_upgrade_method_needed(47, 47):
             return
         invoices = self.data.get('invoices', {})
+        invoices_new = {}
         for key, item in list(invoices.items()):
             if item['amount_msat'] == 1000 * "!":
                 item['amount_msat'] = "!"
+            invoices_new[item.get_id()] = item
+        invoices.clear()
+        invoices.update(invoices_new)
         self.data['seed_version'] = 48
 
     def _convert_imported(self):

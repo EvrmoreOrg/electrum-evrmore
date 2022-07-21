@@ -165,7 +165,6 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
                     reg = QRegExp(f'^[0-9]{{0,11}}\\.([0-9]{{1,{divs}}})$')
             validator = QRegExpValidator(reg)
             self.amount_e.setValidator(validator)
-            print('triggered')
 
         self.to_send_combo.currentIndexChanged.connect(on_to_send)
 
@@ -249,8 +248,17 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         outputs = self.payto_e.get_outputs(True)
         if not outputs:
             return
+
+        asset: Optional[str] = None
+        for output in outputs:
+            if output.asset is not None:
+                if asset is None:
+                    asset = output.asset
+                elif asset != output.asset:
+                    raise UserFacingException(_('Only one asset at a time is currently supported.'))
+        
         make_tx = lambda fee_est: self.wallet.make_unsigned_transaction(
-            coins=self.window.get_coins(),
+            coins=self.window.get_coins(asset=asset),
             outputs=outputs,
             fee=fee_est,
             is_sweep=False)
@@ -270,14 +278,24 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
 
         self.max_button.setChecked(True)
         amount = tx.output_value()
-        __, x_fee_amount = run_hook('get_tx_extra_fee', self.wallet, tx) or (None, 0)
+            
+        __, x_fee_amount = run_hook('get_tx_extra_fee', self.wallet, tx) or (None, RavenValue())
         amount_after_all_fees = amount - x_fee_amount
+
+        if amount_after_all_fees.assets:
+            if len(amount_after_all_fees.assets) > 1:
+                raise UserFacingException(_('Only one asset operation at a time is supported'))
+            amount_after_all_fees = list(amount_after_all_fees.assets.values())[0].value
+        else:
+            amount_after_all_fees = amount_after_all_fees.rvn_value.value
+
         self.amount_e.setAmount(amount_after_all_fees)
         # show tooltip explaining max amount
         mining_fee = tx.get_fee()
-        mining_fee_str = self.format_amount_and_units(mining_fee)
+        # Mining fees will only be rvn
+        mining_fee_str = self.format_amount_and_units(mining_fee.rvn_value.value)
         msg = _("Mining fee: {} (can be adjusted on next screen)").format(mining_fee_str)
-        if x_fee_amount:
+        if x_fee_amount != RavenValue():
             twofactor_fee_str = self.format_amount_and_units(x_fee_amount)
             msg += "\n" + _("2fa fee: {} (for the next batch of transactions)").format(twofactor_fee_str)
         frozen_bal = self.get_frozen_balance_str()
@@ -288,7 +306,8 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
     def pay_onchain_dialog(
             self, inputs: Sequence[PartialTxInput],
             outputs: List[PartialTxOutput], *,
-            external_keypairs=None) -> None:
+            external_keypairs=None,
+            coinbase_outputs: List[PartialTxOutput]=None) -> None:
         # trustedcoin requires this
         if run_hook('abort_send', self):
             return
@@ -318,7 +337,8 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
             coins=inputs,
             outputs=outputs,
             fee=fee_est,
-            is_sweep=is_sweep)
+            is_sweep=is_sweep,
+            coinbase_outputs=coinbase_outputs)
         output_values = [x.raven_value for x in outputs]
         if any(parse_max_spend(outval) for outval in output_values):
             output_value = '!'
@@ -376,7 +396,7 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
 
     def get_frozen_balance_str(self) -> Optional[str]:
         frozen_bal = sum(self.wallet.get_frozen_balance(), RavenValue())
-        if not frozen_bal:
+        if frozen_bal == RavenValue():
             return None
         return self.format_amount_and_units(frozen_bal)
 
@@ -694,12 +714,10 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
     def read_outputs(self) -> List[PartialTxOutput]:
         if self.payment_request:
             outputs = self.payment_request.get_outputs()
-            print(f'1: {outputs}')
         else:
             # Double check in case asset has changed
             self.payto_e._check_text(full_check=True, force_check=True)
             outputs = self.payto_e.get_outputs(self.max_button.isChecked())
-            print(f'2: {outputs}')
         return outputs
 
     def check_send_tab_onchain_outputs_and_show_errors(self, outputs: List[PartialTxOutput]) -> bool:

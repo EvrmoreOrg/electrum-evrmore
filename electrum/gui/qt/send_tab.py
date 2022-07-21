@@ -297,7 +297,11 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         op_return_raw: str = self.op_return_e.text()
         if len(op_return_raw) > 0:
             try:
-                op_return_encoded = bytes.fromhex(op_return_raw)
+                if len(op_return_raw) % 2 == 0:
+                    text_to_encode = op_return_raw
+                else:
+                    text_to_encode = op_return_raw[:-1]
+                op_return_encoded = bytes.fromhex(text_to_encode)
             except ValueError:
                 op_return_encoded = op_return_raw.encode('utf8')
 
@@ -573,6 +577,7 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
             return
         try:
             if not self._is_onchain:
+                raise UserFacingException(_('Only on-chain invoices are currently supported'))
                 invoice_str = self.payto_e.lightning_invoice
                 if not invoice_str:
                     return
@@ -689,8 +694,12 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
     def read_outputs(self) -> List[PartialTxOutput]:
         if self.payment_request:
             outputs = self.payment_request.get_outputs()
+            print(f'1: {outputs}')
         else:
+            # Double check in case asset has changed
+            self.payto_e._check_text(full_check=True, force_check=True)
             outputs = self.payto_e.get_outputs(self.max_button.isChecked())
+            print(f'2: {outputs}')
         return outputs
 
     def check_send_tab_onchain_outputs_and_show_errors(self, outputs: List[PartialTxOutput]) -> bool:

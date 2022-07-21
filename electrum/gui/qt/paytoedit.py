@@ -130,6 +130,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
         scriptpubkey = self.parse_output(x)
         amount = self.parse_amount(y)
         asset = self.win.get_asset_from_spend_tab()
+        print(f'asset from send tab: {asset}')
         if asset is not None:
             script = assets.create_transfer_asset_script(scriptpubkey, asset, amount)
             return PartialTxOutput(scriptpubkey=script, value=amount, asset=asset)
@@ -195,8 +196,8 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
             return
         self._check_text(full_check=True)
 
-    def _check_text(self, *, full_check: bool):
-        if self.previous_payto == str(self.toPlainText()).strip():
+    def _check_text(self, *, full_check: bool, force_check: bool = False):
+        if not force_check and self.previous_payto == str(self.toPlainText()).strip():
             return
         if full_check:
             self.previous_payto = str(self.toPlainText()).strip()

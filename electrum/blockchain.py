@@ -458,7 +458,7 @@ class Blockchain(Logger):
             s += 1
 
         # DGW must be received in correct chunk sizes to be valid with our checkpoints
-        if start_height >= constants.net.DGW_CHECKPOINTS_START:
+        if constants.net.DGW_CHECKPOINTS_START <= start_height <= constants.net.max_dgw_checkpoint():
             assert start_height % constants.net.DGW_CHECKPOINTS_SPACING == 0, 'dgw chunk not from start'
             assert s - start_height == constants.net.DGW_CHECKPOINTS_SPACING, 'dgw chunk not correct size'
 

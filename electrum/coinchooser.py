@@ -93,17 +93,17 @@ def strip_unneeded(bkts: List[Bucket], needs_more) -> List[Bucket]:
         # none of the buckets are needed
         return []
 
-    a = sum([b.value for b in bkts], RavenValue()).assets.keys()
+    associated_assets = sum([b.value for b in bkts], RavenValue()).assets.keys()
 
     bkts_rvn = sorted([b for b in bkts if b.value.rvn_value.value != 0],
                       key=lambda bkt: bkt.value.rvn_value.value, reverse=True)
 
     bkts_asset = {asset: sorted([b for b in bkts if asset in b.value.assets.keys()],
-                                key=lambda bkt: bkt.value.assets[asset].value, reverse=True) for asset in a}
+                                key=lambda bkt: bkt.value.assets[asset].value, reverse=True) for asset in associated_assets}
 
     rvn_ptr = 0
 
-    asset_ptr = {asset: -1 for asset in a}
+    asset_ptr = {asset: -1 for asset in associated_assets}
 
     def get_rvn_bucket_value() -> RavenValue:
         try:
@@ -219,7 +219,7 @@ class CoinChooserBase(Logger):
         if not output_amounts_rvn:
             # Append an amount for the vout after our transaction fee
             output_amounts_rvn = [max(0, tx.get_fee().rvn_value.value -
-                                  fee_estimator_numchange(1, assets_change))]
+                                  fee_estimator_numchange(1 + len(assets_change), assets_change))]
 
         # Don't split change of less than 0.02 BTC
         max_change_rvn = max(max([o for o in output_amounts_rvn]) * 1.25, 0.02 * COIN)
@@ -233,7 +233,7 @@ class CoinChooserBase(Logger):
             # i.e. what should be going in our vouts
             n = n1
             change_amount_rvn = max(0, tx.get_fee().rvn_value.value -
-                                    fee_estimator_numchange(n1, assets_change))
+                                    fee_estimator_numchange(n1 + len(assets_change), assets_change))
             if change_amount_rvn // n1 <= max_change_rvn:
                 break
 
@@ -599,6 +599,7 @@ class CoinChooserPrivacy(CoinChooserRandom):
     """
 
     def keys(self, coins):
+        # Spend all coins associated with an address
         return [coin.scriptpubkey.hex() for coin in coins]
 
     def penalty_func(self, base_tx, *, tx_from_buckets):

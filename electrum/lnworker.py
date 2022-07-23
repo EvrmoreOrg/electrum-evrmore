@@ -1075,7 +1075,7 @@ class LNWallet(LNWorker):
         if self.has_recoverable_channels():
             dummy_scriptpubkey = make_op_return(self.cb_data(node_id))
             outputs.append(PartialTxOutput(scriptpubkey=dummy_scriptpubkey, value=0))
-        tx = self.wallet.make_unsigned_transaction(
+        tx, _ = self.wallet.make_unsigned_transaction(
             coins=coins,
             outputs=outputs,
             fee=fee_est)

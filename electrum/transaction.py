@@ -1218,7 +1218,10 @@ class Transaction:
         return self.virtual_size_from_weight(weight)
 
     def has_unbalanced_assets(self) -> bool:
-        difference: RavenValue = sum((x.value_sats() for x in self.inputs()), RavenValue()) - sum((x.raven_value for x in self.outputs()), RavenValue())
+        try:
+            difference: RavenValue = sum((x.value_sats() for x in self.inputs()), RavenValue()) - sum((x.raven_value for x in self.outputs()), RavenValue())
+        except ValueError:
+            return False
         for val in difference.assets.values():
             if val > 0:
                 return True

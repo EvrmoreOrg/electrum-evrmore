@@ -263,7 +263,10 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
                         idx=i, line_content=line.strip(), exc=e, is_multiline=True))
                     continue
             outputs.append(output)
-            total += output.value
+            if parse_max_spend(output.value):
+                is_max = True
+            else:
+                total += output.value
         if outputs:
             self.send_tab.set_onchain(True)
 

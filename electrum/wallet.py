@@ -54,7 +54,7 @@ from .bip32 import BIP32Node, convert_bip32_intpath_to_strpath, convert_bip32_pa
 from .crypto import sha256
 from . import util
 from .util import (NotEnoughFunds, UserCancelled, profiler, OldTaskGroup, ignore_exceptions,
-                   format_satoshis, format_fee_satoshis, NoDynamicFeeEstimates,
+                   format_satoshis, format_fee_satoshis, NoDynamicFeeEstimates, AssetAmountModified,
                    WalletFileException, BitcoinException,
                    InvalidPassword, format_time, timestamp_to_datetime, Satoshis,
                    Fiat, bfh, bh2u, TxMinedInfo, quantize_feerate, create_bip21_uri, OrderedDictWithIndex, 
@@ -1585,6 +1585,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             freeze_locktime=None,
             for_swap=False,
             locking_script_overrides=None,
+            raise_on_asset_changes=True
         ) -> PartialTransaction:
 
         if not coins and not inputs:  # any bitcoin tx must have at least 1 input by consensus
@@ -1698,6 +1699,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                 spendable_coins = list(coins if inputs else [])
                 coins_to_spend = list(inputs or coins)
                 total_amount = RavenValue(-1)
+                outputs_to_remove = []
 
                 initial = True
                 while total_amount.rvn_value.value <= 0:
@@ -1716,10 +1718,22 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                 current_count = defaultdict(lambda: 0)
                 for (weight, i) in i_max:
                     asset_name = outputs[i].asset
+                    current_count[asset_name] += 1
                     if asset_name is None:
                         val = int((total_amount.rvn_value.value/i_max_sum[None]) * weight)
                     else:
                         val = int((total_amount.assets[asset_name].value/i_max_sum[asset_name]) * weight)
+                        # Must evenly distribute based on divisibility
+                        asset_meta = self.adb.get_asset_meta(asset_name)
+                        divisibility = 8
+                        if asset_meta:
+                            divisibility = asset_meta.divisions
+
+                        minimum_sats = COIN * pow(10, -divisibility)
+                        old_val = val
+                        val = val - (val % minimum_sats)
+                        if old_val > val and raise_on_asset_changes:
+                            raise AssetAmountModified()
 
                     distr_amount[asset_name] += val
 
@@ -1730,12 +1744,17 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                             val += (total_amount.rvn_value.value - distr_amount[asset_name])
                         else:
                             val += (total_amount.assets[asset_name].value - distr_amount[asset_name])
+                    elif val == 0:
+                        outputs_to_remove.append(i)
 
                     outputs[i].value = val
                     if asset_name:
                         # We must re-generate the script with the correct value
                         outputs[i].scriptpubkey = replace_amount_in_transfer_asset_script(outputs[i].scriptpubkey, val)
 
+
+                for i in sorted(outputs_to_remove, reverse=True):
+                    outputs.pop(i)
                 tx = PartialTransaction.from_io(list(coins_to_spend), list(outputs))
             else:
                 # No max RVN;
@@ -1745,9 +1764,22 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                 sendable: RavenValue = sum(map(lambda c: c.value_sats(), inputs or coins), RavenValue())
                 distr_amount = defaultdict(lambda: 0)
                 current_count = defaultdict(lambda: 0)
+                outputs_to_remove = []
                 for (weight, i) in i_max:
                     asset_name = outputs[i].asset
+                    current_count[asset_name] += 1
                     val = int((sendable.assets[asset_name].value/i_max_sum[asset_name]) * weight)
+                    # Must evenly distribute based on divisibility
+                    asset_meta = self.adb.get_asset_meta(asset_name)
+                    divisibility = 8
+                    if asset_meta:
+                        divisibility = asset_meta.divisions
+
+                    minimum_sats = COIN * pow(10, -divisibility)
+                    old_val = val
+                    val = val - (val % minimum_sats)
+                    if old_val > val and raise_on_asset_changes:
+                        raise AssetAmountModified()
 
                     distr_amount[asset_name] += val
 
@@ -1755,11 +1787,16 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                     # If last add extras
                     if current_count[asset_name] == counts_of_each[asset_name]:
                         val += (sendable.assets[asset_name].value - distr_amount[asset_name])
+                    elif val == 0:
+                        outputs_to_remove.append(i)
 
                     outputs[i].value = val
                     if asset_name:
                         # We must re-generate the script with the correct value
                         outputs[i].scriptpubkey = replace_amount_in_transfer_asset_script(outputs[i].scriptpubkey, val)
+
+                for i in sorted(outputs_to_remove, reverse=True):
+                    outputs.pop(i)
 
                 coin_chooser = coinchooser.get_coin_chooser(self.config)
                 tx = coin_chooser.make_tx(

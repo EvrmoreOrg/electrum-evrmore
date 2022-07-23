@@ -224,6 +224,10 @@ class ConfirmTxDialog(TxEditor, WindowModalDialog):
         if parse_max_spend(self.output_value) is not None:
             if tx:
                 amount = tx.output_value()
+                tx.input_value()
+                if amount.assets and not parse_max_spend(amount.rvn_value):
+                    # If we are not max spending rvn, don't display it
+                    amount = RavenValue(0, amount.assets)
                 amount_str = self.main_window.format_amount_and_units(amount)
             else:
                 amount_str = "max"

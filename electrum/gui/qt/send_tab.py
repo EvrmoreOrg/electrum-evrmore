@@ -17,7 +17,7 @@ from electrum import util, paymentrequest
 from electrum import lnutil
 from electrum.plugin import run_hook
 from electrum.i18n import _
-from electrum.util import (UserFacingException, get_asyncio_loop, bh2u,
+from electrum.util import (AssetAmountModified, UserFacingException, get_asyncio_loop, bh2u,
                            InvalidBitcoinURI, maybe_extract_lightning_payment_identifier, NotEnoughFunds,
                            NoDynamicFeeEstimates, InvoiceError, parse_max_spend, RavenValue)
 from electrum.invoices import PR_PAID, Invoice
@@ -65,6 +65,7 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         self.payto_URI = None
         self.payment_request = None  # type: Optional[paymentrequest.PaymentRequest]
         self.pending_invoice = None
+        self.notify_asset_amounts_have_changed = False
 
         # A 4-column grid layout.  All the stretch is in the last column.
         # The exchange rate plugin adds a fiat widget in column 2
@@ -166,6 +167,9 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
             validator = QRegExpValidator(reg)
             self.amount_e.setValidator(validator)
 
+            # In case of max, update amount
+            self.read_outputs()
+
         self.to_send_combo.currentIndexChanged.connect(on_to_send)
 
         msg = (_('The amount to be received by the recipient.') + ' '
@@ -257,24 +261,34 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
                 elif asset != output.asset:
                     raise UserFacingException(_('Only one asset at a time is currently supported.'))
         
-        make_tx = lambda fee_est: self.wallet.make_unsigned_transaction(
+        make_tx = lambda fee_est, raise_on_asset_amount_modified: self.wallet.make_unsigned_transaction(
             coins=self.window.get_coins(asset=asset),
             outputs=outputs,
             fee=fee_est,
-            is_sweep=False)
+            is_sweep=False,
+            raise_on_asset_changes=raise_on_asset_amount_modified)
 
-        try:
+        raise_on_asset_amount_modified = True
+        while True:
             try:
-                tx = make_tx(None)
-            except (NotEnoughFunds, NoDynamicFeeEstimates) as e:
-                # Check if we had enough funds excluding fees,
-                # if so, still provide opportunity to set lower fees.
-                tx = make_tx(0)
-        except NotEnoughFunds as e:
-            self.max_button.setChecked(False)
-            text = self.get_text_not_enough_funds_mentioning_frozen()
-            self.show_error(text)
-            return
+                try:
+                    try:
+                        tx = make_tx(None, raise_on_asset_amount_modified)
+                        break
+                    except (NotEnoughFunds, NoDynamicFeeEstimates) as e:
+                        # Check if we had enough funds excluding fees,
+                        # if so, still provide opportunity to set lower fees.
+                        tx = make_tx(0, raise_on_asset_amount_modified)
+                        break
+                except AssetAmountModified:
+                    self.notify_asset_amounts_have_changed = True
+                    raise_on_asset_amount_modified = False
+                    continue
+            except NotEnoughFunds as e:
+                self.max_button.setChecked(False)
+                text = self.get_text_not_enough_funds_mentioning_frozen()
+                self.show_error(text)
+                return
 
         self.max_button.setChecked(True)
         amount = tx.output_value()
@@ -338,7 +352,8 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
             outputs=outputs,
             fee=fee_est,
             is_sweep=is_sweep,
-            coinbase_outputs=coinbase_outputs)
+            coinbase_outputs=coinbase_outputs,
+            raise_on_asset_changes=False)
         output_values = [x.raven_value for x in outputs]
         if any(parse_max_spend(outval) for outval in output_values):
             output_value = '!'
@@ -701,6 +716,12 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
             raise UserFacingException(_('Lightning is currently not supported'))
             self.pay_lightning_invoice(invoice)
         else:
+            if self.notify_asset_amounts_have_changed:
+                self.notify_asset_amounts_have_changed = False
+                text = _('Asset amounts could not be properly distributed evenly due to\n' +
+                        'this asset\'s divisibility. Amounts may not be what you\n' +
+                        'expect. Click "Advanced" on the payment window for more information.')
+                self.show_warning(text)
             asset: Optional[str] = None
             invoice_outputs: Optional[List[PartialTxOutput]] = invoice.outputs
             for output in invoice_outputs:

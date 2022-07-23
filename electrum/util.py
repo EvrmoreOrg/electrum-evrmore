@@ -155,6 +155,9 @@ class NoDynamicFeeEstimates(Exception):
     def __str__(self):
         return _('Dynamic fee estimates not available')
 
+class AssetAmountModified(Exception):
+    pass
+
 
 class InvalidPassword(Exception):
     def __init__(self, message: Optional[str] = None):

@@ -279,6 +279,7 @@ class TxWalletDetails(NamedTuple):
     mempool_depth_bytes: Optional[int]
     can_remove: bool  # whether user should be allowed to delete tx
     is_lightning_funding_tx: bool
+    has_unbalanced_assets: bool
 
 
 class Abstract_Wallet(ABC, Logger, EventListener):
@@ -836,6 +837,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             mempool_depth_bytes=exp_n,
             can_remove=can_remove,
             is_lightning_funding_tx=is_lightning_funding_tx,
+            has_unbalanced_assets=tx.has_unbalanced_assets()
         )
 
     def get_non_frozen_assets(self) -> List[str]:
@@ -1086,7 +1088,6 @@ class Abstract_Wallet(ABC, Logger, EventListener):
         """
         outputs = invoice.get_outputs()
         if not outputs:  # e.g. lightning-only
-            print(1)
             return False, None, []
         invoice_amounts = defaultdict(RavenValue)  # type: Dict[bytes, RavenValue]  # scriptpubkey -> value_sats
         for txo in outputs:  # type: PartialTxOutput
@@ -2943,7 +2944,9 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             self, *,
             invoice_amt: RavenValue,
             tx_size: int,
-            fee: int) -> Optional[Tuple[bool, str, str]]:
+            fee: int,
+            has_unbalanced_assets: bool
+        ) -> Optional[Tuple[bool, str, str]]:
 
         feerate = Decimal(fee) / tx_size  # sat/byte
         fee_ratio = Decimal(fee) / invoice_amt.rvn_value.value if invoice_amt.rvn_value.value else (1 if not invoice_amt.assets else 0)
@@ -2967,6 +2970,12 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                     _('Warning') + ': ' + _("The fee for this transaction seems unusually high.")
                     + f' (feerate: {feerate:.2f} sat/byte)')
             short_warning = _("high fee rate") + "!"
+        elif has_unbalanced_assets:
+            # We will be burning assets:
+            long_warning = (
+                    _('Warning') + ': ' + _("The asset inputs are greater than the asset outputs.")
+                    + f' This will burn assets!')
+            short_warning = _("burning assets") + "!"
         if long_warning is None:
             return None
         else:

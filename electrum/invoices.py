@@ -194,7 +194,20 @@ class Invoice(StoredObject):
     def _validate_amount(self, attribute, value: Optional[RavenValue]):
         if value is None:
             return
-        if isinstance(value.rvn_value, Satoshis):
+        if value.assets:
+            assert value.rvn_value == 0
+            assert len(value.assets) == 1
+            asset_name, asset_val = list(value.assets.items())[0]
+            if isinstance(asset_val, (Satoshis, int)):
+                if not (0 <= asset_val <= TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN * 1000):
+                    raise InvoiceError(f"{asset_name} amount is out-of-bounds: {value!r} msat")
+            elif isinstance(asset_val, str):
+                if asset_val != '!':
+                    raise InvoiceError(f"{asset_name} unexpected amount: {value!r}")
+            else:
+                raise InvoiceError(f"{asset_name} unexpected amount: {value!r}")
+        
+        if isinstance(value.rvn_value, (Satoshis, int)):
             if not (0 <= value.rvn_value <= TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN * 1000):
                 raise InvoiceError(f"amount is out-of-bounds: {value!r} msat")
         elif isinstance(value.rvn_value, str):

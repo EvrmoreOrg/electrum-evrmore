@@ -438,7 +438,7 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
         tx_details = self.wallet.get_tx_info(self.tx)
         tx_mined_status = tx_details.tx_mined_status
         exp_n = tx_details.mempool_depth_bytes
-        amount, fee = tx_details.amount, tx_details.fee
+        amount, fee, has_unbalanced_assets = tx_details.amount, tx_details.fee, tx_details.has_unbalanced_assets
         size = self.tx.estimated_size()
         txid = self.tx.txid()
         fx = self.main_window.fx
@@ -546,7 +546,7 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
                 else:
                     invoice_amt = amount
                 fee_warning_tuple = self.wallet.get_tx_fee_warning(
-                    invoice_amt=invoice_amt, tx_size=size, fee=fee)
+                    invoice_amt=invoice_amt, tx_size=size, fee=fee, has_unbalanced_assets=has_unbalanced_assets)
                 if fee_warning_tuple:
                     allow_send, long_warning, short_warning = fee_warning_tuple
                     fee_str += " - <font color={color}>{header}: {body}</font>".format(

@@ -1217,6 +1217,13 @@ class Transaction:
         weight = self.estimated_weight()
         return self.virtual_size_from_weight(weight)
 
+    def has_unbalanced_assets(self) -> bool:
+        difference: RavenValue = sum((x.value_sats() for x in self.inputs()), RavenValue()) - sum((x.raven_value for x in self.outputs()), RavenValue())
+        for val in difference.assets.values():
+            if val > 0:
+                return True
+        return False
+
     @classmethod
     def estimated_input_weight(cls, txin, is_segwit_tx):
         '''Return an estimate of serialized input weight in weight units.'''

@@ -1242,6 +1242,13 @@ class LnFeatures(IntFlag):
         return (flag in our_flags
                 or get_ln_flag_pair_of_bit(flag) in our_flags)
 
+    def get_names(self) -> Sequence[str]:
+        r = []
+        for flag in list_enabled_bits(self):
+            feature_name = LnFeatures(1 << flag).name
+            r.append(feature_name or f"bit_{flag}")
+        return r
+
 
 class ChannelType(IntFlag):
     OPTION_LEGACY_CHANNEL = 0

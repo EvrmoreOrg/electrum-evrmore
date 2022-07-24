@@ -17,6 +17,7 @@ from electrum import util, paymentrequest
 from electrum import lnutil
 from electrum.plugin import run_hook
 from electrum.i18n import _
+from electrum.ravencoin import COIN
 from electrum.util import (AssetAmountModified, UserFacingException, get_asyncio_loop, bh2u,
                            InvalidBitcoinURI, maybe_extract_lightning_payment_identifier, NotEnoughFunds,
                            NoDynamicFeeEstimates, InvoiceError, parse_max_spend, RavenValue)
@@ -75,7 +76,7 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
 
         # Let user choose to send RVN or Asset
         self.to_send_combo = QComboBox()
-        self.amount_e = PayToAmountEdit(self.window.get_decimal_point,
+        self.amount_e = PayToAmountEdit(lambda: 8 if self.to_send_combo.currentIndex() > 0 else self.window.get_decimal_point(),
                                         lambda: self.window.send_options[self.to_send_combo.currentIndex()][:4])
 
         from .paytoedit import PayToEdit
@@ -149,7 +150,6 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
 
         def on_to_send():
             vis = self.config.get('enable_op_return_messages', False)
-            self.amount_e.update()
 
             i = self.to_send_combo.currentIndex()
             self.fiat_send_e.setVisible(i == 0)
@@ -164,8 +164,14 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
                     reg = QRegExp('^[1-9][0-9]{0,10}$')
                 else:
                     reg = QRegExp(f'^[0-9]{{0,11}}\\.([0-9]{{1,{divs}}})$')
+                amt_sats = self.amount_e.get_amount()
+                if amt_sats:
+                    minimum_sats = COIN * pow(10, -divs)
+                    new_sats = amt_sats - (amt_sats % minimum_sats)
+                    self.amount_e.setAmount(new_sats)
             validator = QRegExpValidator(reg)
             self.amount_e.setValidator(validator)
+            self.amount_e.update()
 
             # In case of max, update amount
             self.read_outputs()

@@ -220,6 +220,7 @@ class AddressList(MyTreeView):
         label = self.wallet.get_label(address)
         num = self.wallet.adb.get_address_history_len(address)
         c, u, x = self.wallet.get_addr_balance(address)
+        # TODO: Figure out a way to display assets
         balance = c.rvn_value + u.rvn_value + x.rvn_value
         balance_text = self.parent.format_amount(balance, whitespaces=True)
         # create item

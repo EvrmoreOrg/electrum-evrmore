@@ -34,7 +34,7 @@ from PyQt5.QtWidgets import QApplication
 from electrum import ravencoin, assets
 from electrum.util import bfh, parse_max_spend
 from electrum.transaction import PartialTxOutput
-from electrum.ravencoin import opcodes, construct_script
+from electrum.ravencoin import COIN, opcodes, construct_script
 from electrum.logging import Logger
 from electrum.lnurl import LNURLError
 
@@ -59,6 +59,9 @@ class PayToLineError(NamedTuple):
     exc: Exception
     idx: int = 0  # index of line
     is_multiline: bool = False
+
+class InvalidAssetAmount(Exception):
+    pass
 
 
 class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
@@ -130,7 +133,15 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
         scriptpubkey = self.parse_output(x)
         amount = self.parse_amount(y)
         asset = self.win.get_asset_from_spend_tab()
-        print(f'asset from send tab: {asset}')
+        divisibility = 8
+        if asset:
+            asset_meta = self.win.wallet.adb.get_asset_meta(asset)
+            if asset_meta:
+                divisibility = asset_meta.divisions
+        min_divisibility = COIN * pow(10, -divisibility)
+        if amount % min_divisibility != 0:
+            raise InvalidAssetAmount(f'amount {y} exceeds the minimum amount for asset {asset} ({pow(10, -divisibility)})') from None
+        
         if asset is not None:
             script = assets.create_transfer_asset_script(scriptpubkey, asset, amount)
             return PartialTxOutput(scriptpubkey=script, value=amount, asset=asset)
@@ -225,6 +236,9 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
             # try "address, amount" on-chain format
             try:
                 self._parse_as_multiline(lines, raise_errors=True)
+            except InvalidAssetAmount as e:
+                self.errors.append(PayToLineError(line_content=data, exc=e))
+                return
             except Exception as e:
                 pass
             else:

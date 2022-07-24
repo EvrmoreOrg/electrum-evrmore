@@ -1694,6 +1694,12 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             for (_,i) in i_max:
                 outputs[i].value = 0
             
+            distr_amount = defaultdict(lambda: 0)
+            current_count = defaultdict(lambda: 0)
+            for asset, value in sum((x.raven_value for x in outputs), RavenValue()).assets.items():
+                if value > 0:
+                    distr_amount[asset] = value.value
+
             if None in counts_of_each:
                 # Max spend RVN
                 spendable_coins = list(coins if inputs else [])
@@ -1714,8 +1720,6 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                     total_amount = sendable - tx.output_value() - RavenValue(fee)
                     initial = False
 
-                distr_amount = defaultdict(lambda: 0)
-                current_count = defaultdict(lambda: 0)
                 for (weight, i) in i_max:
                     asset_name = outputs[i].asset
                     current_count[asset_name] += 1
@@ -1762,8 +1766,6 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                 # There will be no change for assets
                 change_addrs = self.get_change_addresses_for_new_transaction(change_addr)
                 sendable: RavenValue = sum(map(lambda c: c.value_sats(), inputs or coins), RavenValue())
-                distr_amount = defaultdict(lambda: 0)
-                current_count = defaultdict(lambda: 0)
                 outputs_to_remove = []
                 for (weight, i) in i_max:
                     asset_name = outputs[i].asset

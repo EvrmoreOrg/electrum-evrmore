@@ -49,6 +49,8 @@ import asyncio
 
 from aiorpcx import timeout_after, TaskTimeout, ignore_after, run_in_thread
 
+from electrum import constants
+
 from .i18n import _
 from .bip32 import BIP32Node, convert_bip32_intpath_to_strpath, convert_bip32_path_to_list_of_uint32
 from .crypto import sha256
@@ -1442,7 +1444,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             # 6 clock images
             # confirmed in 60
             # /10 per clock
-            status = 3 + min(max(math.floor(conf / 10), 1), 6)
+            status = 3 + min(max(math.floor(conf / (constants.net.MATURE // 6)), 1), 6)
         time_str = format_time(timestamp) if timestamp else _("unknown")
         status_str = TX_STATUS[status] if status < 4 else time_str
         if extra:

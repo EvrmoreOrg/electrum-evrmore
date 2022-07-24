@@ -4,7 +4,7 @@
 
 import asyncio
 from decimal import Decimal
-from typing import Optional, TYPE_CHECKING, Sequence, List
+from typing import Optional, TYPE_CHECKING, Sequence, List, Dict
 from urllib.parse import urlparse
 
 from PyQt5.QtCore import pyqtSignal, QPoint, QRegExp
@@ -327,7 +327,11 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
             self, inputs: Sequence[PartialTxInput],
             outputs: List[PartialTxOutput], *,
             external_keypairs=None,
-            coinbase_outputs: List[PartialTxOutput]=None) -> None:
+            mixed=False,
+            coinbase_outputs: List[PartialTxOutput]=None,
+            mandatory_inputs: List[PartialTxInput]=list(),
+            locking_script_overrides: Dict[str, str]=None
+        ) -> None:
         # trustedcoin requires this
         if run_hook('abort_send', self):
             return
@@ -359,6 +363,8 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
             fee=fee_est,
             is_sweep=is_sweep,
             coinbase_outputs=coinbase_outputs,
+            inputs=mandatory_inputs,
+            locking_script_overrides=locking_script_overrides,
             raise_on_asset_changes=False)
         output_values = [x.raven_value for x in outputs]
         if any(parse_max_spend(outval) for outval in output_values):
@@ -380,6 +386,7 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
                 window=self.window,
                 make_tx=make_tx,
                 external_keypairs=external_keypairs,
+                mixed=mixed,
                 output_value=output_value)
             preview_dlg.show()
             return
@@ -396,12 +403,14 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
                 tx,
                 callback=sign_done,
                 password=password,
+                mixed=mixed,
                 external_keypairs=external_keypairs,
             )
         else:
             preview_dlg = PreviewTxDialog(
                 window=self.window,
                 make_tx=make_tx,
+                mixed=mixed,
                 external_keypairs=external_keypairs,
                 output_value=output_value)
             preview_dlg.show()

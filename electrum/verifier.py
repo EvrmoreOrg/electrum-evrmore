@@ -150,11 +150,15 @@ class SPV(NetworkJobOnDefaultServer):
 
         async def parse_and_verify(asset, result: AssetMeta):
             og = self.wallet.get_asset_meta(asset)
-            if og and og.height > result.height:
-                raise AssetVerification(f"Server is trying to send old asset data")
+            print(og)
+            print(result)
+            if og and (og.height - constants.net.MATURE > result.height):
+                raise AssetVerification(f"Server is trying to send old asset data for source (height {og.height} vs {result.height})")
 
             if result.source_divisions and result.div_height:
                 div_height = result.div_height
+                if og and og.div_height is not None and (og.div_height - constants.net.MATURE > div_height):
+                    raise AssetVerification(f"Server is trying to send old asset data for division source (height {og.div_height} vs {div_height})")
                 prev_txid = result.source_divisions.txid.hex()
                 prev_idx = result.source_divisions.out_idx
                 try:
@@ -167,6 +171,8 @@ class SPV(NetworkJobOnDefaultServer):
             
             if result.source_ipfs and result.ipfs_height:
                 ipfs_height = result.ipfs_height
+                if og and og.ipfs_height is not None and (og.ipfs_height - constants.net.MATURE> ipfs_height):
+                    raise AssetVerification(f"Server is trying to send old asset data for ipfs source (height {og.ipfs_height} vs {ipfs_height})")
                 prev_txid = result.source_ipfs.txid.hex()
                 prev_idx = result.source_ipfs.out_idx
                 try:

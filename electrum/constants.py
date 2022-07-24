@@ -77,6 +77,7 @@ class AbstractNet:
     DGW_CHECKPOINTS = None
     DGW_CHECKPOINTS_SPACING = 0
     DGW_CHECKPOINTS_START = 0
+    MATURE = 0
 
     NET_NAME: str
     TESTNET: bool
@@ -111,6 +112,7 @@ class RavencoinMainnet(AbstractNet):
     ADDRTYPE_P2PKH = 60
     ADDRTYPE_P2SH = 122
     ADDRTYPE_P2SH_ALT = 122
+    MATURE = 60
     SEGWIT_HRP = ""
     BOLT11_HRP = SEGWIT_HRP
     GENESIS = "0000006b444bc2f2ffe627be9d9e7e7a0730000870ef6eb6da46c8eae389df90"
@@ -176,6 +178,7 @@ class RavencoinTestnet(AbstractNet):
     ADDRTYPE_P2PKH = 111
     ADDRTYPE_P2SH = 196
     ADDRTYPE_P2SH_ALT = 196
+    MATURE = 60
     SEGWIT_HRP = ""
     BOLT11_HRP = SEGWIT_HRP
     GENESIS = "000000ecfc5e6324a079542221d00e10362bdc894d56500c414060eea8a3ad5a"

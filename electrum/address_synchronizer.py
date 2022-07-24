@@ -362,19 +362,22 @@ class AddressSynchronizer(Logger, EventListener):
                 self.db.add_prevout_by_scripthash(scripthash, prevout=TxOutpoint.from_str(ser), value=v)
                 addr = txo.address
                 if addr and self.is_mine(addr):
-                    if txo.asset:
+                    if asset:
                         if asset not in self.get_assets():
                             self.add_asset(asset)
                         try:
                             d = pull_meta_from_create_or_reissue_script(txo.scriptpubkey)
-                            if d['type'] in ('r', 'q'):
+                            if d['type'] in ('r', 'q', 'o'):
+                                print(f'Adding reissue point for asset {asset} ({d["type"]}) at {ser} ({tx_height})')
                                 self.db.add_asset_reissue_point(asset, ser, txo.scriptpubkey.hex())
                         except:
                             pass
                         if is_asset_output_script_malformed_or_non_standard(txo.scriptpubkey):
+                            print(f'Adding malformed asset script {asset} at {ser} ({tx_height})')
                             self.db.add_nonstandard_outpoint(ser, txo.scriptpubkey.hex())
 
                     if is_output_script_p2pk(txo.scriptpubkey):
+                        print(f'Adding p2pk script at {ser} ({tx_height})')
                         self.db.add_nonstandard_outpoint(ser, txo.scriptpubkey.hex())
 
                     self.db.add_txo_addr(tx_hash, addr, n, v, is_coinbase)

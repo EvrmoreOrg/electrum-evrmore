@@ -319,30 +319,17 @@ def guess_asset_script_for_vin(script: bytes, asset: str, amt: int, txin, wallet
         script = create_transfer_asset_script(script, asset, amt).hex()
         return script
     else:
-        meta = wallet.adb.get_asset_meta(asset)
+        # Ensure we are using the latest meta for mempool spend chaining
+        meta = wallet.adb.get_unverified_asset_meta(asset)
+        if not meta:
+            meta = wallet.adb.get_asset_meta(asset)
         reissue_outpoints = wallet.adb.get_asset_reissue_outpoints(asset)
         
         if not meta:
             _logger.warning("Using best effort pre-image script for asset: no meta: {}".format(asset))
             script = create_transfer_asset_script(script, asset, amt).hex()
             return script
-        # We need to find out what the correct prevout script should be.
-        if meta.source_outpoint.txid == txin.prevout.txid:
-            # Our script is some source type
-            if meta.source_type == 'o':
-                script = create_owner_asset_script(script, asset).hex()
-            elif meta.source_type == 'q':
-                script = create_new_asset_script(script, asset, amt, meta.divisions,
-                                                 meta.is_reissuable,
-                                                 base_decode(meta.ipfs_str,
-                                                             base=58) if meta.ipfs_str else None).hex()
-            else:
-                script = create_reissue_asset_script(script, asset, amt,
-                                                         b'\xff' if meta.source_divisions else bytes([meta.divisions]), 
-                                                         meta.is_reissuable,
-                                                         base_decode(meta.ipfs_str,
-                                                                     base=58) if (meta.ipfs_str and not meta.source_ipfs) else None).hex()
-        elif txin.prevout.to_str() in reissue_outpoints:
+        if txin.prevout.to_str() in reissue_outpoints:
             script = reissue_outpoints[txin.prevout.to_str()]
         else:
             script = create_transfer_asset_script(script, asset, amt).hex()

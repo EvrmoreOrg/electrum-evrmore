@@ -1700,6 +1700,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             distr_amount = defaultdict(lambda: 0)
             current_count = defaultdict(lambda: 0)
             for asset, value in sum((x.raven_value for x in outputs), RavenValue()).assets.items():
+                # Initialize the distr_amount in order to mix static amounts and '!' amounts
                 if value > 0:
                     distr_amount[asset] = value.value
 

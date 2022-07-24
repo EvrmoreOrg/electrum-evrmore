@@ -81,7 +81,7 @@ async def try_download_ipfs(parent, ipfs, downloading, url, only_headers=True, p
                 if only_headers or resp.content_type not in VIEWABLE_MIMES or \
                     (resp.content_length and resp.content_length > parent.config.get('max_ipfs_size', 1024 * 1024 * 10)):
                     info = IPFSData(ipfs, resp.content_type, resp.content_length, False)
-                    parent.wallet.add_ipfs_information(info)
+                    parent.wallet.adb.add_ipfs_information(info)
                     downloading.discard(ipfs)
                     return
                 while True:
@@ -100,7 +100,7 @@ async def try_download_ipfs(parent, ipfs, downloading, url, only_headers=True, p
                     with open(ipfs_path, 'ab') as f:
                         f.write(chunk)
     except asyncio.exceptions.TimeoutError:
-        parent.wallet.add_ipfs_information(IPFSData(
+        parent.wallet.adb.add_ipfs_information(IPFSData(
                     ipfs,
                     None,
                     None,
@@ -120,7 +120,7 @@ async def try_download_ipfs(parent, ipfs, downloading, url, only_headers=True, p
         return
 
     info = IPFSData(ipfs, resp.content_type, total_downloaded, True) #, is_rip14)
-    parent.wallet.add_ipfs_information(info)
+    parent.wallet.adb.add_ipfs_information(info)
     downloading.discard(ipfs)
 
 

@@ -1729,14 +1729,23 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                     if asset_name is None:
                         val = int((total_amount.rvn_value.value/i_max_sum[None]) * weight)
                     else:
-                        val = int((total_amount.assets[asset_name].value/i_max_sum[asset_name]) * weight)
+                        try:
+                            # This is the case in which none of this asset is avaliable
+                            # i.e. specified the max amount as input then added another with '!'
+                            val = int((total_amount.assets[asset_name].value/i_max_sum[asset_name]) * weight)
+                        except KeyError:
+                            val = 0
+                            outputs_to_remove.append(i)
+                            if raise_on_asset_changes:
+                                raise AssetAmountModified()
+
                         # Must evenly distribute based on divisibility
                         asset_meta = self.adb.get_asset_meta(asset_name)
                         divisibility = 8
                         if asset_meta:
                             divisibility = asset_meta.divisions
 
-                        minimum_sats = COIN * pow(10, -divisibility)
+                        minimum_sats = int(COIN * pow(10, -divisibility))
                         old_val = val
                         val = val - (val % minimum_sats)
                         if old_val > val and raise_on_asset_changes:
@@ -1750,7 +1759,11 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                         if not asset_name:
                             val += (total_amount.rvn_value.value - distr_amount[asset_name])
                         else:
-                            val += (total_amount.assets[asset_name].value - distr_amount[asset_name])
+                            try:
+                                val += (total_amount.assets[asset_name].value - distr_amount[asset_name])
+                            except KeyError:
+                                # This case has none of this asset avaliable
+                                pass
                     elif val == 0:
                         outputs_to_remove.append(i)
 
@@ -1773,14 +1786,22 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                 for (weight, i) in i_max:
                     asset_name = outputs[i].asset
                     current_count[asset_name] += 1
-                    val = int((sendable.assets[asset_name].value/i_max_sum[asset_name]) * weight)
+                    try:
+                        # This is the case in which none of this asset is avaliable
+                        # i.e. specified the max amount as input then added another with '!'
+                        val = int((sendable.assets[asset_name].value/i_max_sum[asset_name]) * weight)
+                    except KeyError:
+                        val = 0
+                        outputs_to_remove.append(i)
+                        if raise_on_asset_changes:
+                            raise AssetAmountModified()
                     # Must evenly distribute based on divisibility
                     asset_meta = self.adb.get_asset_meta(asset_name)
                     divisibility = 8
                     if asset_meta:
                         divisibility = asset_meta.divisions
 
-                    minimum_sats = COIN * pow(10, -divisibility)
+                    minimum_sats = int(COIN * pow(10, -divisibility))
                     old_val = val
                     val = val - (val % minimum_sats)
                     if old_val > val and raise_on_asset_changes:
@@ -1791,7 +1812,13 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                     # (x,i) = i_max[-1]
                     # If last add extras
                     if current_count[asset_name] == counts_of_each[asset_name]:
-                        val += (sendable.assets[asset_name].value - distr_amount[asset_name])
+                        try:
+                            # Note: This will actually subtract to the correct amount if needed
+                            # since distr_amount is preset with static values
+                            val += (sendable.assets[asset_name].value - distr_amount[asset_name])
+                        except KeyError:
+                            # This case has none of this asset avaliable
+                            pass
                     elif val == 0:
                         outputs_to_remove.append(i)
 

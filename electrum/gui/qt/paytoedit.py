@@ -133,14 +133,16 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
         scriptpubkey = self.parse_output(x)
         amount = self.parse_amount(y)
         asset = self.win.get_asset_from_spend_tab()
-        divisibility = 8
-        if asset:
-            asset_meta = self.win.wallet.adb.get_asset_meta(asset)
-            if asset_meta:
-                divisibility = asset_meta.divisions
-        min_divisibility = COIN * pow(10, -divisibility)
-        if amount % min_divisibility != 0:
-            raise InvalidAssetAmount(f'amount {y} exceeds the minimum amount for asset {asset} ({pow(10, -divisibility)})') from None
+
+        if isinstance(amount, int):
+            divisibility = 8
+            if asset:
+                asset_meta = self.win.wallet.adb.get_asset_meta(asset)
+                if asset_meta:
+                    divisibility = asset_meta.divisions
+            min_divisibility = COIN * pow(10, -divisibility)
+            if amount % min_divisibility != 0:
+                raise InvalidAssetAmount(f'amount {y} exceeds the minimum amount for asset {asset} ({pow(10, -divisibility)})') from None
         
         if asset is not None:
             script = assets.create_transfer_asset_script(scriptpubkey, asset, amount)

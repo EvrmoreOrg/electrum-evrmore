@@ -1729,16 +1729,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                     if asset_name is None:
                         val = int((total_amount.rvn_value.value/i_max_sum[None]) * weight)
                     else:
-                        try:
-                            # This is the case in which none of this asset is avaliable
-                            # i.e. specified the max amount as input then added another with '!'
-                            val = int((total_amount.assets[asset_name].value/i_max_sum[asset_name]) * weight)
-                        except KeyError:
-                            val = 0
-                            outputs_to_remove.append(i)
-                            if raise_on_asset_changes:
-                                raise AssetAmountModified()
-
+                        val = int((total_amount.assets[asset_name].value/i_max_sum[asset_name]) * weight)
                         # Must evenly distribute based on divisibility
                         asset_meta = self.adb.get_asset_meta(asset_name)
                         divisibility = 8
@@ -1764,8 +1755,10 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                             except KeyError:
                                 # This case has none of this asset avaliable
                                 pass
-                    elif val == 0:
+                    if val <= 0:
                         outputs_to_remove.append(i)
+                        if raise_on_asset_changes:
+                            raise AssetAmountModified()
 
                     outputs[i].value = val
                     if asset_name:
@@ -1786,15 +1779,8 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                 for (weight, i) in i_max:
                     asset_name = outputs[i].asset
                     current_count[asset_name] += 1
-                    try:
-                        # This is the case in which none of this asset is avaliable
-                        # i.e. specified the max amount as input then added another with '!'
-                        val = int((sendable.assets[asset_name].value/i_max_sum[asset_name]) * weight)
-                    except KeyError:
-                        val = 0
-                        outputs_to_remove.append(i)
-                        if raise_on_asset_changes:
-                            raise AssetAmountModified()
+                    val = int((sendable.assets[asset_name].value/i_max_sum[asset_name]) * weight)
+
                     # Must evenly distribute based on divisibility
                     asset_meta = self.adb.get_asset_meta(asset_name)
                     divisibility = 8
@@ -1819,8 +1805,10 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                         except KeyError:
                             # This case has none of this asset avaliable
                             pass
-                    elif val == 0:
+                    if val <= 0:
                         outputs_to_remove.append(i)
+                        if raise_on_asset_changes:
+                            raise AssetAmountModified()
 
                     outputs[i].value = val
                     if asset_name:

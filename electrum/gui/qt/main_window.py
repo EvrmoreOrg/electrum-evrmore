@@ -596,7 +596,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         msg = ''.join([
             _("This is a hardware wallet."), '\n',
             _("Mining to this wallet may cause you problems. If mining, ensure you make your mining payouts sporadic"), '\n',
-            _("or mine to an electrum software wallet and transfer to hardware.")
+            _("or mine to an electrum software wallet and transfer to hardware."), '\n',
+            _("Additionally, asset operations are currently unavaliable for hardware. Any assets you send to hardware"), '\n',
+            _("will be stuck until asset operations are built into the hardware.")
         ])
         cb = QCheckBox(_("Don't show this again."))
         cb_checked = False

@@ -292,7 +292,7 @@ class Synchronizer(SynchronizerBase):
             result = await self.network.get_meta_for_asset(asset)
         self._requests_answered += 1
         self.logger.info(f"receiving asset meta {asset} {repr(result)}")
-        if asset_status(result) != status:
+        if not result or asset_status(result) != status:
             self.logger.info(f"error: status mismatch: {asset}. we'll wait a bit for status update.")
             async def disconnect_if_still_stale():
                 timeout = self.network.get_network_timeout_seconds(NetworkTimeout.Generic)
@@ -302,7 +302,7 @@ class Synchronizer(SynchronizerBase):
             self._stale_metadata[asset] = await self.taskgroup.spawn(disconnect_if_still_stale)
 
         else:
-            self._stale_histories.pop(asset, asyncio.Future()).cancel()
+            self._stale_metadata.pop(asset, asyncio.Future()).cancel()
             self.adb.recieve_asset_callback(asset, result)
 
         self.requested_asset_metas.discard((asset, status))

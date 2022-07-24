@@ -1737,10 +1737,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                             divisibility = asset_meta.divisions
 
                         minimum_sats = int(COIN * pow(10, -divisibility))
-                        old_val = val
-                        val = val - (val % minimum_sats)
-                        if old_val > val and raise_on_asset_changes:
-                            raise AssetAmountModified()
+                        val = val - (val % minimum_sats)                        
 
                     distr_amount[asset_name] += val
 
@@ -1788,11 +1785,8 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                         divisibility = asset_meta.divisions
 
                     minimum_sats = int(COIN * pow(10, -divisibility))
-                    old_val = val
                     val = val - (val % minimum_sats)
-                    if old_val > val and raise_on_asset_changes:
-                        raise AssetAmountModified()
-
+                    
                     distr_amount[asset_name] += val
 
                     # (x,i) = i_max[-1]

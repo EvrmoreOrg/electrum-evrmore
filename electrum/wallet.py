@@ -1439,6 +1439,9 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             else:
                 status = 2  # not SPV verified
         else:
+            # 6 clock images
+            # confirmed in 60
+            # /10 per clock
             status = 3 + min(max(math.floor(conf / 10), 1), 6)
         time_str = format_time(timestamp) if timestamp else _("unknown")
         status_str = TX_STATUS[status] if status < 4 else time_str

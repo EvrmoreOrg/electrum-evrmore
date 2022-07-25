@@ -150,8 +150,6 @@ class SPV(NetworkJobOnDefaultServer):
 
         async def parse_and_verify(asset, result: AssetMeta):
             og = self.wallet.get_asset_meta(asset)
-            print(og)
-            print(result)
             if og and (og.height - constants.net.MATURE > result.height):
                 raise AssetVerification(f"Server is trying to send old asset data for source (height {og.height} vs {result.height})")
 

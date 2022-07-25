@@ -359,7 +359,7 @@ class Synchronizer(SynchronizerBase):
         for addr in random_shuffled_copy(self.adb.get_addresses()):
             await self._add_address(addr)
         # Ensure we have asset meta
-        assets = self.adb.get_assets()
+        assets = set(self.adb.get_assets()).union(set(sum(self.adb.get_balance(self.adb.get_addresses()), RavenValue()).assets.keys()))
         for asset in assets:
             await self._add_asset(asset)
         # main loop

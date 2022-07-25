@@ -479,6 +479,7 @@ class AssetList(MyTreeView):
         
         unverified_meta = self.wallet.adb.get_unverified_asset_meta(asset)
         meta = self.wallet.adb.get_asset_meta(asset)
+       
         if unverified_meta or meta:
             self.view.data_viewer.update_view(meta, unverified_meta)
 
@@ -491,7 +492,9 @@ class AssetList(MyTreeView):
 
         asset = self.model().index(idx.row(), self.Columns.NAME).data(self.ROLE_ASSET_STR)
 
-        meta = self.wallet.adb.get_asset_meta(asset)
+        meta = self.wallet.adb.get_unverified_asset_meta(asset)
+        if not meta or not self.view.main_window.config.get('use_mempool_metadata', True):
+            meta = self.wallet.adb.get_asset_meta(asset)
 
         if not meta or not meta.ipfs_str:
             return
@@ -920,7 +923,6 @@ class MetadataViewer(QFrame):
                                     ipfs_data.byte_length and ipfs_data.byte_length <= self.main_window.config.get('max_ipfs_size', 1024 * 1024 * 10):
                             loop = get_asyncio_loop()
                             url = ipfs_explorer_URL(self.main_window.config, 'ipfs', meta.ipfs_str)
-                            print('Get 1')
                             task = loop.create_task(get_data_on_ipfs(meta.ipfs_str, url))
                             def maybe_update_view(task: asyncio.Task):
                                 if task.result() == self.current_meta.ipfs_str:
@@ -930,7 +932,6 @@ class MetadataViewer(QFrame):
                 elif meta.ipfs_str not in self.requested_ipfses:
                     loop = get_asyncio_loop()
                     url = ipfs_explorer_URL(self.main_window.config, 'ipfs', meta.ipfs_str)
-                    print('Get 2')
                     task = loop.create_task(get_data_on_ipfs(meta.ipfs_str, url))
                     def maybe_update_view(task: asyncio.Task):
                         if task.result() == self.current_meta.ipfs_str:

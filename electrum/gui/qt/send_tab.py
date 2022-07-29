@@ -733,8 +733,8 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         else:
             if self.notify_asset_amounts_have_changed:
                 self.notify_asset_amounts_have_changed = False
-                text = _('Asset amounts could not be properly distributed evenly due to ' +
-                        'this asset\'s divisibility. Amounts may not be what you ' +
+                text = _('Transaction amounts could not be properly distributed evenly due to ' +
+                        'divisibility. Amounts may not be what you ' +
                         'expect. Click "Advanced" on the payment window for more information.')
                 self.show_warning(text)
             asset: Optional[str] = None

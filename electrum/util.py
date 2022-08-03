@@ -914,6 +914,9 @@ def xor_bytes(a: bytes, b: bytes) -> bytes:
             .to_bytes(size, "big"))
 
 
+def escape_string_for_url(s: str) -> str:
+    return s
+
 def convert_bytes_to_utf8_safe(_bytes: bytes) -> str:
     '''Returns bytes as ascii decoded with .'s for invalid bytes'''
     try:
@@ -1339,12 +1342,12 @@ def parse_URI(uri: str, on_pr: Callable = None, *, loop=None) -> dict:
 
     if ':' not in uri:
         if not ravencoin.is_address(uri):
-            raise InvalidBitcoinURI("Not a bitcoin address")
+            raise InvalidBitcoinURI("Not a ravencoin address")
         return {'address': uri}
 
     u = urllib.parse.urlparse(uri)
     if u.scheme.lower() != BITCOIN_BIP21_URI_SCHEME:
-        raise InvalidBitcoinURI("Not a bitcoin URI")
+        raise InvalidBitcoinURI("Not a ravencoin URI")
     address = u.path
 
     # python for android fails to parse query
@@ -1380,6 +1383,9 @@ def parse_URI(uri: str, on_pr: Callable = None, *, loop=None) -> dict:
     if 'message' in out:
         out['message'] = out['message']
         out['memo'] = out['message']
+    if 'asset' in out:
+        pass
+        # TODO: Validate asset
     if 'time' in out:
         try:
             out['time'] = int(out['time'])
@@ -1396,6 +1402,7 @@ def parse_URI(uri: str, on_pr: Callable = None, *, loop=None) -> dict:
         except Exception as e:
             raise InvalidBitcoinURI(f"failed to parse 'sig' field: {repr(e)}") from e
     if 'lightning' in out:
+        raise NotImplemented()
         try:
             lnaddr = lndecode(out['lightning'])
             amount_sat = out.get('amount')

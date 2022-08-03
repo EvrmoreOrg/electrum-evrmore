@@ -484,7 +484,7 @@ class CoinChooserBase(Logger):
                     address = grouping_to_address[output.scriptpubkey[0]]
                 else:
                     # pull from the end of the list as to not repeat change addresses
-                    # when not wanted 
+                    # when not wanted
                     address = change_addresses[::-1][cnt % len(change_addresses)]
                     grouping_to_address[output.scriptpubkey[0]] = address
                     cnt += 1

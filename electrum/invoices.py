@@ -133,6 +133,9 @@ class Invoice(StoredObject):
         else:
             return self.outputs[0].address
 
+    def get_asset(self) -> Optional[str]:
+        return next(self.outputs[0].raven_value.assets.keys(), None)
+
     def get_outputs(self):
         if self.is_lightning():
             address = self.get_address()
@@ -168,19 +171,21 @@ class Invoice(StoredObject):
         from electrum.util import create_bip21_uri
         addr = self.get_address()
         amount = self.get_amount_sat()
-        # TODO: Only RVN
+        asset = self.get_asset()
         if amount is not None:
-            amount = amount.rvn_value.value
+            amount = amount.rvn_value.value if not asset else amount.assets[asset].value
         message = self.message
         extra = {}
         if self.time and self.exp:
             extra['time'] = str(self.time)
             extra['exp'] = str(self.exp)
+        if asset:
+            extra['asset'] = asset
         # only if we can receive
         if lightning:
             extra['lightning'] = lightning
         if not addr and lightning:
-            return "bitcoin:?lightning="+lightning
+            return "raven:?lightning="+lightning
         uri = create_bip21_uri(addr, amount, message, extra_query_params=extra)
         return str(uri)
 

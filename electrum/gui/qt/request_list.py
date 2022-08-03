@@ -53,16 +53,18 @@ class RequestList(MyTreeView):
     class Columns(IntEnum):
         DATE = 0
         DESCRIPTION = 1
-        AMOUNT = 2
-        STATUS = 3
+        ASSET = 2
+        AMOUNT = 3
+        STATUS = 4
 
     headers = {
         Columns.DATE: _('Date'),
         Columns.DESCRIPTION: _('Description'),
+        Columns.ASSET: _('Asset'),
         Columns.AMOUNT: _('Amount'),
         Columns.STATUS: _('Status'),
     }
-    filter_columns = [Columns.DATE, Columns.DESCRIPTION, Columns.AMOUNT]
+    filter_columns = [Columns.DATE, Columns.DESCRIPTION, Columns.ASSET, Columns.AMOUNT]
 
     def __init__(self, receive_tab: 'ReceiveTab'):
         window = receive_tab.window
@@ -119,7 +121,6 @@ class RequestList(MyTreeView):
         status_item.setText(status_str)
         status_item.setIcon(read_QIcon(pr_icons.get(status)))
 
-    # TODO: Implement for assets
     def update(self):
         current_key = self.get_current_key()
         # not calling maybe_defer_update() as it interferes with conditional-visibility
@@ -135,7 +136,9 @@ class RequestList(MyTreeView):
             message = req.get_message()
             date = format_time(timestamp)
             amount_str = self.parent.format_amount(amount) if amount else ""
-            labels = [date, message, amount_str, status_str]
+            asset = req.get_asset()
+            asset_str = asset if asset else ""
+            labels = [date, message, asset_str, amount_str, status_str]
             items = [QStandardItem(e) for e in labels]
             self.set_editability(items)
             #items[self.Columns.DATE].setData(request_type, ROLE_REQUEST_TYPE)
@@ -179,9 +182,9 @@ class RequestList(MyTreeView):
             return
         menu = QMenu(self)
         if req.get_address():
-            menu.addAction(_("Copy Address"), lambda: self.parent.do_copy(req.get_address(), title='Bitcoin Address'))
+            menu.addAction(_("Copy Address"), lambda: self.parent.do_copy(req.get_address(), title='Ravencoin Address'))
             URI = self.wallet.get_request_URI(req)
-            menu.addAction(_("Copy URI"), lambda: self.parent.do_copy(URI, title='Bitcoin URI'))
+            menu.addAction(_("Copy URI"), lambda: self.parent.do_copy(URI, title='Ravencoin URI'))
         if req.is_lightning():
             menu.addAction(_("Copy Lightning Request"), lambda: self.parent.do_copy(req.lightning_invoice, title='Lightning Request'))
         self.add_copy_menu(menu, idx)

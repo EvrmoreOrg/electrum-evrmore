@@ -680,7 +680,7 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
                 b = bytes.fromhex(h)
                 if b:
                     cursor.insertBlock()
-                    cursor.insertText(f'\tutf8: {convert_bytes_to_utf8_safe(b)}', ext)
+                    cursor.insertText(f'\tstringified: {convert_bytes_to_utf8_safe(b)}', ext)
                     cursor.insertBlock()
 
             cursor.insertBlock()

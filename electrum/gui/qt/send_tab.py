@@ -571,6 +571,14 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         except InvalidBitcoinURI as e:
             self.show_error(_("Error parsing URI") + f":\n{e}")
             return
+        if out.get('asset', None):
+            asset = out['asset']
+            try:
+                index = self.window.send_options.index(asset)
+                self.to_send_combo.setCurrentIndex(index)
+            except ValueError:
+                self.show_error(_("Asset not available") + f":\n{asset}")
+                return
         self.payto_URI = out
         r = out.get('r')
         sig = out.get('sig')
@@ -594,7 +602,7 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         if message:
             self.message_e.setText(message)
         if amount:
-            self.amount_e.setAmount(amount)
+            self.amount_e.setAmount(amount)            
 
     def handle_payment_identifier(self, text: str, *, can_use_network: bool = True):
         """Takes

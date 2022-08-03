@@ -55,7 +55,7 @@ from .i18n import _
 from .bip32 import BIP32Node, convert_bip32_intpath_to_strpath, convert_bip32_path_to_list_of_uint32
 from .crypto import sha256
 from . import util
-from .util import (NotEnoughFunds, UserCancelled, profiler, OldTaskGroup, ignore_exceptions,
+from .util import (NotEnoughFunds, UserCancelled, escape_string_for_url, profiler, OldTaskGroup, ignore_exceptions,
                    format_satoshis, format_fee_satoshis, NoDynamicFeeEstimates, AssetAmountModified,
                    WalletFileException, BitcoinException,
                    InvalidPassword, format_time, timestamp_to_datetime, Satoshis,
@@ -2502,22 +2502,24 @@ class Abstract_Wallet(ABC, Logger, EventListener):
     def delete_address(self, address: str) -> None:
         raise Exception("this wallet cannot delete addresses")
 
-    # TODO: RVN Only
     def get_request_URI(self, req: Invoice) -> str:
         # todo: should be a method of invoice?
         addr = req.get_address()
         message = self.get_label(addr)
         amount = req.get_amount_sat()
+        asset = next(amount.assets.keys(), None)
         extra_query_params = {}
         if req.time and req.exp:
             extra_query_params['time'] = str(int(req.time))
             extra_query_params['exp'] = str(int(req.exp))
+        if asset:
+            extra_query_params['asset'] = asset
         # if req.get('name') and req.get('sig'):
         #    sig = bfh(req.get('sig'))
         #    sig = bitcoin.base_encode(sig, base=58)
         #    extra_query_params['name'] = req['name']
         #    extra_query_params['sig'] = sig
-        uri = create_bip21_uri(addr, amount.rvn_value.value, message, extra_query_params=extra_query_params)
+        uri = create_bip21_uri(addr, amount.rvn_value.value if not asset else amount.assets[asset].value, message, extra_query_params=extra_query_params)
         return str(uri)
 
     def check_expired_status(self, r: Invoice, status):
@@ -2657,7 +2659,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
                 status = self.get_request_status(addr)
                 util.trigger_callback('request_status', self, addr, status)
 
-    def create_request(self, amount_sat: int, message: str, exp_delay: int, address: str):
+    def create_request(self, amount_sat: int, message: str, exp_delay: int, address: str, asset: str):
         # for receiving
         amount_sat = amount_sat or 0
         assert isinstance(amount_sat, int), f"{amount_sat!r}"
@@ -2666,6 +2668,7 @@ class Abstract_Wallet(ABC, Logger, EventListener):
         fallback_address = address if self.config.get('bolt11_fallback', True) else None
         lightning = self.has_lightning()
         if lightning:
+            raise NotImplementedError()
             lightning_invoice = self.lnworker.add_request(
                 amount_sat=amount_sat,
                 message=message,
@@ -2674,13 +2677,13 @@ class Abstract_Wallet(ABC, Logger, EventListener):
             )
         else:
             lightning_invoice = None
-        outputs = [ PartialTxOutput.from_address_and_value(address, amount_sat)] if address else []
+        outputs = [ PartialTxOutput.from_address_and_value(address, amount_sat, asset=asset)] if address else []
         height = self.adb.get_local_height()
         req = Invoice(
             outputs=outputs,
             message=message,
             time=timestamp,
-            amount_msat=RavenValue(amount_sat)*1000,
+            amount_msat=RavenValue(amount_sat)*1000 if not asset else RavenValue(0, {asset: amount_sat * 1000}),
             exp=exp_delay,
             height=height,
             bip70=None,

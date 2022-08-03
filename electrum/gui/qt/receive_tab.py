@@ -64,8 +64,6 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
         # But there are some invalid asset names that this allows
         #self.asset_requested.setValidator(QRegExpValidator(QRegExp('/^(?=.{0,31}$)(\#|\$)?[A-Z0-9._]+(\/\#?[A-Z0-9._]+)*(\#[-A-Za-z0-9@$%&*()\[\\\]{}_.?:]+)?(\~[A-Za-z0-9_]+)?$/')))
         
-        # Currently this doesn't do anything lol
-        # Just a placebo for the end user
         def update_receive_and_fiat():
             self.receive_amount_e.update()
             self.fiat_receive_e.setVisible(not bool(self.asset_requested.text().strip()))
@@ -328,6 +326,8 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
         amount_sat = self.receive_amount_e.get_amount()
         message = self.receive_message_e.text()
         expiry = self.config.get('request_expiry', PR_DEFAULT_EXPIRATION_WHEN_CREATING)
+        asset = self.asset_requested.text().strip()
+        # TODO: Validate asset
 
         if amount_sat and amount_sat < self.wallet.dust_threshold():
             address = None
@@ -341,7 +341,7 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
 
         # generate even if we cannot receive
         try:
-            key = self.wallet.create_request(amount_sat, message, expiry, address)
+            key = self.wallet.create_request(amount_sat, message, expiry, address, asset)
         except InvoiceError as e:
             self.show_error(_('Error creating payment request') + ':\n' + str(e))
             return

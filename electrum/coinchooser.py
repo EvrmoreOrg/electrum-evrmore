@@ -297,7 +297,7 @@ class CoinChooserBase(Logger):
         # size of the change output, add it to the transaction.
         amounts = [amount for amount in amounts if amount[1] >= dust_threshold]
         change = [PartialTxOutput.from_address_and_value(addr, Satoshis(amount[1]), amount[0])
-                  for addr, amount in zip(change_addrs[::-1], amounts)]
+                  for addr, amount in zip(change_addrs, amounts)]
         return change
 
     def _construct_tx_from_selected_buckets(self, *, buckets: Sequence[Bucket],
@@ -483,7 +483,9 @@ class CoinChooserBase(Logger):
                 if output.scriptpubkey[0] in grouping_to_address:
                     address = grouping_to_address[output.scriptpubkey[0]]
                 else:
-                    address = change_addresses[cnt % len(change_addresses)]
+                    # pull from the end of the list as to not repeat change addresses
+                    # when not wanted 
+                    address = change_addresses[::-1][cnt % len(change_addresses)]
                     grouping_to_address[output.scriptpubkey[0]] = address
                     cnt += 1
 

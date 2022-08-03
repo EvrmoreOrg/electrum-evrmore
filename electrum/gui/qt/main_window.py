@@ -1697,7 +1697,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         self.send_tab.to_send_combo.clear()
         self.send_options = new_send_options
         self.send_tab.to_send_combo.addItems(self.send_options)
-        if current_selection:
+        if current_selection and current_selection not in diff:
+            # The set is quick
+            # the current selection is from the old set
+            # if was in old set & in diff = not in new set
             self.send_tab.to_send_combo.setCurrentIndex(self.send_options.index(current_selection))
 
     def get_asset_from_spend_tab(self) -> Optional[str]:

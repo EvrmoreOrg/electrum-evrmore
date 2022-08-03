@@ -2507,12 +2507,12 @@ class Abstract_Wallet(ABC, Logger, EventListener):
         addr = req.get_address()
         message = self.get_label(addr)
         amount = req.get_amount_sat()
-        asset = next(amount.assets.keys(), None)
+        asset = next(iter(amount.assets.keys()), None)
         extra_query_params = {}
         if req.time and req.exp:
             extra_query_params['time'] = str(int(req.time))
             extra_query_params['exp'] = str(int(req.exp))
-        if asset:
+        if amount and asset:
             extra_query_params['asset'] = asset
         # if req.get('name') and req.get('sig'):
         #    sig = bfh(req.get('sig'))

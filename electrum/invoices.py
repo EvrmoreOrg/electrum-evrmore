@@ -134,7 +134,7 @@ class Invoice(StoredObject):
             return self.outputs[0].address
 
     def get_asset(self) -> Optional[str]:
-        return next(self.outputs[0].raven_value.assets.keys(), None)
+        return next(iter(self.outputs[0].raven_value.assets.keys()), None)
 
     def get_outputs(self):
         if self.is_lightning():
@@ -179,7 +179,7 @@ class Invoice(StoredObject):
         if self.time and self.exp:
             extra['time'] = str(self.time)
             extra['exp'] = str(self.exp)
-        if asset:
+        if amount is not None and asset:
             extra['asset'] = asset
         # only if we can receive
         if lightning:

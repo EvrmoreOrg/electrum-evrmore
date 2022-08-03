@@ -135,8 +135,8 @@ class RequestList(MyTreeView):
             amount = req.get_amount_sat()
             message = req.get_message()
             date = format_time(timestamp)
-            amount_str = self.parent.format_amount(amount) if amount else ""
             asset = req.get_asset()
+            amount_str = self.parent.format_amount(amount.rvn_value.value if not asset else amount.assets[asset].value) if amount else ""
             asset_str = asset if asset else ""
             labels = [date, message, asset_str, amount_str, status_str]
             items = [QStandardItem(e) for e in labels]

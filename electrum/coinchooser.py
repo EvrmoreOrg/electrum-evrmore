@@ -464,7 +464,7 @@ class CoinChooserBase(Logger):
                                             len(b.value.assets) > 0, all_buckets))
 
         # Choose a subset of the buckets
-        scored_candidate, change_addresses = self.choose_buckets(all_buckets, needs_more,
+        scored_candidate, change_addresses, cnt = self.choose_buckets(all_buckets, needs_more,
                                                self.penalty_func(base_tx, tx_from_buckets=tx_from_buckets),
                                                coinbase_outputs=coinbase_outputs)
         tx = scored_candidate.tx
@@ -473,7 +473,6 @@ class CoinChooserBase(Logger):
         self.logger.info(f"using buckets: {[bucket.desc for bucket in scored_candidate.buckets]}")
 
         # Replace dummy asset creations
-        cnt = 0
         grouping_to_address = {}
         for output in tx._outputs:
             # If the first 25 bytes are the same, this is a dummy that needs to be replaced
@@ -483,9 +482,7 @@ class CoinChooserBase(Logger):
                 if output.scriptpubkey[0] in grouping_to_address:
                     address = grouping_to_address[output.scriptpubkey[0]]
                 else:
-                    # pull from the end of the list as to not repeat change addresses
-                    # when not wanted
-                    address = change_addresses[::-1][cnt % len(change_addresses)]
+                    address = change_addresses[cnt % len(change_addresses)]
                     grouping_to_address[output.scriptpubkey[0]] = address
                     cnt += 1
 
@@ -609,7 +606,7 @@ class CoinChooserPrivacy(CoinChooserRandom):
         min_change = min(o.value for o in base_tx.outputs()) * 0.75
         max_change = max(o.value for o in base_tx.outputs()) * 1.33
 
-        def penalty(buckets: List[Bucket]) -> ScoredCandidate:
+        def penalty(buckets: List[Bucket]) -> Tuple[ScoredCandidate, List[str], int]:
             # Penalize using many buckets (~inputs)
             badness = len(buckets) - 1
             tx, change_outputs, change_addresses = tx_from_buckets(buckets)
@@ -626,7 +623,7 @@ class CoinChooserPrivacy(CoinChooserRandom):
                 badness += (change - max_change) / (max_change + 10000)
                 # Penalize large change; 5 BTC excess ~= using 1 more input
                 badness += change / (COIN * 5)
-            return ScoredCandidate(badness, tx, buckets), change_addresses
+            return ScoredCandidate(badness, tx, buckets), change_addresses, len(change_outputs)
 
         return penalty
 

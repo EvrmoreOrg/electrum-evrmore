@@ -3,7 +3,9 @@ import QtQuick.Layouts 1.0
 import QtQuick.Controls 2.14
 import QtQuick.Controls.Material 2.0
 
-Dialog {
+import "controls"
+
+ElDialog {
     id: dialog
 
     property string text
@@ -80,13 +82,13 @@ Dialog {
                 Layout.alignment: Qt.AlignHCenter
                 Button {
                     text: qsTr('Copy')
-                    icon.source: '../../../icons/copy_bw.png'
+                    icon.source: '../../icons/copy_bw.png'
                     onClicked: AppController.textToClipboard(dialog.text)
                 }
                 Button {
                     //enabled: false
                     text: qsTr('Share')
-                    icon.source: '../../../icons/share.png'
+                    icon.source: '../../icons/share.png'
                     onClicked: {
                         AppController.doShare(dialog.text, dialog.title)
                     }

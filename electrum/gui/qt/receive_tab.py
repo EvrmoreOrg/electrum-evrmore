@@ -274,7 +274,7 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
         self.receive_rebalance_button.setEnabled(can_rebalance and self.window.num_tasks() == 0)
         self.receive_swap_button.setEnabled(can_swap and self.window.num_tasks() == 0)
         icon_name = "lightning.png" if lnaddr else "lightning_disconnected.png"
-        self.receive_tabs.setTabIcon(2, read_QIcon(icon_name))
+        #self.receive_tabs.setTabIcon(2, read_QIcon(icon_name))
         # encode lightning invoices as uppercase so QR encoding can use
         # alphanumeric mode; resulting in smaller QR codes
         lnaddr_qr = lnaddr.upper()

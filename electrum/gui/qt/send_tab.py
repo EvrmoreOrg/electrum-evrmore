@@ -577,8 +577,8 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
                 index = self.window.send_options.index(asset)
                 self.to_send_combo.setCurrentIndex(index)
             except ValueError:
-                self.show_error(_("Asset not available") + f":\n{asset}")
                 self.payto_e.do_clear()
+                self.show_error(_("Asset not available") + f":\n{asset}")
                 return
         self.payto_URI = out
         r = out.get('r')

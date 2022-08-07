@@ -17,7 +17,7 @@ from electrum import util, paymentrequest
 from electrum import lnutil
 from electrum.plugin import run_hook
 from electrum.i18n import _
-from electrum.ravencoin import COIN
+from electrum.ravencoin import COIN, make_op_return
 from electrum.util import (AssetAmountModified, UserFacingException, get_asyncio_loop, bh2u,
                            InvalidBitcoinURI, maybe_extract_lightning_payment_identifier, NotEnoughFunds,
                            NoDynamicFeeEstimates, InvoiceError, parse_max_spend, RavenValue)
@@ -340,21 +340,20 @@ class SendTab(QWidget, MessageBoxMixin, Logger):
         op_return_raw: str = self.op_return_e.text()
         if len(op_return_raw) > 0:
             try:
+                if len(op_return_raw) <= 1:
+                    raise ValueError()
                 if len(op_return_raw) % 2 == 0:
                     text_to_encode = op_return_raw
                 else:
+                    self.show_warning(_('OP_RETURN predicted hex value has an odd number of characters; truncating by 1 to maintain a proper hex value.'))
                     text_to_encode = op_return_raw[:-1]
                 op_return_encoded = bytes.fromhex(text_to_encode)
             except ValueError:
                 op_return_encoded = op_return_raw.encode('utf8')
-
             outputs.append(
                 PartialTxOutput(
                     value=0,
-                    scriptpubkey=
-                    b'\x6a' +
-                    len(op_return_encoded).to_bytes(1, 'big', signed=False) +
-                    op_return_encoded
+                    scriptpubkey=make_op_return(op_return_encoded)
                 ))
 
         make_tx = lambda fee_est: self.wallet.make_unsigned_transaction(

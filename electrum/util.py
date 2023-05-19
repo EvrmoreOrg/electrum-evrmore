@@ -1177,19 +1177,17 @@ def time_difference(distance_in_time, include_seconds):
 
 
 mainnet_block_explorers = {
-    'ravencoin.network': ('https://ravencoin.network/',
-                          {'tx': 'tx/', 'addr': 'address/'}),
-    'rvn.traysi.org': ('http://rvn.traysi.org/',
-                       {'tx': 'tx/', 'addr': 'address/'}),
-    'rvn.cryptoscope.io': ('https://rvn.cryptoscope.io/',
+    'evr.cryptoscope.io': ('https://evr.cryptoscope.io/',
                           {'tx': 'tx/?txid=', 'addr': 'address/?address='}),
+    'evr-explorer-mainnet.ting.finance': ('https://evr-explorer-mainnet.ting.finance/',
+                       {'tx': 'index.html?route=TRANSACTION&id=', 'addr': 'index.html?route=ADDRESS&address='}),
 }
 
 testnet_block_explorers = {
-    'ravencoin.network': ('https://testnet.ravencoin.network/',
-                          {'tx': 'tx/', 'addr': 'address/'}),
-    'rvn.cryptoscope.io': ('https://rvnt.cryptoscope.io/',
+    'evrt.cryptoscope.io': ('https://evrt.cryptoscope.io/',
                           {'tx': 'tx/?txid=', 'addr': 'address/?address='}),
+    'tevr.hyperbit.app': ('https://tevr.hyperbit.app/',
+                           {'tx': 'explorer/transactions/', 'addr': 'explorer/addresses/'}),
 }
 
 signet_block_explorers = {
@@ -1205,14 +1203,10 @@ signet_block_explorers = {
                        {'tx': 'tx/', 'addr': 'address/'}),
 }
 
-_block_explorer_default_api_loc = {'tx': 'tx/', 'addr': 'address/'}
+_block_explorer_default_api_loc = {'tx': 'tx/?txid=', 'addr': 'address/?address='}
 
 ipfs_explorers = {
     'ipfs.io': ('https://ipfs.io/',
-                {'ipfs': 'ipfs/'}),
-    'infura.io': ('https://ipfs.infura.io/',
-                  {'ipfs': 'ipfs/'}),
-    'ravencoinipfs-gateway.com': ('https://ravencoinipfs-gateway.com/',
                 {'ipfs': 'ipfs/'}),
 }
 
@@ -1226,7 +1220,7 @@ def ipfs_explorer_info():
 def ipfs_explorer(config: 'SimpleConfig') -> Optional[str]:
     if config.get('ipfs_explorer_custom') is not None:
         return None
-    default_ = 'infura.io'
+    default_ = 'ipfs.io'
     ie_key = config.get('ipfs_explorer', default_)
     ie_tuple = ipfs_explorer_info().get(ie_key)
     if ie_tuple is None:

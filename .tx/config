@@ -1,7 +1,7 @@
 [main]
 host = https://www.transifex.com
 
-[electrum-ravencoin.messagespot]
+[electrum-evrmore.messagespot]
 file_filter = electrum/locale/<lang>/electrum.po
 minimum_perc = 0
 source_file = electrum/locale/messages.pot

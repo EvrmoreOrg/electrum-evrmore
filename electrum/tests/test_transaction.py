@@ -1,12 +1,12 @@
 from typing import NamedTuple, Union
 
-from electrum import transaction, ravencoin
+from electrum import transaction, evrmore
 from electrum.transaction import (convert_raw_tx_to_hex, tx_from_any, Transaction,
                                   PartialTransaction, TxOutpoint, PartialTxInput,
                                   PartialTxOutput, Sighash, match_script_against_template,
                                   SCRIPTPUBKEY_TEMPLATE_ANYSEGWIT)
 from electrum.util import bh2u, bfh
-from electrum.ravencoin import (deserialize_privkey, opcodes,
+from electrum.evrmore import (deserialize_privkey, opcodes,
                                 construct_script, construct_witness)
 from electrum.ecc import ECPrivkey
 from .test_bitcoin import disable_ecdsa_r_value_grinding
@@ -904,7 +904,7 @@ class TestTransactionTestnet(TestCaseForTestnet):
         witness_script = bfh(construct_script([
             locktime, opcodes.OP_CHECKLOCKTIMEVERIFY, opcodes.OP_DROP, pubkey, opcodes.OP_CHECKSIG,
         ]))
-        from_addr = ravencoin.script_to_p2wsh(witness_script.hex())
+        from_addr = evrmore.script_to_p2wsh(witness_script.hex())
         self.assertEqual("tb1q9dn6qke9924xe3zmptmhrdge0s043pjxpjndypgnu2t9fvsd4crs2qjuer", from_addr)
         prevout = TxOutpoint(txid=bfh('8680971efd5203025cffe746f8598d0a704fae81f236ffe009c2609ec673d59a'), out_idx=0)
         txin = PartialTxInput(prevout=prevout)

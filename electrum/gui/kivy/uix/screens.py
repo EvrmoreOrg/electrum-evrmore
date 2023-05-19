@@ -15,7 +15,7 @@ from kivy.properties import StringProperty
 from electrum.invoices import (PR_DEFAULT_EXPIRATION_WHEN_CREATING,
                                PR_PAID, PR_UNKNOWN, PR_EXPIRED, PR_INFLIGHT,
                                pr_expiration_values, Invoice)
-from electrum import ravencoin, constants
+from electrum import evrmore, constants
 from electrum import lnutil
 from electrum.transaction import tx_from_any, PartialTxOutput
 from electrum.util import (parse_URI, InvalidBitcoinURI, TxMinedInfo, maybe_extract_lightning_payment_identifier,
@@ -230,7 +230,7 @@ class SendScreen(CScreen, Logger):
             return
         self.address = invoice
         self.message = lnaddr.get_description()
-        self.amount = self.app.format_amount_and_units(lnaddr.amount * ravencoin.COIN) if lnaddr.amount else ''
+        self.amount = self.app.format_amount_and_units(lnaddr.amount * evrmore.COIN) if lnaddr.amount else ''
         self.payment_request = None
         self.is_lightning = True
 
@@ -325,7 +325,7 @@ class SendScreen(CScreen, Logger):
     def read_invoice(self):
         address = str(self.address)
         if not address:
-            self.app.show_error(_('Recipient not specified.') + ' ' + _('Please scan a ravencoin address or a payment request'))
+            self.app.show_error(_('Recipient not specified.') + ' ' + _('Please scan a evrmore address or a payment request'))
             return
         if not self.amount:
             self.app.show_error(_('Please enter an amount'))
@@ -346,8 +346,8 @@ class SendScreen(CScreen, Logger):
                 if self.payment_request:
                     outputs = self.payment_request.get_outputs()
                 else:
-                    if not ravencoin.is_address(address):
-                        self.app.show_error(_('Invalid Ravencoin Address') + ':\n' + address)
+                    if not evrmore.is_address(address):
+                        self.app.show_error(_('Invalid Evrmore Address') + ':\n' + address)
                         return
 
                     outputs = [PartialTxOutput.from_address_and_value(address, amount)]

@@ -6,7 +6,7 @@ from typing import Sequence
 import asyncio
 import copy
 
-from electrum import storage, ravencoin, keystore, bip32, slip39, wallet
+from electrum import storage, evrmore, keystore, bip32, slip39, wallet
 from electrum import Transaction
 from electrum import SimpleConfig
 from electrum import util

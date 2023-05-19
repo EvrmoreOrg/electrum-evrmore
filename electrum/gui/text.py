@@ -14,7 +14,7 @@ from electrum.gui import BaseElectrumGui
 from electrum import util
 from electrum.util import format_satoshis, format_time
 from electrum.util import EventListener, event_listener
-from electrum.ravencoin import is_address, address_to_script, COIN
+from electrum.evrmore import is_address, address_to_script, COIN
 from electrum.transaction import PartialTxOutput
 from electrum.wallet import Wallet, Abstract_Wallet
 from electrum.wallet_db import WalletDB

@@ -57,7 +57,7 @@ class BaseCrashReporter(Logger):
     DESCRIBE_ERROR_MESSAGE = _("Please briefly describe what led to the error (optional):")
     # ASK_CONFIRM_SEND = _("Do you want to send this report?")
     ASK_CONFIM_SEND = _("Sorry, remote sending of crash reports has been temporarily disabled. Please ask for help "
-                         "on the Ravencoin discord. (https://discord.gg/VuubYncHz4)")
+                         "on the Evrmore discord. (https://discord.gg/4csauGuvw3)")
 
     USER_COMMENT_PLACEHOLDER = _("Do not enter sensitive/private information here. "
                                  "The report will be visible on the public issue tracker.")

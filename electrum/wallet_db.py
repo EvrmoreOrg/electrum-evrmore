@@ -31,8 +31,8 @@ from collections import defaultdict
 from typing import Dict, Optional, List, Tuple, Set, Iterable, NamedTuple, Sequence, TYPE_CHECKING, Union
 import binascii
 
-from . import util, ravencoin
-from .util import IPFSData, profiler, WalletFileException, multisig_type, TxMinedInfo, bfh, Satoshis, RavenValue
+from . import util, evrmore
+from .util import IPFSData, profiler, WalletFileException, multisig_type, TxMinedInfo, bfh, Satoshis, EvrmoreValue
 from .invoices import Invoice
 from .keystore import bip44_derivation
 from .transaction import Transaction, TxOutpoint, tx_from_any, PartialTransaction, PartialTxOutput, AssetMeta
@@ -307,7 +307,7 @@ class WalletDB(JsonDB):
                 d = {'change': []}
                 receiving_addresses = []
                 for pubkey in pubkeys:
-                    addr = ravencoin.pubkey_to_address('p2pkh', pubkey)
+                    addr = evrmore.pubkey_to_address('p2pkh', pubkey)
                     receiving_addresses.append(addr)
                 d['receiving'] = receiving_addresses
                 self.put('addresses', d)
@@ -332,7 +332,7 @@ class WalletDB(JsonDB):
                 assert len(addresses) == len(pubkeys)
                 d = {}
                 for pubkey in pubkeys:
-                    addr = ravencoin.pubkey_to_address('p2pkh', pubkey)
+                    addr = evrmore.pubkey_to_address('p2pkh', pubkey)
                     assert addr in addresses
                     d[addr] = {
                         'pubkey': pubkey,
@@ -384,7 +384,7 @@ class WalletDB(JsonDB):
             assert isinstance(addresses, dict)
             addresses_new = dict()
             for address, details in addresses.items():
-                if not ravencoin.is_address(address):
+                if not evrmore.is_address(address):
                     remove_address(address)
                     continue
                 if details is None:
@@ -485,7 +485,7 @@ class WalletDB(JsonDB):
         if not self._is_upgrade_method_needed(21, 21):
             return
 
-        from .ravencoin import script_to_scripthash
+        from .evrmore import script_to_scripthash
         transactions = self.get('transactions', {})  # txid -> raw_tx
         prevouts_by_scripthash = defaultdict(list)
         for txid, raw_tx in transactions.items():
@@ -763,7 +763,7 @@ class WalletDB(JsonDB):
             return
         PR_TYPE_ONCHAIN = 0
         PR_TYPE_LN = 2
-        from .ravencoin import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN
+        from .evrmore import TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, COIN
         max_sats = TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN
         requests = self.data.get('payment_requests', {})
         invoices = self.data.get('invoices', {})
@@ -819,7 +819,7 @@ class WalletDB(JsonDB):
         txi = self.data.get('txi', {})
         txi = {txi_hash:
                    {addr:
-                        {ser: RavenValue(v) for ser, v in d2.items()}
+                        {ser: EvrmoreValue(v) for ser, v in d2.items()}
                     for addr, d2 in d1.items()}
                for txi_hash, d1 in txi.items()}
         self.data['txi'] = txi
@@ -827,14 +827,14 @@ class WalletDB(JsonDB):
         txo = self.data.get('txo', {})
         txo = {tx_hash:
                    {addr:
-                        {pos: (RavenValue(v), cb) for pos, (v, cb) in d2.items()}
+                        {pos: (EvrmoreValue(v), cb) for pos, (v, cb) in d2.items()}
                     for addr, d2 in d1.items()}
                for tx_hash, d1 in txo.items()}
         self.data['txo'] = txo
 
-        # This seems to be updated to RavenValues in an earlier update
+        # This seems to be updated to EvrmoreValues in an earlier update
         # prev = self.data.get('prevouts_by_scripthash', {})
-        # prev = {scripthash: [(out, RavenValue(v)) for (out, v) in lst] for scripthash, lst in prev.items()}
+        # prev = {scripthash: [(out, EvrmoreValue(v)) for (out, v) in lst] for scripthash, lst in prev.items()}
         # self.data['prevouts_by_scripthash'] = prev
 
         # Clear history to mark re-download for assets
@@ -957,7 +957,7 @@ class WalletDB(JsonDB):
                     message = lnaddr.get_description()
                     height = 0
                 else:
-                    amount_sat = RavenValue.from_json(item['amount_sat'])
+                    amount_sat = EvrmoreValue.from_json(item['amount_sat'])
                     amount_msat = amount_sat * 1000 if amount_sat not in [None, '!'] else amount_sat
                     message = item['message']
                     timestamp = item['time']
@@ -1190,7 +1190,7 @@ class WalletDB(JsonDB):
         return list(self.txo.get(tx_hash, {}).keys())
 
     @locked
-    def get_txi_addr(self, tx_hash: str, address: str) -> Iterable[Tuple[str, RavenValue]]:
+    def get_txi_addr(self, tx_hash: str, address: str) -> Iterable[Tuple[str, EvrmoreValue]]:
         """Returns an iterable of (prev_outpoint, value)."""
         assert isinstance(tx_hash, str)
         assert isinstance(address, str)
@@ -1198,7 +1198,7 @@ class WalletDB(JsonDB):
         return list(d.items())
 
     @locked
-    def get_txo_addr(self, tx_hash: str, address: str) -> Dict[int, Tuple[RavenValue, bool]]:
+    def get_txo_addr(self, tx_hash: str, address: str) -> Dict[int, Tuple[EvrmoreValue, bool]]:
         """Returns a dict: output_index -> (value, is_coinbase)."""
         assert isinstance(tx_hash, str)
         assert isinstance(address, str)
@@ -1206,11 +1206,11 @@ class WalletDB(JsonDB):
         return {int(n): (v, cb) for (n, (v, cb)) in d.items()}
 
     @modifier
-    def add_txi_addr(self, tx_hash: str, addr: str, ser: str, v: RavenValue) -> None:
+    def add_txi_addr(self, tx_hash: str, addr: str, ser: str, v: EvrmoreValue) -> None:
         assert isinstance(tx_hash, str)
         assert isinstance(addr, str)
         assert isinstance(ser, str)
-        assert isinstance(v, RavenValue)
+        assert isinstance(v, EvrmoreValue)
         if tx_hash not in self.txi:
             self.txi[tx_hash] = {}
         d = self.txi[tx_hash]
@@ -1219,12 +1219,12 @@ class WalletDB(JsonDB):
         d[addr][ser] = v
 
     @modifier
-    def add_txo_addr(self, tx_hash: str, addr: str, n: Union[int, str], v: RavenValue, is_coinbase: bool) -> None:
+    def add_txo_addr(self, tx_hash: str, addr: str, n: Union[int, str], v: EvrmoreValue, is_coinbase: bool) -> None:
         n = str(n)
         assert isinstance(tx_hash, str)
         assert isinstance(addr, str)
         assert isinstance(n, str)
-        assert isinstance(v, RavenValue)
+        assert isinstance(v, EvrmoreValue)
         assert isinstance(is_coinbase, bool)
         if tx_hash not in self.txo:
             self.txo[tx_hash] = {}
@@ -1291,25 +1291,25 @@ class WalletDB(JsonDB):
         self.spent_outpoints[prevout_hash][prevout_n] = tx_hash
 
     @modifier
-    def add_prevout_by_scripthash(self, scripthash: str, *, prevout: TxOutpoint, value: RavenValue) -> None:
+    def add_prevout_by_scripthash(self, scripthash: str, *, prevout: TxOutpoint, value: EvrmoreValue) -> None:
         assert isinstance(scripthash, str)
         assert isinstance(prevout, TxOutpoint)
-        assert isinstance(value, RavenValue)
+        assert isinstance(value, EvrmoreValue)
         if scripthash not in self._prevouts_by_scripthash:
             self._prevouts_by_scripthash[scripthash] = set()
         self._prevouts_by_scripthash[scripthash].add((prevout.to_str(), value))
 
     @modifier
-    def remove_prevout_by_scripthash(self, scripthash: str, *, prevout: TxOutpoint, value: RavenValue) -> None:
+    def remove_prevout_by_scripthash(self, scripthash: str, *, prevout: TxOutpoint, value: EvrmoreValue) -> None:
         assert isinstance(scripthash, str)
         assert isinstance(prevout, TxOutpoint)
-        assert isinstance(value, RavenValue)
+        assert isinstance(value, EvrmoreValue)
         self._prevouts_by_scripthash[scripthash].discard((prevout.to_str(), value))
         if not self._prevouts_by_scripthash[scripthash]:
             self._prevouts_by_scripthash.pop(scripthash)
 
     @locked
-    def get_prevouts_by_scripthash(self, scripthash: str) -> Set[Tuple[TxOutpoint, RavenValue]]:
+    def get_prevouts_by_scripthash(self, scripthash: str) -> Set[Tuple[TxOutpoint, EvrmoreValue]]:
         assert isinstance(scripthash, str)
         prevouts_and_values = self._prevouts_by_scripthash.get(scripthash, set())
         return {(TxOutpoint.from_str(prevout), value) for prevout, value in prevouts_and_values}
@@ -1554,14 +1554,14 @@ class WalletDB(JsonDB):
         self.asset_reissue_outpoints = self.get_dict('asset_reissue_points')  # type: Dict[str, Dict[str, str]]
         self.nonstandard_outpoints = self.get_dict('nonstandard_points')  # type: Dict[str, str]
         self.ipfs_information = self.get_dict('ipfs_information')   # type: Dict[str, IPFSData]
-        self.txi = self.get_dict('txi')                          # type: Dict[str, Dict[str, Dict[str, RavenValue]]]
-        self.txo = self.get_dict('txo')                          # type: Dict[str, Dict[str, Dict[str, Tuple[RavenValue, bool]]]]
+        self.txi = self.get_dict('txi')                          # type: Dict[str, Dict[str, Dict[str, EvrmoreValue]]]
+        self.txo = self.get_dict('txo')                          # type: Dict[str, Dict[str, Dict[str, Tuple[EvrmoreValue, bool]]]]
         self.transactions = self.get_dict('transactions')        # type: Dict[str, Transaction]
         self.spent_outpoints = self.get_dict('spent_outpoints')  # txid -> output_index -> next_txid
         self.history = self.get_dict('addr_history')             # address -> list of (txid, height)
         self.verified_tx = self.get_dict('verified_tx3')         # txid -> (height, timestamp, txpos, header_hash)
         self.tx_fees = self.get_dict('tx_fees')                  # type: Dict[str, TxFeesValue]
-        self._prevouts_by_scripthash = self.get_dict('prevouts_by_scripthash')  # type: Dict[str, Set[Tuple[str, RavenValue]]]
+        self._prevouts_by_scripthash = self.get_dict('prevouts_by_scripthash')  # type: Dict[str, Set[Tuple[str, EvrmoreValue]]]
         # remove unreferenced tx
         for tx_hash in list(self.transactions.keys()):
             if not self.get_txi_addresses(tx_hash) and not self.get_txo_addresses(tx_hash):
@@ -1607,11 +1607,11 @@ class WalletDB(JsonDB):
         elif key == 'tx_fees':
             v = dict((k, TxFeesValue(*x)) for k, x in v.items())
         elif key == 'prevouts_by_scripthash':
-            v = dict((k, {(prevout, value if isinstance(value, RavenValue) else (RavenValue(value) if isinstance(value, Satoshis) else RavenValue.from_json(value))) for (prevout, value) in x}) for k, x in v.items())
+            v = dict((k, {(prevout, value if isinstance(value, EvrmoreValue) else (EvrmoreValue(value) if isinstance(value, Satoshis) else EvrmoreValue.from_json(value))) for (prevout, value) in x}) for k, x in v.items())
         elif key == 'txo':
-            v = {txid: {addr: {pos: (v if isinstance(v, RavenValue) else RavenValue.from_json(v), cb) for pos, (v, cb) in d2.items()} for addr, d2 in d1.items()} for txid, d1 in v.items()}
+            v = {txid: {addr: {pos: (v if isinstance(v, EvrmoreValue) else EvrmoreValue.from_json(v), cb) for pos, (v, cb) in d2.items()} for addr, d2 in d1.items()} for txid, d1 in v.items()}
         elif key == 'txi':
-            v = {txid: {addr: {ser: v if isinstance(v, RavenValue) else RavenValue.from_json(v) for ser, v in d2.items()} for addr, d2 in d1.items()} for txid, d1 in v.items()}
+            v = {txid: {addr: {ser: v if isinstance(v, EvrmoreValue) else EvrmoreValue.from_json(v) for ser, v in d2.items()} for addr, d2 in d1.items()} for txid, d1 in v.items()}
         elif key == 'buckets':
             v = dict((k, ShachainElement(bfh(x[0]), int(x[1]))) for k, x in v.items())
         elif key == 'data_loss_protect_remote_pcp':

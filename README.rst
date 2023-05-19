@@ -1,4 +1,4 @@
-Electrum - Lightweight Ravencoin client
+Electrum - Lightweight Evrmore client
 =====================================
 
 ::
@@ -10,7 +10,7 @@ Electrum - Lightweight Ravencoin client
 
 
 .. image:: https://d322cqt584bo4o.cloudfront.net/electrum/localized.svg
-    :target: https://www.transifex.com/ravencoin/electrum-ravencoin/
+    :target: https://www.transifex.com/evrmore/electrum-evrmore/
     :alt: Help translate Electrum online
 
 
@@ -27,7 +27,7 @@ Want to mine to hardware? See this `article`_. Trezor has similar problems. It i
 
 Interested in a pre-built binary? Find them `here`_. Otherwise, continue reading.
 
-Electrum Ravencoin is currently only supported for Qt-based software.
+Electrum Evrmore is currently only supported for Qt-based software.
 
 The master branch is not always guaranteed to be working as expected. If you would like to build from source or run raw python, please use the source from one of our `releases`_.
 
@@ -77,11 +77,11 @@ If you would like hardware wallet support, see `this`_.
 .. _pycryptodomex: https://github.com/Legrandin/pycryptodome
 .. _cryptography: https://github.com/pyca/cryptography
 .. _this: https://github.com/spesmilo/electrum-docs/blob/master/hardware-linux.rst
-.. _here: https://github.com/Electrum-RVN-SIG/electrum-ravencoin/releases
+.. _here: https://github.com/EvrmoreOrg/electrum-evrmore/releases
 .. _Discord: https://discord.gg/VuubYncHz4
 .. _article: https://support.ledger.com/hc/en-us/articles/360018969814-Receive-mining-proceeds?docs=true
-.. _releases: https://github.com/Electrum-RVN-SIG/electrum-ravencoin/releases
-.. _`ElectrumX Server`: https://github.com/Electrum-RVN-SIG/electrumx-ravencoin
+.. _releases: https://github.com/EvrmoreOrg/electrum-evrmore/releases
+.. _`ElectrumX Server`: https://github.com/EvrmoreOrg/electrumx-evrmore
 
 Running from tar.gz
 -------------------
@@ -109,7 +109,7 @@ Development version (git clone)
 
 Check out the code from GitHub::
 
-    git clone git://github.com/Electrum-RVN-SIG/electrum-ravencoin.git
+    git clone git://github.com/EvrmoreOrg/electrum-evrmore.git
     cd electrum
     git submodule update --init
 
@@ -178,6 +178,6 @@ also welcome, but to avoid wasted effort, especially for larger changes,
 we encourage discussing these on the discord first.
 
 Besides `GitHub`_, most communication about Electrum development happens on discord, in the
-:code:`#electrum-rvn-sig` channel on discord.
+:code:`#development` channel on discord.
 
-.. _GitHub: https://github.com/Electrum-RVN-SIG/electrum-ravencoin
+.. _GitHub: https://github.com/EvrmoreOrg/electrum-evrmore

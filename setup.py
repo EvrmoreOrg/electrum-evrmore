@@ -35,9 +35,9 @@ data_files = []
 if platform.system() in ['Linux', 'FreeBSD', 'DragonFly']:
     # note: we can't use absolute paths here. see #7787
     data_files += [
-        (os.path.join('share', 'applications'),               ['electrum-ravencoin.desktop']),
-        (os.path.join('share', 'pixmaps'),                    ['electrum/gui/icons/electrum-ravencoin.png']),
-        (os.path.join('share', 'icons/hicolor/128x128/apps'), ['electrum/gui/icons/electrum-ravencoin.png']),
+        (os.path.join('share', 'applications'),               ['electrum-evrmore.desktop']),
+        (os.path.join('share', 'pixmaps'),                    ['electrum/gui/icons/electrum-evrmore.png']),
+        (os.path.join('share', 'icons/hicolor/128x128/apps'), ['electrum/gui/icons/electrum-evrmore.png']),
     ]
 
 extras_require = {
@@ -55,7 +55,7 @@ extras_require['fast'] = extras_require['crypto']
 
 
 setup(
-    name="Electrum-Ravencoin",
+    name="Electrum-Evrmore",
     version=version.ELECTRUM_VERSION,
     python_requires='>={}'.format(MIN_PYTHON_VERSION),
     install_requires=requirements,
@@ -70,12 +70,12 @@ setup(
     # package_data kwarg lists what gets put in site-packages when pip installing the tar.gz.
     # By specifying include_package_data=True, MANIFEST.in becomes responsible for both.
     include_package_data=True,
-    scripts=['electrum/electrum-ravencoin'],
+    scripts=['electrum/electrum-evrmore'],
     data_files=data_files,
-    description="Lightweight Ravencoin Wallet",
+    description="Lightweight Evrmore Wallet",
     author="kralverde",
-    author_email="electrum.raven@gmail.com",
+    author_email="hans_schm1dt@protonmail.com",
     license="MIT Licence",
-    url="https://github.com/Electrum-RVN-SIG/electrum-ravencoin",
-    long_description="""Lightweight Ravencoin Wallet""",
+    url="https://github.com/EvrmoreOrg/electrum-evrmore",
+    long_description="""Lightweight Evrmore Wallet""",
 )

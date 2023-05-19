@@ -471,7 +471,7 @@ msgstr ""
 #: electrum/plugins/trezor/qt.py:588
 msgid ""
 "Are you SURE you want to wipe the device?\n"
-"Your wallet still has ravencoin in it!"
+"Your wallet still has EVR in it!"
 msgstr ""
 
 #: electrum/gui/qt/channels_list.py:168
@@ -1637,7 +1637,7 @@ msgid "Device communication error. Please unplug and replug your Digital Bitbox.
 msgstr ""
 
 #: electrum/plugins/ledger/ledger.py:242
-msgid "Device not in ravencoin mode"
+msgid "Device not in evrmore mode"
 msgstr ""
 
 #: electrum/plugins/trezor/qt.py:722
@@ -1782,7 +1782,7 @@ msgstr ""
 msgid ""
 "Electrum cannot pair with your {}.\n"
 "\n"
-"Before you request ravencoins to be sent to addresses in this wallet, ensure you can pair with your device, or that you have its seed (and passphrase, if any).  Otherwise all ravencoins you receive will be unspendable."
+"Before you request EVR to be sent to addresses in this wallet, ensure you can pair with your device, or that you have its seed (and passphrase, if any).  Otherwise all EVR you receive will be unspendable."
 msgstr ""
 
 #: electrum/gui/qt/installwizard.py:744
@@ -1840,7 +1840,7 @@ msgid "Electrum will now exit."
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:913
-msgid "Electrum's focus is speed, with low resource usage and simplifying Ravencoin."
+msgid "Electrum's focus is speed, with low resource usage and simplifying Evrmore."
 msgstr ""
 
 #: electrum/plugins/email_requests/__init__.py:3
@@ -1856,7 +1856,7 @@ msgid "Enable"
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:4066
-msgid "Enable 'Write logs to file' in Preferences -> General and restart Electrum-Ravencoin to view logs here"
+msgid "Enable 'Write logs to file' in Preferences -> General and restart Electrum-Evrmore to view logs here"
 msgstr ""
 
 #: electrum/gui/kivy/main_window.py:1467
@@ -1987,7 +1987,7 @@ msgid "Enter a label to name your device:"
 msgstr ""
 
 #: electrum/base_wizard.py:230
-msgid "Enter a list of Ravencoin addresses (this will create a watching-only wallet), or a list of private keys."
+msgid "Enter a list of Evrmore addresses (this will create a watching-only wallet), or a list of private keys."
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:2858
@@ -2003,7 +2003,7 @@ msgid "Enter a new password below."
 msgstr ""
 
 #: electrum/plugins/trezor/clientbase.py:297
-msgid "Enter a passphrase to generate this wallet.  Each time you use this wallet your {} will prompt you for the passphrase.  If you forget the passphrase you cannot access the ravencoins in the wallet."
+msgid "Enter a passphrase to generate this wallet.  Each time you use this wallet your {} will prompt you for the passphrase.  If you forget the passphrase you cannot access the EVR in the wallet."
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:3966
@@ -2360,7 +2360,7 @@ msgid "Firmware Version"
 msgstr ""
 
 #: electrum/plugins/ledger/ledger.py:50
-msgid "Firmware version (or \"ravencoin\" app) too old for Segwit support. Please update at"
+msgid "Firmware version (or \"evrmore\" app) too old for Segwit support. Please update at"
 msgstr ""
 
 #: electrum/plugins/trezor/qt.py:425
@@ -2404,7 +2404,7 @@ msgid "For security reasons we advise that you always use the latest version of 
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:196 electrum/gui/qt/main_window.py:3859
-msgid "Force use own RVN"
+msgid "Force use own EVR"
 msgstr ""
 
 #: electrum/gui/kivy/uix/dialogs/lightning_channels.py:499
@@ -2654,7 +2654,7 @@ msgid "If you are not sure what this is, leave this field unchanged."
 msgstr ""
 
 #: electrum/plugins/trezor/qt.py:725
-msgid "If you disable your PIN, anyone with physical access to your {} device can spend your ravencoin."
+msgid "If you disable your PIN, anyone with physical access to your {} device can spend your EVR."
 msgstr ""
 
 #: electrum/base_wizard.py:506
@@ -2667,7 +2667,7 @@ msgid "If you force-close this channel, the funds you have in it will not be ava
 msgstr ""
 
 #: electrum/plugins/trezor/qt.py:34
-msgid "If you forget a passphrase you will be unable to access any ravencoin in the wallet behind it.  A passphrase is not a PIN. Only change this if you are sure you understand it."
+msgid "If you forget a passphrase you will be unable to access any EVR in the wallet behind it.  A passphrase is not a PIN. Only change this if you are sure you understand it."
 msgstr ""
 
 #: electrum/gui/kivy/uix/dialogs/installwizard.py:686
@@ -2731,11 +2731,11 @@ msgid "Import Channel Backup?"
 msgstr ""
 
 #: electrum/base_wizard.py:229
-msgid "Import Ravencoin Addresses"
+msgid "Import Evrmore Addresses"
 msgstr ""
 
 #: electrum/base_wizard.py:150
-msgid "Import Ravencoin addresses or private keys"
+msgid "Import Evrmore addresses or private keys"
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:814 electrum/gui/qt/main_window.py:3966
@@ -2914,11 +2914,11 @@ msgstr ""
 
 #: electrum/gui/qt/asset_workspace.py:330
 #: electrum/gui/qt/asset_workspace.py:1022 electrum/gui/kivy/uix/screens.py:322
-msgid "Invalid Ravencoin Address"
+msgid "Invalid Evrmore Address"
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:3429 electrum/gui/qt/main_window.py:3457
-msgid "Invalid Ravencoin address."
+msgid "Invalid Evrmore address."
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:1781
@@ -2966,7 +2966,7 @@ msgid "Invalid node ID, must be 33 bytes and hexadecimal"
 msgstr ""
 
 #: electrum/gui/text.py:353 electrum/gui/stdio.py:178
-msgid "Invalid ravencoin address"
+msgid "Invalid evrmore address"
 msgstr ""
 
 #: electrum/gui/kivy/main_window.py:179
@@ -3013,7 +3013,7 @@ msgstr ""
 #: electrum/plugins/ledger/ledger.py:338
 msgid ""
 "It looks there is a lot of data to parse.\n"
-"This occurs if you receive RVN from transactions\n"
+"This occurs if you receive EVR from transactions\n"
 "with a lot of other outputs such as mining directly\n"
 "to your ledger.\n"
 "These long wait times are due to hardware limitations.\n"
@@ -3022,7 +3022,7 @@ msgid ""
 "These settings can be found in:\n"
 "Settings > Security > Screen Saver > Off\n"
 "Settings > Security > Pin Lock > Off\n"
-"Once this transaction is complete and sent, your RVN will\n"
+"Once this transaction is complete and sent, your EVR will\n"
 "be consolidated and transaction parsing times will be\n"
 "unnoticeable in the future.\n"
 "\n"
@@ -3257,7 +3257,7 @@ msgid "Make sure you install it with python3"
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:642
-msgid "Make sure you own the seed phrase or the private keys, before you request Ravencoins to be sent to this wallet."
+msgid "Make sure you own the seed phrase or the private keys, before you request EVR to be sent to this wallet."
 msgstr ""
 
 #: electrum/gui/qt/asset_list.py:245
@@ -3634,7 +3634,7 @@ msgid "Note that this is NOT your encryption password."
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:1591
-msgid "Note that this is not an intented feature of Ravencoin and may be removed in the future."
+msgid "Note that this is not an intented feature of Evrmore and may be removed in the future."
 msgstr ""
 
 #: electrum/gui/qt/settings_dialog.py:162
@@ -3739,7 +3739,7 @@ msgid "Only connect to a single server"
 msgstr ""
 
 #: electrum/plugins/trezor/qt.py:750
-msgid "Only wipe a device if you have the recovery seed written down and the device wallet(s) are empty, otherwise the ravencoin will be lost forever."
+msgid "Only wipe a device if you have the recovery seed written down and the device wallet(s) are empty, otherwise the EVR will be lost forever."
 msgstr ""
 
 #: electrum/gui/qt/channels_list.py:352 electrum/gui/qt/channels_list.py:388
@@ -3844,7 +3844,7 @@ msgid "PIN not updated"
 msgstr ""
 
 #: electrum/plugins/trezor/qt.py:659
-msgid "PIN protection is strongly recommended.  A PIN is your only protection against someone stealing your ravencoin if they obtain physical access to your {}."
+msgid "PIN protection is strongly recommended.  A PIN is your only protection against someone stealing your EVR if they obtain physical access to your {}."
 msgstr ""
 
 #: electrum/plugins/trezor/qt.py:618
@@ -4114,7 +4114,7 @@ msgid "Please save these {0} words on paper (order is important). "
 msgstr ""
 
 #: electrum/gui/kivy/uix/screens.py:300
-msgid "Please scan a ravencoin address or a payment request"
+msgid "Please scan a evrmore address or a payment request"
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:720
@@ -4347,38 +4347,38 @@ msgid "REMEMBER THE PASSWORD!"
 msgstr ""
 
 #: electrum/gui/qt/history_list.py:888
-msgid "RVN Fiat price"
+msgid "EVR Fiat price"
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:1864
-msgid "RVN Offered:"
+msgid "EVR Offered:"
 msgstr ""
 
 #: electrum/gui/qt/history_list.py:884
-msgid "RVN balance"
+msgid "EVR balance"
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:3839
 msgid ""
-"RVN currently in your wallet will be used for the fee to sweep assets\n"
-"if there is no RVN held in the private keys.\n"
+"EVR currently in your wallet will be used for the fee to sweep assets\n"
+"if there is no EVR held in the private keys.\n"
 "Enter private keys:"
 msgstr ""
 
 #: electrum/gui/qt/history_list.py:905
-msgid "RVN incoming"
+msgid "EVR incoming"
 msgstr ""
 
 #: electrum/gui/qt/history_list.py:909
-msgid "RVN outgoing"
+msgid "EVR outgoing"
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:2222
-msgid "Ravencoin Address is None"
+msgid "Evrmore Address is None"
 msgstr ""
 
 #: electrum/gui/qt/confirm_tx_dialog.py:145
-msgid "Ravencoin transactions are in general not free. A transaction fee is paid by the sender of the funds."
+msgid "Evrmore transactions are in general not free. A transaction fee is paid by the sender of the funds."
 msgstr ""
 
 #: electrum/gui/qt/locktimeedit.py:36
@@ -4889,7 +4889,7 @@ msgid "Share Invoice"
 msgstr ""
 
 #: electrum/gui/kivy/uix/dialogs/request_dialog.py:134
-msgid "Share Ravencoin Request"
+msgid "Share Evrmore Request"
 msgstr ""
 
 #: electrum/gui/qt/channels_list.py:47
@@ -5076,7 +5076,7 @@ msgid "Sorry, but we were unable to check for updates. Please try again later."
 msgstr ""
 
 #: electrum/base_crash_reporter.py:59
-msgid "Sorry, remote sending of crash reports has been temporarily disabled. Please ask for help on the Ravencoin discord. (https://discord.gg/VuubYncHz4)"
+msgid "Sorry, remote sending of crash reports has been temporarily disabled. Please ask for help on the Evrmore discord. (https://discord.gg/4csauGuvw3)"
 msgstr ""
 
 #: electrum/gui/qt/settings_dialog.py:575
@@ -5112,7 +5112,7 @@ msgid "Standard wallet"
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:916
-msgid "Startup times are instant because it operates in conjunction with high-performance servers that handle the most complicated parts of the Ravencoin system."
+msgid "Startup times are instant because it operates in conjunction with high-performance servers that handle the most complicated parts of the Evrmore system."
 msgstr ""
 
 #: electrum/gui/qt/channel_details.py:178
@@ -5221,7 +5221,7 @@ msgid "Testnet coins are worthless."
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:681
-msgid "Testnet is separate from the main Ravencoin network. It is used for testing."
+msgid "Testnet is separate from the main Evrmore network. It is used for testing."
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:1470 electrum/gui/qt/qrcodewidget.py:148
@@ -5367,7 +5367,7 @@ msgid "The proposed fee is computed using your fee/kB settings, applied to the t
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:1280
-msgid "The ravencoin address never expires and will always be part of this electrum wallet."
+msgid "The evrmore address never expires and will always be part of this electrum wallet."
 msgstr ""
 
 #: electrum/gui/kivy/uix/dialogs/installwizard.py:838
@@ -5529,7 +5529,7 @@ msgid "This is discouraged."
 msgstr ""
 
 #: electrum/gui/qt/settings_dialog.py:364
-msgid "This is not typical Ravencoin behavior and these messages"
+msgid "This is not typical Evrmore behavior and these messages"
 msgstr ""
 
 #: electrum/gui/qt/network_dialog.py:300
@@ -5545,7 +5545,7 @@ msgid "This may result in higher transactions fees."
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:641
-msgid "This means you will not be able to spend Ravencoins with it."
+msgid "This means you will not be able to spend EVR with it."
 msgstr ""
 
 #: electrum/gui/qt/settings_dialog.py:352
@@ -6017,7 +6017,7 @@ msgid "Update check failed"
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:347
-msgid "Update to Electrum-Ravencoin {} is available"
+msgid "Update to Electrum-Evrmore {} is available"
 msgstr ""
 
 #: electrum/base_wizard.py:168
@@ -6454,7 +6454,7 @@ msgid "You can override the suggested derivation path."
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:1281
-msgid "You can reuse a ravencoin address any number of times but it is not good for your privacy."
+msgid "You can reuse a evrmore address any number of times but it is not good for your privacy."
 msgstr ""
 
 #: electrum/plugins/trezor/qt.py:680
@@ -6487,7 +6487,7 @@ msgid "You have {n} open channels."
 msgstr ""
 
 #: electrum/gui/qt/main_window.py:1558
-msgid "You may enter a Ravencoin address, a label from your list of contacts (a list of completions will be proposed), or an alias (email-like address that forwards to a Bitcoin address)"
+msgid "You may enter a Evrmore address, a label from your list of contacts (a list of completions will be proposed), or an alias (email-like address that forwards to a Bitcoin address)"
 msgstr ""
 
 #: electrum/base_wizard.py:501
@@ -6531,7 +6531,7 @@ msgid "You send"
 msgstr ""
 
 #: electrum/plugins/trezor/qt.py:31
-msgid "You should enable PIN protection.  Your PIN is the only protection for your ravencoin if your device is lost or stolen."
+msgid "You should enable PIN protection.  Your PIN is the only protection for your EVR if your device is lost or stolen."
 msgstr ""
 
 #: electrum/plugins/trezor/trezor.py:252 electrum/plugins/safe_t/safe_t.py:212
@@ -6604,7 +6604,7 @@ msgid "Your device might not have support for this functionality."
 msgstr ""
 
 #: electrum/gui/qt/password_dialog.py:256
-msgid "Your ravencoins are password protected. However, your wallet file is not encrypted."
+msgid "Your EVR are password protected. However, your wallet file is not encrypted."
 msgstr ""
 
 #: electrum/gui/qt/seed_dialog.py:420 electrum/gui/qt/seed_dialog.py:571
@@ -6625,7 +6625,7 @@ msgid "Your server is on branch"
 msgstr ""
 
 #: electrum/network.py:1015
-msgid "Your transaction is paying a fee that is so low that the ravencoin node cannot fit it into its mempool. The mempool is already full of hundreds of megabytes of transactions that all pay higher fees. Try to increase the fee."
+msgid "Your transaction is paying a fee that is so low that the evrmore node cannot fit it into its mempool. The mempool is already full of hundreds of megabytes of transactions that all pay higher fees. Try to increase the fee."
 msgstr ""
 
 #: electrum/network.py:1024

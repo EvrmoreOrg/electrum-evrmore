@@ -12,7 +12,7 @@ from electrum.util import NotEnoughFunds, NoDynamicFeeEstimates
 
 from .util import (WindowModalDialog, Buttons, OkButton, CancelButton,
                    EnterButton, ColorScheme, WWLabel, read_QIcon, IconLabel)
-from .amountedit import RVNAmountEdit
+from .amountedit import EVRAmountEdit
 
 
 if TYPE_CHECKING:
@@ -47,7 +47,7 @@ class NewChannelDialog(WindowModalDialog):
             self.trampoline_combo = QComboBox()
             self.trampoline_combo.addItems(self.trampoline_names)
             self.trampoline_combo.setCurrentIndex(1)
-        self.amount_e = RVNAmountEdit(self.window.get_decimal_point)
+        self.amount_e = EVRAmountEdit(self.window.get_decimal_point)
         self.amount_e.setAmount(amount_sat)
         self.min_button = EnterButton(_("Min"), self.spend_min)
         self.min_button.setEnabled(bool(self.min_amount_sat))

@@ -577,9 +577,9 @@ class DeviceMgr(ThreadJob):
         # or it is not pairable
         raise DeviceUnpairableError(
             _('Electrum cannot pair with your {}.\n\n'
-              'Before you request ravencoins to be sent to addresses in this '
+              'Before you request EVR to be sent to addresses in this '
               'wallet, ensure you can pair with your device, or that you have '
-              'its seed (and passphrase, if any).  Otherwise all ravencoins you '
+              'its seed (and passphrase, if any).  Otherwise all EVR you '
               'receive will be unspendable.').format(plugin.device))
 
     def unpaired_device_infos(self, handler: Optional['HardwareHandlerBase'], plugin: 'HW_PluginBase',

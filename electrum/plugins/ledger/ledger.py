@@ -11,7 +11,7 @@ from typing import Optional, Tuple
 from electrum import ecc, constants
 from electrum import bip32
 from electrum.crypto import hash_160
-from electrum.ravencoin import int_to_hex, var_int, is_segwit_script_type, is_b58_address
+from electrum.evrmore import int_to_hex, var_int, is_segwit_script_type, is_b58_address
 from electrum.bip32 import BIP32Node, convert_bip32_intpath_to_strpath
 from electrum.i18n import _
 from electrum.keystore import Hardware_KeyStore
@@ -47,7 +47,7 @@ except ImportError as e:
 
 MSG_NEEDS_FW_UPDATE_GENERIC = _('Firmware version too old. Please update at') + \
                               ' https://www.ledgerwallet.com'
-MSG_NEEDS_FW_UPDATE_SEGWIT = _('Firmware version (or "ravencoin" app) too old for Segwit support. Please update at') + \
+MSG_NEEDS_FW_UPDATE_SEGWIT = _('Firmware version (or "evrmore" app) too old for Segwit support. Please update at') + \
                              ' https://www.ledgerwallet.com'
 MULTI_OUTPUT_SUPPORT = '1.1.4'
 SEGWIT_SUPPORT = '1.1.10'
@@ -252,7 +252,7 @@ class Ledger_Client(HardwareClientBase):
                 self.perform_hw1_preflight()
             except BTChipException as e:
                 if (e.sw == 0x6d00 or e.sw == 0x6700 or e.sw == 0x6702):
-                    raise UserFacingException(_("Device not in ravencoin mode")) from e
+                    raise UserFacingException(_("Device not in evrmore mode")) from e
                 raise e
             self.preflightDone = True
 
@@ -349,7 +349,7 @@ class ParsingTracker(AbstractTracker):
         line = _('Parsing transaction data...\n\n')
         if self.send_warning:
             line += _('It looks there is a lot of data to parse.\n'
-                      'This occurs if you receive RVN from transactions\n'
+                      'This occurs if you receive EVR from transactions\n'
                       'with a lot of other outputs such as mining directly\n'
                       'to your ledger.\n'
                       'These long wait times are due to hardware limitations.\n'
@@ -358,7 +358,7 @@ class ParsingTracker(AbstractTracker):
                       'These settings can be found in:\n'
                       'Settings > Security > Screen Saver > Off\n'
                       'Settings > Security > Pin Lock > Off\n'
-                      'Once this transaction is complete and sent, your RVN will\n'
+                      'Once this transaction is complete and sent, your EVR will\n'
                       'be consolidated and transaction parsing times will be\n'
                       'unnoticeable in the future.\n\n')
         line += _('Tx: {}/{}\nInputs: {}/{}\nOutputs: {}/{}\n').format(

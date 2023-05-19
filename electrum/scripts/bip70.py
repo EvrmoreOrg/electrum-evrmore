@@ -7,7 +7,7 @@ import tlslite
 from electrum.transaction import Transaction
 from electrum import paymentrequest
 from electrum import paymentrequest_pb2 as pb2
-from electrum.ravencoin import address_to_script
+from electrum.evrmore import address_to_script
 
 chain_file = 'mychain.pem'
 cert_file = 'mycert.pem'

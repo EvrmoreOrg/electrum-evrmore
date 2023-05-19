@@ -48,10 +48,10 @@ from .util import (log_exceptions, ignore_exceptions, OldTaskGroup,
                    bfh, make_aiohttp_session, send_exception_to_crash_reporter,
                    is_hash256_str, is_non_negative_integer, MyEncoder, NetworkRetryManager,
                    nullcontext)
-from .ravencoin import COIN
+from .evrmore import COIN
 from . import constants
 from . import blockchain
-from . import ravencoin
+from . import evrmore
 from . import dns_hacks
 from .transaction import Transaction
 from .blockchain import Blockchain
@@ -1020,7 +1020,7 @@ class Network(Logger, NetworkRetryManager[ServerAddr]):
             r"bad-txns-too-many-sigops": None,
             r"mempool min fee not met":
                 ("mempool min fee not met\n" +
-                 _("Your transaction is paying a fee that is so low that the ravencoin node cannot "
+                 _("Your transaction is paying a fee that is so low that the evrmore node cannot "
                    "fit it into its mempool. The mempool is already full of hundreds of megabytes "
                    "of transactions that all pay higher fees. Try to increase the fee.")),
             r"min relay fee not met": None,

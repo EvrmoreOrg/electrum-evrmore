@@ -43,8 +43,8 @@ import os
 from .import util, ecc
 from .util import (bfh, bh2u, format_satoshis, json_decode, json_normalize,
                    is_hash256_str, is_hex_str, to_bytes, parse_max_spend)
-from . import ravencoin
-from .ravencoin import is_address,  hash_160, COIN
+from . import evrmore
+from .evrmore import is_address,  hash_160, COIN
 from .bip32 import BIP32Node
 from .i18n import _
 from .transaction import (Transaction, multisig_script, TxOutput, PartialTransaction, PartialTxOutput,
@@ -202,7 +202,7 @@ class Commands:
 
     @command('')
     async def address_to_h160(self, address: str):
-        _, hash_160_ = ravencoin.b58_address_to_hash160(address)
+        _, hash_160_ = evrmore.b58_address_to_hash160(address)
         return hash_160_.hex()
 
     @command('')
@@ -212,11 +212,11 @@ class Commands:
     @command('')
     async def h160_to_address(self, h160: str, addr_type: int):
         h160 = bytes.fromhex(h160)
-        return ravencoin.hash160_to_b58_address(h160, addr_type)
+        return evrmore.hash160_to_b58_address(h160, addr_type)
 
     @command('')
     async def scripthash_from_address(self, address: str):
-        return ravencoin.address_to_scripthash(address)
+        return evrmore.address_to_scripthash(address)
 
     @command('n')
     async def send_custom_script(self, function: str, *args):
@@ -233,7 +233,7 @@ class Commands:
         return "Your max receive amount has been changed to {} bytes. " \
                "It was {} bytes. " \
                "The default is {} bytes. " \
-               "Restart electrum-ravencoin for the effect to take place.".format(amt, old_max, MAX_INCOMING_MSG_SIZE)
+               "Restart electrum-evrmore for the effect to take place.".format(amt, old_max, MAX_INCOMING_MSG_SIZE)
 
     @command('n')
     async def getinfo(self):
@@ -299,8 +299,8 @@ class Commands:
     @command('')
     async def restore(self, text, passphrase=None, password=None, encrypt_file=True, wallet_path=None):
         """Restore a wallet from text. Text can be a seed phrase, a master
-        public key, a master private key, a list of ravencoin addresses
-        or ravencoin private keys.
+        public key, a master private key, a list of evrmore addresses
+        or evrmore private keys.
         If you want to be prompted for an argument, type '?' or ':' (concealed)
         """
         # TODO create a separate command that blocks until wallet is synced
@@ -380,7 +380,7 @@ class Commands:
         """Return the transaction history of any address. Note: This is a
         walletless server query, results are not checked by SPV.
         """
-        sh = ravencoin.address_to_scripthash(address)
+        sh = evrmore.address_to_scripthash(address)
         return await self.network.get_history_for_scripthash(sh)
 
     @command('w')
@@ -400,7 +400,7 @@ class Commands:
         """Returns the UTXO list of any address. Note: This
         is a walletless server query, results are not checked by SPV.
         """
-        sh = ravencoin.address_to_scripthash(address)
+        sh = evrmore.address_to_scripthash(address)
         return await self.network.listunspent_for_scripthash(sh)
 
     @command('')
@@ -426,7 +426,7 @@ class Commands:
                 txin.nsequence = nsequence
             sec = txin_dict.get('privkey')
             if sec:
-                txin_type, privkey, compressed = ravencoin.deserialize_privkey(sec)
+                txin_type, privkey, compressed = evrmore.deserialize_privkey(sec)
                 pubkey = ecc.ECPrivkey(privkey).get_public_key_hex(compressed=compressed)
                 keypairs[pubkey] = privkey, compressed
                 txin.script_type = txin_type
@@ -452,9 +452,9 @@ class Commands:
             privkey = [privkey]
 
         for priv in privkey:
-            txin_type, priv2, compressed = ravencoin.deserialize_privkey(priv)
+            txin_type, priv2, compressed = evrmore.deserialize_privkey(priv)
             pubkey = ecc.ECPrivkey(priv2).get_public_key_bytes(compressed=compressed)
-            address = ravencoin.pubkey_to_address(txin_type, pubkey.hex())
+            address = evrmore.pubkey_to_address(txin_type, pubkey.hex())
             if address in txins_dict.keys():
                 for txin in txins_dict[address]:
                     txin.pubkeys = [pubkey]
@@ -488,7 +488,7 @@ class Commands:
         """Create multisig address"""
         assert isinstance(pubkeys, list), (type(num), type(pubkeys))
         redeem_script = multisig_script(pubkeys, num)
-        address = ravencoin.hash160_to_p2sh(hash_160(bfh(redeem_script)))
+        address = evrmore.hash160_to_p2sh(hash_160(bfh(redeem_script)))
         return {'address':address, 'redeemScript':redeem_script}
 
     @command('w')
@@ -569,7 +569,7 @@ class Commands:
         """Return the balance of any address. Note: This is a walletless
         server query, results are not checked by SPV.
         """
-        sh = ravencoin.address_to_scripthash(address)
+        sh = evrmore.address_to_scripthash(address)
         out = await self.network.get_balance_for_scripthash(sh)
         out["confirmed"] =  str(Decimal(out["confirmed"])/COIN)
         out["unconfirmed"] =  str(Decimal(out["unconfirmed"])/COIN)
@@ -1374,7 +1374,7 @@ class Commands:
         """Returns the Asset list of any address. Note: This
         is a walletless server query, results are not checked by SPV.
         """
-        sh = ravencoin.address_to_scripthash(address)
+        sh = evrmore.address_to_scripthash(address)
         return self.network.run_from_another_thread(self.network.listasset_for_scripthash(sh))
 
     @command('n')
@@ -1382,7 +1382,7 @@ class Commands:
         """Return the asset balance of any address. Note: This is a walletless
         server query, results are not checked by SPV.
         """
-        sh = ravencoin.address_to_scripthash(address)
+        sh = evrmore.address_to_scripthash(address)
         out = self.network.run_from_another_thread(self.network.get_asset_balance_for_scripthash(sh))
         for key, value in out["confirmed"].items():
             val = str(Decimal(value) / COIN)
@@ -1517,8 +1517,8 @@ param_descriptions = {
     'pubkey': 'Public key',
     'message': 'Clear text message. Use quotes if it contains spaces.',
     'encrypted': 'Encrypted message',
-    'amount': 'Amount to be sent (in rvn). Type \'!\' to send the maximum available.',
-    'requested_amount': 'Requested amount (in rvn).',
+    'amount': 'Amount to be sent (in evr). Type \'!\' to send the maximum available.',
+    'requested_amount': 'Requested amount (in evr).',
     'outputs': 'list of ["address", amount]',
     'redeem_script': 'redeem script (hexadecimal)',
     'lightning_amount': "Amount sent or received in a submarine swap. Set it to 'dryrun' to receive a value",
@@ -1538,7 +1538,7 @@ command_options = {
     'labels':      ("-l", "Show the labels of listed addresses"),
     'nocheck':     (None, "Do not verify aliases"),
     'imax':        (None, "Maximum number of inputs"),
-    'fee':         ("-f", "Transaction fee (absolute, in rvn)"),
+    'fee':         ("-f", "Transaction fee (absolute, in EVR)"),
     'feerate':     (None, "Transaction fee rate (in sat/byte)"),
     'from_addr':   ("-F", "Source address (must be a wallet address; use sweep to spend from non-wallet address)."),
     'from_coins':  (None, "Source coins (must be in wallet; use sweep to spend from non-wallet address)."),
@@ -1558,7 +1558,7 @@ command_options = {
     'timeout':     (None, "Timeout in seconds"),
     'force':       (None, "Create new address beyond gap limit, if no more addresses are available."),
     'pending':     (None, "Show only pending requests."),
-    'push_amount': (None, 'Push initial amount (in rvn)'),
+    'push_amount': (None, 'Push initial amount (in EVR)'),
     'expired':     (None, "Show only expired requests."),
     'paid':        (None, "Show only paid requests."),
     'show_addresses': (None, "Show input and output addresses"),

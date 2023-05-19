@@ -53,7 +53,7 @@ from . import pem
 from . import version
 from . import blockchain
 from .blockchain import Blockchain, PRE_KAWPOW_HEADER_SIZE, POST_KAWPOW_HEADER_SIZE
-from . import ravencoin
+from . import evrmore
 from . import constants
 from .i18n import _
 from .logging import Logger
@@ -1138,9 +1138,9 @@ class Interface(Logger):
         # check response
         if not res:  # ignore empty string
             return ''
-        if not ravencoin.is_address(res):
+        if not evrmore.is_address(res):
             # note: do not hard-fail -- allow server to use future-type
-            #       ravencoin address we do not recognize
+            #       evrmore address we do not recognize
             self.logger.info(f"invalid donation address from server: {repr(res)}")
             res = ''
         return res
@@ -1151,7 +1151,7 @@ class Interface(Logger):
         res = await self.session.send_request('blockchain.relayfee')
         # check response
         assert_non_negative_int_or_float(res)
-        relayfee = int(res * ravencoin.COIN)
+        relayfee = int(res * evrmore.COIN)
         relayfee = max(0, relayfee)
         return relayfee
 
@@ -1166,7 +1166,7 @@ class Interface(Logger):
         # check response
         if res != -1:
             assert_non_negative_int_or_float(res)
-            res = int(res * ravencoin.COIN)
+            res = int(res * evrmore.COIN)
         return res
 
 

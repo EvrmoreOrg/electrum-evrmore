@@ -46,7 +46,7 @@ from electrum.address_synchronizer import TX_HEIGHT_LOCAL, TX_HEIGHT_FUTURE
 from electrum.i18n import _
 from electrum.util import (block_explorer_URL, profiler, TxMinedInfo,
                            OrderedDictWithIndex, timestamp_to_datetime,
-                           Satoshis, Fiat, format_time, RavenValue)
+                           Satoshis, Fiat, format_time, EvrmoreValue)
 from electrum.logging import get_logger, Logger
 
 from .custom_model import CustomNode, CustomModel
@@ -305,8 +305,8 @@ class HistoryModel(CustomModel, Logger):
                     node1 = HistoryNode(self, child_data)
                     parent.addChild(node1)
                     parent._data['label'] = child_data.get('group_label')
-                    parent._data['bc_value'] = child_data.get('bc_value', RavenValue())
-                    parent._data['ln_value'] = child_data.get('ln_value', RavenValue())
+                    parent._data['bc_value'] = child_data.get('bc_value', EvrmoreValue())
+                    parent._data['ln_value'] = child_data.get('ln_value', EvrmoreValue())
                 # add child to parent
                 parent.addChild(node)
                 # update parent data
@@ -377,7 +377,7 @@ class HistoryModel(CustomModel, Logger):
 
             # Create separate rows for assets
 
-            value = tx_item['value']  # type: RavenValue
+            value = tx_item['value']  # type: EvrmoreValue
             lightning = tx_item.get('lightning', False)
             timestamp = tx_item.get('timestamp')
             txid = tx_item.get('txid')
@@ -398,10 +398,10 @@ class HistoryModel(CustomModel, Logger):
             fiat_fee = tx_item.get('fiat_fee'),
             capital_gain = tx_item.get('capital_gain')
 
-            if value.rvn_value != 0:
-                asset_name = 'RVN'
-                amount = value.rvn_value
-                balance = tx_item['balance'].rvn_value
+            if value.evr_value != 0:
+                asset_name = 'EVR'
+                amount = value.evr_value
+                balance = tx_item['balance'].evr_value
                 node_data = HistoryNodeData(
                     lightning=lightning,
                     timestamp=timestamp,
@@ -641,7 +641,7 @@ class AssetHistoryModel(HistoryModel):
 
             # Create separate rows for assets
 
-            value = tx_item['value']  # type: RavenValue
+            value = tx_item['value']  # type: EvrmoreValue
             lightning = tx_item.get('lightning', False)
             timestamp = tx_item.get('timestamp')
             txid = tx_item.get('txid')
@@ -879,11 +879,11 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
         grid.addWidget(QLabel(self.format_date(start_date)), 1, 1)
         grid.addWidget(QLabel(self.format_date(end_date)), 1, 2)
         #
-        grid.addWidget(QLabel(_("RVN balance")), 2, 0)
-        grid.addWidget(QLabel(format_amount(start['BTC_balance'].rvn_value)), 2, 1)
-        grid.addWidget(QLabel(format_amount(end['BTC_balance'].rvn_value)), 2, 2)
+        grid.addWidget(QLabel(_("EVR balance")), 2, 0)
+        grid.addWidget(QLabel(format_amount(start['BTC_balance'].evr_value)), 2, 1)
+        grid.addWidget(QLabel(format_amount(end['BTC_balance'].evr_value)), 2, 2)
         #
-        grid.addWidget(QLabel(_("RVN Fiat price")), 3, 0)
+        grid.addWidget(QLabel(_("EVR Fiat price")), 3, 0)
         grid.addWidget(QLabel(format_fiat(start.get('BTC_fiat_price'))), 3, 1)
         grid.addWidget(QLabel(format_fiat(end.get('BTC_fiat_price'))), 3, 2)
         #
@@ -900,12 +900,12 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
         grid.addWidget(QLabel(format_fiat(end.get('unrealized_gains', ''))), 6, 2)
         #
         grid2 = QGridLayout()
-        grid2.addWidget(QLabel(_("RVN incoming")), 0, 0)
-        grid2.addWidget(QLabel(format_amount(flow['BTC_incoming'].rvn_value)), 0, 1)
+        grid2.addWidget(QLabel(_("EVR incoming")), 0, 0)
+        grid2.addWidget(QLabel(format_amount(flow['BTC_incoming'].evr_value)), 0, 1)
         grid2.addWidget(QLabel(_("Fiat incoming")), 1, 0)
         grid2.addWidget(QLabel(format_fiat(flow.get('fiat_incoming'))), 1, 1)
-        grid2.addWidget(QLabel(_("RVN outgoing")), 2, 0)
-        grid2.addWidget(QLabel(format_amount(flow['BTC_outgoing'].rvn_value)), 2, 1)
+        grid2.addWidget(QLabel(_("EVR outgoing")), 2, 0)
+        grid2.addWidget(QLabel(format_amount(flow['BTC_outgoing'].evr_value)), 2, 1)
         grid2.addWidget(QLabel(_("Fiat outgoing")), 3, 0)
         grid2.addWidget(QLabel(format_fiat(flow.get('fiat_outgoing'))), 3, 1)
         #
@@ -1030,7 +1030,7 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
             menu.addAction(_("Edit {}").format(label), lambda p=persistent: self.edit(QModelIndex(p)))
         menu.addAction(_("View Transaction"), lambda: self.show_transaction(tx_item, tx))
         channel_id = tx_item.channel_id
-        if tx_item.asset_name != 'RVN':
+        if tx_item.asset_name != 'EVR':
             menu.addAction(_('Mark as spam'), lambda: self.parent.hide_asset(tx_item.asset_name))
         if channel_id:
             menu.addAction(_("View Channel"), lambda: self.parent.show_channel(bytes.fromhex(channel_id)))
@@ -1083,7 +1083,7 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
         d = WindowModalDialog(self, _('Export History'))
         d.setMinimumSize(400, 200)
         vbox = QVBoxLayout(d)
-        defaultname = os.path.expanduser('~/electrum-ravencoin-history.csv')
+        defaultname = os.path.expanduser('~/electrum-evrmore-history.csv')
         select_msg = _('Select file to export your wallet transactions to')
         hbox, filename_e, csv_button = filename_field(self, self.config, defaultname, select_msg)
         vbox.addLayout(hbox)
@@ -1111,8 +1111,8 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
         lines = []
         if is_csv:
             for item in txns:
-                rvn_value = item['bc_value']
-                val = rvn_value.rvn_value
+                evr_value = item['bc_value']
+                val = evr_value.evr_value
 
                 if val != 0:
                     lines.append([item['txid'],
@@ -1125,7 +1125,7 @@ class HistoryList(MyTreeView, AcceptFileDragDrop):
                                   item.get('fiat_fee', ''),
                                   item['date']])
 
-                assets = rvn_value.assets
+                assets = evr_value.assets
                 for asset, val in assets.items():
                     lines.append([item['txid'],
                                   item.get('label', ''),

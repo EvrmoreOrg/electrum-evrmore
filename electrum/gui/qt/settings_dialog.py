@@ -230,7 +230,7 @@ class SettingsDialog(QDialog, QtEventListener):
         # units
         units = base_units_list
         msg = (_('Base unit of your wallet.')
-               + '\n1 RVN = 1000 mRVN. 1 mRVN = 1000 bits. 1 bit = 100 sat.\n'
+               + '\n1 EVR = 1000 mEVR. 1 mEVR = 1000 bits. 1 bit = 100 sat.\n'
                + _('This setting affects the Send tab, and all balance related fields.'))
         unit_label = HelpLabel(_('Base unit') + ':', msg)
         unit_combo = QComboBox()
@@ -247,7 +247,7 @@ class SettingsDialog(QDialog, QtEventListener):
             self.app.refresh_amount_edits_signal.emit()
         unit_combo.currentIndexChanged.connect(lambda x: on_unit(x, nz))
 
-        thousandsep_cb = QCheckBox(_("Add thousand separators to ravencoin amounts"))
+        thousandsep_cb = QCheckBox(_("Add thousand separators to evrmore amounts"))
         thousandsep_cb.setChecked(bool(self.config.get('amt_add_thousands_sep', False)))
         def on_set_thousandsep(v):
             checked = v == Qt.Checked
@@ -376,7 +376,7 @@ class SettingsDialog(QDialog, QtEventListener):
         tx_custom_message.setToolTip(
             _('Add the ability to add an invalid pubkey to a transaction') + '\n' +
             _('that has been encoded with a short message.') + '\n' +
-            _('This is not typical Ravencoin behavior and these messages') + '\n' +
+            _('This is not typical Evrmore behavior and these messages') + '\n' +
             _('may be pruned from the chain in the future.') + '\n' +
             _('This will increase your transaction size and therefore your fee.'))
         tx_custom_message.setChecked(enable_tx_custom_message)

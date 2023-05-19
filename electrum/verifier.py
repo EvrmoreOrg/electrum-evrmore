@@ -29,7 +29,7 @@ import aiorpcx
 from .assets import pull_meta_from_create_or_reissue_script, BadAssetScript
 from .util import bh2u, TxMinedInfo, NetworkJobOnDefaultServer, bfh
 from .crypto import sha256d
-from .ravencoin import hash_decode, hash_encode
+from .evrmore import hash_decode, hash_encode
 from .transaction import Transaction, TxOutpoint, AssetMeta
 from .blockchain import hash_header
 from .interface import GracefulDisconnect

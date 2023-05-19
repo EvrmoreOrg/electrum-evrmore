@@ -38,8 +38,8 @@ from PyQt5.QtWidgets import (QAbstractItemView, QMenu, QCheckBox, QSplitter, QFr
 
 from electrum.i18n import _
 from electrum.network import Network
-from electrum.util import IPFSData, get_ipfs_path, ipfs_explorer_URL, profiler, RavenValue, Satoshis, get_asyncio_loop, make_aiohttp_session
-from electrum.ravencoin import COIN, is_address, base_decode
+from electrum.util import IPFSData, get_ipfs_path, ipfs_explorer_URL, profiler, EvrmoreValue, Satoshis, get_asyncio_loop, make_aiohttp_session
+from electrum.evrmore import COIN, is_address, base_decode
 from electrum.wallet import InternalAddressCorruption
 from electrum.transaction import AssetMeta
 import electrum.transaction as transaction
@@ -311,7 +311,7 @@ class JsonViewWidget(QTreeWidget):
                 def open_transaction():
                     raw_tx = self.parent_widget.main_window._fetch_tx_from_network(txid_str, False)
                     if not raw_tx:
-                        self.parent_widget.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                        self.parent_widget.main_window.show_message(_("This transaction is not on the Evrmore blockchain."))
                         return
                     tx = transaction.Transaction(raw_tx)
                     self.parent_widget.main_window.show_transaction(tx)
@@ -509,7 +509,7 @@ class AssetList(MyTreeView):
         elif raw_ipfs[:2] == b'\x54\x20' and len(raw_ipfs) == 34:
             raw_tx = self.view.main_window._fetch_tx_from_network(raw_ipfs[2:].hex(), False)
             if not raw_tx:
-                self.view.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                self.view.main_window.show_message(_("This transaction is not on the Evrmore blockchain."))
                 return
             tx = transaction.Transaction(raw_tx)
             self.view.main_window.show_transaction(tx)
@@ -538,8 +538,8 @@ class AssetList(MyTreeView):
         assets = {}  # type: Dict[str, List[int, Optional[AssetMeta]]]
 
         c, u, x = self.wallet.get_balance()
-        confirmed_balance: RavenValue = c
-        unconfirmed_balance: RavenValue = u + x
+        confirmed_balance: EvrmoreValue = c
+        unconfirmed_balance: EvrmoreValue = u + x
 
         all_assets = {x for x in confirmed_balance.assets.keys()}
         all_assets.update({x for x in unconfirmed_balance.assets.keys()})
@@ -621,7 +621,7 @@ class AssetList(MyTreeView):
                 def open_transaction():
                     raw_tx = self.view.main_window._fetch_tx_from_network(raw_ipfs[2:].hex(), False)
                     if not raw_tx:
-                        self.view.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                        self.view.main_window.show_message(_("This transaction is not on the Evrmore blockchain."))
                         return
                     tx = transaction.Transaction(raw_tx)
                     self.view.main_window.show_transaction(tx)
@@ -720,7 +720,7 @@ class MetadataViewer(QFrame):
             raw_ipfs = base_decode(self.current_meta.ipfs_str, base=58)
             raw_tx = self.main_window._fetch_tx_from_network(raw_ipfs[2:].hex(), False)
             if not raw_tx:
-                self.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                self.main_window.show_message(_("This transaction is not on the Evrmore blockchain."))
                 return
             tx = transaction.Transaction(raw_tx)
             
@@ -747,7 +747,7 @@ class MetadataViewer(QFrame):
         def view_source_tx():
             raw_tx = self.main_window._fetch_tx_from_network(self.current_meta.source_outpoint.txid.hex(), False)
             if not raw_tx:
-                self.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                self.main_window.show_message(_("This transaction is not on the Evrmore blockchain."))
                 return
             tx = transaction.Transaction(raw_tx)
             self.main_window.show_transaction(tx)
@@ -769,7 +769,7 @@ class MetadataViewer(QFrame):
         def view_ipfs_source_tx():
             raw_tx = self.main_window._fetch_tx_from_network(self.current_meta.source_ipfs.txid.hex(), False)
             if not raw_tx:
-                self.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                self.main_window.show_message(_("This transaction is not on the Evrmore blockchain."))
                 return
             tx = transaction.Transaction(raw_tx)
             self.main_window.show_transaction(tx)
@@ -791,7 +791,7 @@ class MetadataViewer(QFrame):
         def view_div_source_tx():
             raw_tx = self.main_window._fetch_tx_from_network(self.current_meta.source_divisions.txid.hex(), False)
             if not raw_tx:
-                self.main_window.show_message(_("This transaction is not on the Ravencoin blockchain."))
+                self.main_window.show_message(_("This transaction is not on the Evrmore blockchain."))
                 return
             tx = transaction.Transaction(raw_tx)
             self.main_window.show_transaction(tx)

@@ -30,10 +30,10 @@ import asyncio
 from aiorpcx import TaskGroup
 
 from .crypto import sha256
-from . import ravencoin, util
+from . import evrmore, util
 from .assets import pull_meta_from_create_or_reissue_script
-from .ravencoin import COINBASE_MATURITY
-from .util import IPFSData, profiler, bfh, TxMinedInfo, UnrelatedTransactionException, with_lock, OldTaskGroup, RavenValue
+from .evrmore import COINBASE_MATURITY
+from .util import IPFSData, profiler, bfh, TxMinedInfo, UnrelatedTransactionException, with_lock, OldTaskGroup, EvrmoreValue
 from .transaction import Transaction, TxOutput, TxInput, PartialTxInput, TxOutpoint, PartialTransaction, AssetMeta, \
     is_output_script_p2pk, is_asset_output_script_malformed_or_non_standard
 from .synchronizer import Synchronizer
@@ -58,9 +58,9 @@ TX_HEIGHT_UNCONFIRMED = 0
 class HistoryItem(NamedTuple):
     txid: str
     tx_mined_status: TxMinedInfo
-    delta: RavenValue
+    delta: EvrmoreValue
     fee: Optional[int]
-    balance: RavenValue
+    balance: EvrmoreValue
 
 
 class AddressSynchronizer(Logger, EventListener):
@@ -167,7 +167,7 @@ class AddressSynchronizer(Logger, EventListener):
             return tx.outputs()[prevout_n].address
         return None
 
-    def get_txin_value(self, txin: TxInput, *, address: str = None) -> Optional[RavenValue]:
+    def get_txin_value(self, txin: TxInput, *, address: str = None) -> Optional[EvrmoreValue]:
         if txin.value_sats() is not None:
             return txin.value_sats()
         prevout_hash = txin.prevout.txid.hex()
@@ -185,9 +185,9 @@ class AddressSynchronizer(Logger, EventListener):
         if tx:
             txout = tx.outputs()[prevout_n]
             if txout.asset:
-                return RavenValue(0, {txout.asset: txout.value})
+                return EvrmoreValue(0, {txout.asset: txout.value})
             else:
-                return RavenValue(txout.value)
+                return EvrmoreValue(txout.value)
         return None
 
     def load_unverified_transactions(self):
@@ -354,11 +354,11 @@ class AddressSynchronizer(Logger, EventListener):
                 v = txo.value
                 asset = txo.asset
                 if asset:
-                    v = RavenValue(0, {asset: v})
+                    v = EvrmoreValue(0, {asset: v})
                 else:
-                    v = RavenValue(v)
+                    v = EvrmoreValue(v)
                 ser = tx_hash + ':%d'%n
-                scripthash = ravencoin.script_to_scripthash(txo.scriptpubkey)
+                scripthash = evrmore.script_to_scripthash(txo.scriptpubkey)
                 self.db.add_prevout_by_scripthash(scripthash, prevout=TxOutpoint.from_str(ser), value=v)
                 addr = txo.address
                 if addr and self.is_mine(addr):
@@ -442,7 +442,7 @@ class AddressSynchronizer(Logger, EventListener):
             self.unconfirmed_tx.pop(tx_hash, None)
             if tx:
                 for idx, txo in enumerate(tx.outputs()):
-                    scripthash = ravencoin.script_to_scripthash(txo.scriptpubkey)
+                    scripthash = evrmore.script_to_scripthash(txo.scriptpubkey)
                     prevout = TxOutpoint(bfh(tx_hash), idx)
                     self.db.remove_prevout_by_scripthash(scripthash, prevout=prevout, value=txo.value)
 
@@ -588,7 +588,7 @@ class AddressSynchronizer(Logger, EventListener):
         domain = set(domain)
         # 1. Get the history of each address in the domain, maintain the
         #    delta of a tx as the sum of its deltas on domain addresses
-        tx_deltas = defaultdict(RavenValue)  # type: Dict[str, RavenValue]
+        tx_deltas = defaultdict(EvrmoreValue)  # type: Dict[str, EvrmoreValue]
         for addr in domain:
             h = self.get_address_history(addr)
             for tx_hash, height in h:
@@ -599,11 +599,11 @@ class AddressSynchronizer(Logger, EventListener):
             delta = tx_deltas[tx_hash]
             tx_mined_status = self.get_tx_height(tx_hash)
             fee = self.get_tx_fee(tx_hash)
-            history.append((tx_hash, tx_mined_status, delta, fee.rvn_value.value if fee else None))
+            history.append((tx_hash, tx_mined_status, delta, fee.evr_value.value if fee else None))
         history.sort(key = lambda x: self.get_txpos(x[0]))
         # 3. add balance
         h2 = []
-        balance = RavenValue()
+        balance = EvrmoreValue()
         for tx_hash, tx_mined_status, delta, fee in history:
             balance += delta
             h2.append(HistoryItem(
@@ -822,9 +822,9 @@ class AddressSynchronizer(Logger, EventListener):
         return nsent, nans
 
     @with_transaction_lock
-    def get_tx_delta(self, tx_hash: str, address: str) -> RavenValue:
+    def get_tx_delta(self, tx_hash: str, address: str) -> EvrmoreValue:
         """effect of tx on address"""
-        delta = RavenValue()
+        delta = EvrmoreValue()
         # subtract the value of coins sent from address
         d = self.db.get_txi_addr(tx_hash, address)
         for n, v in d:
@@ -835,12 +835,12 @@ class AddressSynchronizer(Logger, EventListener):
             delta += v
         return delta
 
-    def get_tx_fee(self, txid: str) -> Optional[RavenValue]:
+    def get_tx_fee(self, txid: str) -> Optional[EvrmoreValue]:
         """ Returns tx_fee or None. Use server fee only if tx is unconfirmed and not mine"""
         # check if stored fee is available
         fee = self.db.get_tx_fee(txid, trust_server=False)
         if fee is not None:
-            return RavenValue(fee)
+            return EvrmoreValue(fee)
         # delete server-sent fee for confirmed txns
         confirmed = self.get_tx_height(txid).conf > 0
         if confirmed:
@@ -855,14 +855,14 @@ class AddressSynchronizer(Logger, EventListener):
             # trust server if tx is unconfirmed and not mine
             if num_ismine_inputs < num_all_inputs:
                 fee_int = self.db.get_tx_fee(txid, trust_server=True)
-                return None if confirmed or fee_int is None else RavenValue(fee_int)
+                return None if confirmed or fee_int is None else EvrmoreValue(fee_int)
         # lookup tx and deserialize it.
         # note that deserializing is expensive, hence above hacks
         tx = self.db.get_transaction(txid)
         if not tx:
             return None
         # compute fee if possible
-        v_in = v_out = RavenValue()
+        v_in = v_out = EvrmoreValue()
         with self.lock, self.transaction_lock:
             for txin in tx.inputs():
                 addr = self.get_txin_address(txin)
@@ -872,13 +872,13 @@ class AddressSynchronizer(Logger, EventListener):
                 elif v_in is not None:
                     v_in += value
             for txout in tx.outputs():
-                v_out += txout.raven_value
+                v_out += txout.evrmore_value
         if v_in is not None:
             fee = v_in - v_out
         else:
             fee = None
         # save result
-        self.db.add_tx_fee_we_calculated(txid, fee.rvn_value.value if fee else None)
+        self.db.add_tx_fee_we_calculated(txid, fee.evr_value.value if fee else None)
         self.db.add_num_inputs_to_tx(txid, len(tx.inputs()))
         return fee
 
@@ -937,7 +937,7 @@ class AddressSynchronizer(Logger, EventListener):
 
     @with_local_height_cached
     def get_balance(self, domain, *, excluded_addresses: Set[str] = None,
-                    excluded_coins: Set[str] = None) -> Tuple[RavenValue, RavenValue, RavenValue]:
+                    excluded_coins: Set[str] = None) -> Tuple[EvrmoreValue, EvrmoreValue, EvrmoreValue]:
         """Return the balance of a set of addresses:
         confirmed and matured, unconfirmed, unmatured
         """
@@ -959,7 +959,7 @@ class AddressSynchronizer(Logger, EventListener):
         for address in domain:
             coins.update(self.get_addr_outputs(address))
 
-        c = u = x = RavenValue()
+        c = u = x = EvrmoreValue()
         mempool_height = self.get_local_height() + 1  # height of next block
         for utxo in coins.values():
             if utxo.spent_height is not None:
@@ -979,7 +979,7 @@ class AddressSynchronizer(Logger, EventListener):
                 assert tx is not None # txid comes from get_addr_io
                 # we look at the outputs that are spent by this transaction
                 # if those outputs are ours and confirmed, we count this coin as confirmed
-                confirmed_spent_amount = RavenValue()
+                confirmed_spent_amount = EvrmoreValue()
                 for txin in tx.inputs():
                     if txin.prevout in coins:
                         coin = coins[txin.prevout]
@@ -987,8 +987,8 @@ class AddressSynchronizer(Logger, EventListener):
                             confirmed_spent_amount += coin.value_sats()
                 # Compare amount, in case tx has confirmed and unconfirmed inputs, or is a coinjoin.
                 # (fixme: tx may have multiple change outputs)
-                # TODO: Only RVN
-                if confirmed_spent_amount.rvn_value >= v.rvn_value:
+                # TODO: Only EVR
+                if confirmed_spent_amount.evr_value >= v.evr_value:
                     c += v
                 else:
                     c += confirmed_spent_amount

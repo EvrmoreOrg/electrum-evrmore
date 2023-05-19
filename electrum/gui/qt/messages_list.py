@@ -36,7 +36,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QComboBox, QLabel, QMenu, QCheckB
 from electrum.i18n import _
 from electrum.util import ipfs_explorer_URL, profiler, make_aiohttp_session
 from electrum.plugin import run_hook
-from electrum.ravencoin import is_address, base_decode
+from electrum.evrmore import is_address, base_decode
 from electrum.wallet import InternalAddressCorruption
 from electrum.transaction import AssetMeta
 from .update_checker import VERSION_ANNOUNCEMENT_SIGNING_KEYS
@@ -47,7 +47,7 @@ from ...logging import Logger
 
 
 class UpdateDevMessagesThread(QThread, Logger):
-    url = "https://raw.githubusercontent.com/Electrum-RVN-SIG/electrum-ravencoin/master/dev-notifications.json"
+    url = "https://raw.githubusercontent.com/EvrmoreOrg/electrum-evrmore/master/dev-notifications.json"
 
     def __init__(self, parent):
         QThread.__init__(self)
@@ -74,7 +74,7 @@ class UpdateDevMessagesThread(QThread, Logger):
                     sig = base64.b64decode(sig)
                     msg = message.encode('utf-8')
                     if ecc.verify_message_with_address(address=address, sig65=sig, message=msg,
-                                                       net=constants.RavencoinMainnet):
+                                                       net=constants.EvrmoreMainnet):
                         break
                 else:
                     raise Exception('No items')

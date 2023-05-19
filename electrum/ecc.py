@@ -380,7 +380,7 @@ POINT_AT_INFINITY = ECPubkey(None)
 
 
 def msg_magic(message: bytes) -> bytes:
-    from .ravencoin import var_int
+    from .evrmore import var_int
     length = bfh(var_int(len(message)))
     return b"\x16Raven Signed Message:\n" + length + message
 
@@ -390,7 +390,7 @@ def verify_signature(pubkey: bytes, sig: bytes, h: bytes) -> bool:
 
 
 def verify_message_with_address(address: str, sig65: bytes, message: bytes, *, net=None) -> bool:
-    from .ravencoin import pubkey_to_address
+    from .evrmore import pubkey_to_address
     assert_bytes(sig65, message)
     if net is None: net = constants.net
     h = sha256d(msg_magic(message))

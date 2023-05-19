@@ -40,8 +40,8 @@ import qrcode
 from qrcode import exceptions
 
 from electrum.simple_config import SimpleConfig
-from electrum.util import parse_max_spend, quantize_feerate, convert_bytes_to_utf8_safe, RavenValue
-from electrum.ravencoin import base_encode, NLOCKTIME_BLOCKHEIGHT_MAX
+from electrum.util import parse_max_spend, quantize_feerate, convert_bytes_to_utf8_safe, EvrmoreValue
+from electrum.evrmore import base_encode, NLOCKTIME_BLOCKHEIGHT_MAX
 from electrum.assets import try_get_message_from_asset_transfer, get_asset_vout_type
 from electrum.i18n import _
 from electrum.plugin import run_hook
@@ -59,7 +59,7 @@ from .util import (MessageBoxMixin, read_QIcon, Buttons, icon_path,
 
 from .fee_slider import FeeSlider, FeeComboBox
 from .confirm_tx_dialog import TxEditor
-from .amountedit import FeerateEdit, RVNAmountEdit
+from .amountedit import FeerateEdit, EVRAmountEdit
 from .locktimeedit import LockTimeEdit
 
 if TYPE_CHECKING:
@@ -443,9 +443,9 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
         tx_item_fiat = None
         if (self.finalized  # ensures we don't use historical rates for tx being constructed *now*
                 and txid is not None and fx.is_enabled() and amount is not None):
-            # Only normal RVN has an assignable value
+            # Only normal EVR has an assignable value
             tx_item_fiat = self.wallet.get_tx_item_fiat(
-                tx_hash=txid, amount_sat=abs(amount.rvn_value.value), fx=fx, tx_fee=fee)
+                tx_hash=txid, amount_sat=abs(amount.evr_value.value), fx=fx, tx_fee=fee)
         lnworker_history = self.wallet.lnworker.get_onchain_history() if self.wallet.lnworker else {}
         if txid in lnworker_history:
             item = lnworker_history[txid]
@@ -505,11 +505,11 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
         elif amount is None:
             amount_str = ''
         else:
-            rvn = amount.rvn_value.value
+            evr = amount.evr_value.value
             assets = amount.assets
             amounts = []
-            if rvn != 0:
-                amounts.append('{} {}'.format(format_amount(rvn), base_unit))
+            if evr != 0:
+                amounts.append('{} {}'.format(format_amount(evr), base_unit))
             for asset, v in assets.items():
                 amounts.append('{} {}'.format(format_amount(v.value), asset))
             amount_str = _("My amount") + ('s: ' if len(amounts) > 1 else ': ') + ', '.join(amounts)
@@ -518,8 +518,8 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
                 if tx_item_fiat:
                     amount_str += ' (%s)' % tx_item_fiat['fiat_value'].to_ui_string()
                 else:
-                    # Fiat value only for normal RVN
-                    amount_str += ' (%s)' % format_fiat_and_units(abs(amount.rvn_value.value))
+                    # Fiat value only for normal EVR
+                    amount_str += ' (%s)' % format_fiat_and_units(abs(amount.evr_value.value))
         if amount_str:
             self.amount_label.setText(amount_str)
         else:
@@ -611,12 +611,12 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
                 return self.txo_color_2fa.text_char_format
             return ext
 
-        def format_amount(amt: RavenValue):
-            rvn = amt.rvn_value.value
+        def format_amount(amt: EvrmoreValue):
+            evr = amt.evr_value.value
             assets = amt.assets
             amounts = []
-            if rvn != 0:
-                amounts.append(self.main_window.format_amount(rvn, whitespaces=True) + ' RVN')
+            if evr != 0:
+                amounts.append(self.main_window.format_amount(evr, whitespaces=True) + ' EVR')
             for asset, sats in assets.items():
                 amounts.append('{} {}'.format(self.main_window.format_amount(sats.value, whitespaces=True), asset))
             return ', '.join(amounts)
@@ -655,9 +655,9 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
         for o in self.tx.outputs():
             addr = o.get_ui_address_str()
             if o.asset:
-                v = RavenValue(0, {o.asset: o.value})
+                v = EvrmoreValue(0, {o.asset: o.value})
             else:
-                v = RavenValue(o.value)
+                v = EvrmoreValue(o.value)
             cursor.insertText(addr, text_format(addr))
             cursor.insertText('\t', ext)
             cursor.insertText(format_amount(v), ext)
@@ -870,7 +870,7 @@ class PreviewTxDialog(BaseTxDialog, TxEditor):
         self.feerate_e.textEdited.connect(partial(self.on_fee_or_feerate, self.feerate_e, False))
         self.feerate_e.editingFinished.connect(partial(self.on_fee_or_feerate, self.feerate_e, True))
 
-        self.fee_e = RVNAmountEdit(self.main_window.get_decimal_point)
+        self.fee_e = EVRAmountEdit(self.main_window.get_decimal_point)
         self.fee_e.textEdited.connect(partial(self.on_fee_or_feerate, self.fee_e, False))
         self.fee_e.editingFinished.connect(partial(self.on_fee_or_feerate, self.fee_e, True))
 
@@ -996,7 +996,7 @@ class PreviewTxDialog(BaseTxDialog, TxEditor):
 
         assert tx is not None
         size = tx.estimated_size()
-        fee = tx.get_fee().rvn_value.value
+        fee = tx.get_fee().evr_value.value
 
         self.size_e.setAmount(size)
         fiat_fee = self.main_window.format_fiat_and_units(fee)

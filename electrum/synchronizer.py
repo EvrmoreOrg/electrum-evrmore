@@ -32,8 +32,8 @@ from aiorpcx import run_in_thread, RPCError
 
 from . import util
 from .transaction import Transaction, PartialTransaction, AssetMeta, TxOutpoint
-from .util import bh2u, make_aiohttp_session, NetworkJobOnDefaultServer, random_shuffled_copy, bfh, OldTaskGroup, RavenValue
-from .ravencoin import address_to_scripthash, is_address
+from .util import bh2u, make_aiohttp_session, NetworkJobOnDefaultServer, random_shuffled_copy, bfh, OldTaskGroup, EvrmoreValue
+from .evrmore import address_to_scripthash, is_address
 from .logging import Logger
 from .interface import GracefulDisconnect, NetworkTimeout
 
@@ -359,7 +359,7 @@ class Synchronizer(SynchronizerBase):
         for addr in random_shuffled_copy(self.adb.get_addresses()):
             await self._add_address(addr)
         # Ensure we have asset meta
-        assets = set(self.adb.get_assets()).union(set(sum(self.adb.get_balance(self.adb.get_addresses()), RavenValue()).assets.keys()))
+        assets = set(self.adb.get_assets()).union(set(sum(self.adb.get_balance(self.adb.get_addresses()), EvrmoreValue()).assets.keys()))
         for asset in assets:
             await self._add_asset(asset)
         # main loop

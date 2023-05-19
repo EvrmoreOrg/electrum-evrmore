@@ -141,13 +141,13 @@ class ElectrumGui(BaseElectrumGui, Logger):
         if hasattr(QtCore.Qt, "AA_ShareOpenGLContexts"):
             QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts)
         if hasattr(QGuiApplication, 'setDesktopFileName'):
-            QGuiApplication.setDesktopFileName('electrum-ravencoin.desktop')
+            QGuiApplication.setDesktopFileName('electrum-evrmore.desktop')
         self.gui_thread = threading.current_thread()
         self.windows = []  # type: List[ElectrumWindow]
         self.efilter = OpenFileEventFilter(self.windows)
         self.app = QElectrumApplication(sys.argv)
         self.app.installEventFilter(self.efilter)
-        self.app.setWindowIcon(read_QIcon("electrum-ravencoin.png"))
+        self.app.setWindowIcon(read_QIcon("electrum-evrmore.png"))
         self._cleaned_up = False
         # timer
         self.timer = QTimer(self.app)
@@ -172,7 +172,7 @@ class ElectrumGui(BaseElectrumGui, Logger):
 
     def _init_tray(self):
         self.tray = QSystemTrayIcon(self.tray_icon(), None)
-        self.tray.setToolTip('Electrum Ravencoin')
+        self.tray.setToolTip('Electrum Evrmore')
         self.tray.activated.connect(self.tray_activated)
         self.build_tray_menu()
         self.tray.show()

@@ -29,7 +29,7 @@ import struct
 from typing import Optional, Dict, Mapping, Sequence
 
 from . import util
-from .ravencoin import hash_encode, int_to_hex, rev_hex
+from .evrmore import hash_encode, int_to_hex, rev_hex
 from .crypto import sha256d
 from . import constants
 from .util import bfh, bh2u, with_lock

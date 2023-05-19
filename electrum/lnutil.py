@@ -17,8 +17,8 @@ from .crypto import sha256
 from .transaction import (Transaction, PartialTransaction, PartialTxInput, TxOutpoint,
                           PartialTxOutput, opcodes, TxOutput)
 from .ecc import CURVE_ORDER, sig_string_from_der_sig, ECPubkey, string_to_number
-from . import ecc, ravencoin, crypto, transaction
-from .ravencoin import (push_script, redeem_script_to_address, address_to_script,
+from . import ecc, evrmore, crypto, transaction
+from .evrmore import (push_script, redeem_script_to_address, address_to_script,
                         construct_witness, construct_script)
 from . import segwit_addr
 from .i18n import _
@@ -104,7 +104,7 @@ class ChannelConfig(StoredObject):
             raise Exception(f"{conf_name}. insane initial_msat={self.initial_msat}. (funding_sat={funding_sat})")
         if self.reserve_sat < self.dust_limit_sat:
             raise Exception(f"{conf_name}. MUST set channel_reserve_satoshis greater than or equal to dust_limit_satoshis")
-        if self.dust_limit_sat < ravencoin.DUST_LIMIT_UNKNOWN_SEGWIT:
+        if self.dust_limit_sat < evrmore.DUST_LIMIT_UNKNOWN_SEGWIT:
             raise Exception(f"{conf_name}. dust limit too low: {self.dust_limit_sat} sat")
         if self.dust_limit_sat > DUST_LIMIT_MAX:
             raise Exception(f"{conf_name}. dust limit too high: {self.dust_limit_sat} sat")
@@ -575,7 +575,7 @@ def make_htlc_tx_output(amount_msat, local_feerate, revocationpubkey, local_dela
         delayed_pubkey=local_delayedpubkey,
     )
 
-    p2wsh = ravencoin.redeem_script_to_address('p2wsh', bh2u(script))
+    p2wsh = evrmore.redeem_script_to_address('p2wsh', bh2u(script))
     weight = HTLC_SUCCESS_WEIGHT if success else HTLC_TIMEOUT_WEIGHT
     fee = local_feerate * weight
     fee = fee // 1000 * 1000
@@ -621,7 +621,7 @@ def make_offered_htlc(revocation_pubkey: bytes, remote_htlcpubkey: bytes,
     script = bfh(construct_script([
         opcodes.OP_DUP,
         opcodes.OP_HASH160,
-        ravencoin.hash_160(revocation_pubkey),
+        evrmore.hash_160(revocation_pubkey),
         opcodes.OP_EQUAL,
         opcodes.OP_IF,
         opcodes.OP_CHECKSIG,
@@ -657,7 +657,7 @@ def make_received_htlc(revocation_pubkey: bytes, remote_htlcpubkey: bytes,
     script = bfh(construct_script([
         opcodes.OP_DUP,
         opcodes.OP_HASH160,
-        ravencoin.hash_160(revocation_pubkey),
+        evrmore.hash_160(revocation_pubkey),
         opcodes.OP_EQUAL,
         opcodes.OP_IF,
         opcodes.OP_CHECKSIG,
@@ -906,7 +906,7 @@ def make_commitment_outputs(*, fees_per_participant: Mapping[HTLCOwner, int], lo
     non_htlc_outputs = [to_local, to_remote]
     htlc_outputs = []
     for script, htlc in htlcs:
-        addr = ravencoin.redeem_script_to_address('p2wsh', bh2u(script))
+        addr = evrmore.redeem_script_to_address('p2wsh', bh2u(script))
         htlc_outputs.append(PartialTxOutput(scriptpubkey=bfh(address_to_script(addr)),
                                             value=htlc.amount_msat // 1000))
 
@@ -1032,10 +1032,10 @@ def make_commitment_output_to_local_witness_script(
 def make_commitment_output_to_local_address(
         revocation_pubkey: bytes, to_self_delay: int, delayed_pubkey: bytes) -> str:
     local_script = make_commitment_output_to_local_witness_script(revocation_pubkey, to_self_delay, delayed_pubkey)
-    return ravencoin.redeem_script_to_address('p2wsh', bh2u(local_script))
+    return evrmore.redeem_script_to_address('p2wsh', bh2u(local_script))
 
 def make_commitment_output_to_remote_address(remote_payment_pubkey: bytes) -> str:
-    return ravencoin.pubkey_to_address('p2wpkh', bh2u(remote_payment_pubkey))
+    return evrmore.pubkey_to_address('p2wpkh', bh2u(remote_payment_pubkey))
 
 def sign_and_get_sig_string(tx: PartialTransaction, local_config, remote_config):
     tx.sign({bh2u(local_config.multisig_key.pubkey): (local_config.multisig_key.privkey, True)})

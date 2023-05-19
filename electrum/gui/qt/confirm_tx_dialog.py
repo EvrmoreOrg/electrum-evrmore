@@ -32,7 +32,7 @@ from PyQt5.QtWidgets import QVBoxLayout, QLabel, QGridLayout, QPushButton, QLine
 from electrum.i18n import _
 from electrum.util import NotEnoughFunds, NoDynamicFeeEstimates, parse_max_spend
 from electrum.plugin import run_hook
-from electrum.transaction import Transaction, PartialTransaction, RavenValue
+from electrum.transaction import Transaction, PartialTransaction, EvrmoreValue
 from electrum.wallet import InternalAddressCorruption
 
 from .util import (WindowModalDialog, ColorScheme, HelpLabel, Buttons, CancelButton,
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 class TxEditor:
 
     def __init__(self, *, window: 'ElectrumWindow', make_tx,
-                 output_value: RavenValue = None, is_sweep: bool):
+                 output_value: EvrmoreValue = None, is_sweep: bool):
         self.main_window = window
         self.make_tx = make_tx
         self.output_value = output_value
@@ -126,7 +126,7 @@ class TxEditor:
 class ConfirmTxDialog(TxEditor, WindowModalDialog):
     # set fee and return password (after pw check)
 
-    def __init__(self, *, window: 'ElectrumWindow', make_tx, output_value: RavenValue, is_sweep: bool):
+    def __init__(self, *, window: 'ElectrumWindow', make_tx, output_value: EvrmoreValue, is_sweep: bool):
 
         TxEditor.__init__(self, window=window, make_tx=make_tx, output_value=output_value, is_sweep=is_sweep)
         WindowModalDialog.__init__(self, window, _("Confirm Transaction"))
@@ -142,7 +142,7 @@ class ConfirmTxDialog(TxEditor, WindowModalDialog):
         grid.addWidget(HelpLabel(_("Amount to be sent") + ": ", msg), 0, 0)
         grid.addWidget(self.amount_label, 0, 1)
 
-        msg = _('Ravencoin transactions are in general not free. A transaction fee is paid by the sender of the funds.') + '\n\n'\
+        msg = _('Evrmore transactions are in general not free. A transaction fee is paid by the sender of the funds.') + '\n\n'\
               + _('The amount of fee can be decided freely by the sender. However, transactions with low fees take more time to be processed.') + '\n\n'\
               + _('A suggested fee is automatically added to this field. You may override it. The suggested fee increases with the size of the transaction.')
         self.fee_label = QLabel('')
@@ -225,9 +225,9 @@ class ConfirmTxDialog(TxEditor, WindowModalDialog):
             if tx:
                 amount = tx.output_value()
                 tx.input_value()
-                if amount.assets and not parse_max_spend(amount.rvn_value):
-                    # If we are not max spending rvn, don't display it
-                    amount = RavenValue(0, amount.assets)
+                if amount.assets and not parse_max_spend(amount.evr_value):
+                    # If we are not max spending evr, don't display it
+                    amount = EvrmoreValue(0, amount.assets)
                 amount_str = self.main_window.format_amount_and_units(amount)
             else:
                 amount_str = "max"
@@ -248,7 +248,7 @@ class ConfirmTxDialog(TxEditor, WindowModalDialog):
         if not tx:
             return
 
-        fee = tx.get_fee().rvn_value.value  # Fee will only be rvn
+        fee = tx.get_fee().evr_value.value  # Fee will only be evr
         assert fee is not None
         self.fee_label.setText(self.main_window.format_amount_and_units(fee))
         x_fee = run_hook('get_tx_extra_fee', self.wallet, tx)

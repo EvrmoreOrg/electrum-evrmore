@@ -4,9 +4,9 @@ set -e
 
 # Parameterize
 PYTHON_VERSION=3.9.11
-BUILDDIR=/tmp/electrum-ravencoin-build
-PACKAGE=Electrum-Ravencoin
-GIT_REPO=https://github.com/Electrum-RVN-SIG/electrum-ravencoin
+BUILDDIR=/tmp/electrum-evrmore-build
+PACKAGE=Electrum-Evrmore
+GIT_REPO=https://github.com/EvrmoreOrg/electrum-evrmore
 
 export GCC_STRIP_BINARIES="1"
 export PYTHONDONTWRITEBYTECODE=1  # don't create __pycache__/ folders with .pyc files
@@ -214,14 +214,14 @@ python3 -m pip install --no-build-isolation --no-dependencies --no-warn-script-l
     -Ir ./contrib/deterministic-build/requirements-binaries-mac.txt \
     || fail "Could not install dependencies specific to binaries"
 
-info "Installing dependencies specific to ravencoin..."
-python3 -m pip install --no-dependencies --no-warn-script-location -Ir ./contrib/deterministic-build/requirements-ravencoin.txt \
-    || fail "Could not install dependencies specific to ravencoin"
+info "Installing dependencies specific to evrmore..."
+python3 -m pip install --no-dependencies --no-warn-script-location -Ir ./contrib/deterministic-build/requirements-evrmore.txt \
+    || fail "Could not install dependencies specific to evrmore"
 
-info "Installing dependencies specific to ravencoin binaries..."
+info "Installing dependencies specific to evrmore binaries..."
 # We don't want to ignore installed packages
-python3 -m pip install --no-warn-script-location -r ./contrib/deterministic-build/requirements-ravencoin-binaries.txt \
-    || fail "Could not install dependencies specific to ravencoin binaries"
+python3 -m pip install --no-warn-script-location -r ./contrib/deterministic-build/requirements-evrmore-binaries.txt \
+    || fail "Could not install dependencies specific to evrmore binaries"
 
 
 info "Building $PACKAGE..."
@@ -236,9 +236,9 @@ VERSION=`git describe --tags --dirty --always`
 info "Building binary"
 pyinstaller --noconfirm --ascii --clean --name $VERSION contrib/osx/osx.spec || fail "Could not build binary"
 
-info "Adding ravencoin URI types to Info.plist"
+info "Adding evrmore URI types to Info.plist"
 plutil -insert 'CFBundleURLTypes' \
-	-xml '<array><dict> <key>CFBundleURLName</key> <string>raven</string> <key>CFBundleURLSchemes</key> <array><string>raven</string><string>lightning</string></array> </dict></array>' \
+	-xml '<array><dict> <key>CFBundleURLName</key> <string>evrmore</string> <key>CFBundleURLSchemes</key> <array><string>evrmore</string><string>lightning</string></array> </dict></array>' \
 	-- dist/$PACKAGE.app/Contents/Info.plist \
 	|| fail "Could not add keys to Info.plist. Make sure the program 'plutil' exists and is installed."
 
@@ -254,9 +254,9 @@ if [ ! -z "$CODESIGN_CERT" ]; then
 fi
 
 info "Creating .DMG"
-hdiutil create -fs HFS+ -volname $PACKAGE -srcfolder dist/$PACKAGE.app dist/electrum-ravencoin-$VERSION.dmg || fail "Could not create .DMG"
+hdiutil create -fs HFS+ -volname $PACKAGE -srcfolder dist/$PACKAGE.app dist/electrum-evrmore-$VERSION.dmg || fail "Could not create .DMG"
 
-DoCodeSignMaybe ".DMG" "dist/electrum-ravencoin-${VERSION}.dmg"
+DoCodeSignMaybe ".DMG" "dist/electrum-evrmore-${VERSION}.dmg"
 
 if [ -z "$CODESIGN_CERT" ]; then
     warn "App was built successfully but was not code signed. Users may get security warnings from macOS."

@@ -13,7 +13,7 @@ if [ $(uname) != "Darwin" ]; then
     exit 1
 fi
 
-TEMPDIR="/tmp/electrum_ravencoin_compare_dmg/sigs.temp"
+TEMPDIR="/tmp/electrum_evrmore_compare_dmg/sigs.temp"
 OUT=mac_extracted_sigs.tar.gz
 OUTROOT=.
 

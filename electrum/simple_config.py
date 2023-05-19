@@ -14,7 +14,7 @@ from aiorpcx import NetAddress
 from . import util
 from . import constants
 from .util import base_units, base_unit_name_to_decimal_point, decimal_point_to_base_unit_name, UnknownBaseUnit, DECIMAL_POINT_DEFAULT
-from .util import format_satoshis, format_fee_satoshis, RavenValue
+from .util import format_satoshis, format_fee_satoshis, EvrmoreValue
 from .util import user_dir, make_dir, NoDynamicFeeEstimates, quantize_feerate
 from .i18n import _
 from .logging import get_logger, Logger
@@ -231,7 +231,7 @@ class SimpleConfig(Logger):
         base_unit = self.user_config.get('base_unit')
         if isinstance(base_unit, str):
             self._set_key_in_user_config('base_unit', None)
-            map_ = {'rvn': 8}  # , 'mbtc':5, 'ubtc':2, 'bits':2, 'sat':0}
+            map_ = {'evr': 8}  # , 'mbtc':5, 'ubtc':2, 'bits':2, 'sat':0}
             decimal_point = map_.get(base_unit.lower())
             self._set_key_in_user_config('decimal_point', decimal_point)
 
@@ -679,10 +679,10 @@ class SimpleConfig(Logger):
 
     def format_amount(self, x, is_diff=False, whitespaces=False):
         suffix = ''
-        if isinstance(x, RavenValue):
+        if isinstance(x, EvrmoreValue):
             if x.assets:
                 suffix = f' ({len(x.assets)} asset' + ('s' if len(x.assets) > 1 else '') + ')'
-            x = x.rvn_value.value
+            x = x.evr_value.value
         
         return format_satoshis(
             x,
@@ -696,10 +696,10 @@ class SimpleConfig(Logger):
 
     def format_amount_and_units(self, amount):
         suffix = ''
-        if isinstance(amount, RavenValue):
+        if isinstance(amount, EvrmoreValue):
             if amount.assets:
                 suffix = f' ({len(amount.assets)} asset' + ('s' if len(amount.assets) > 1 else '') + ')'
-            amount = amount.rvn_value.value
+            amount = amount.evr_value.value
         return self.format_amount(amount) + ' ' + self.get_base_unit() + suffix
 
     def format_fee_rate(self, fee_rate):

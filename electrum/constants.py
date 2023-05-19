@@ -29,7 +29,7 @@ import json
 from typing import NamedTuple, Union
 
 from .util import inv_dict, all_subclasses
-from . import ravencoin
+from . import evrmore
 
 
 def read_json(filename, default):
@@ -42,8 +42,8 @@ def read_json(filename, default):
     return r
 
 
-GIT_REPO_URL = "https://github.com/Electrum-RVN-SIG/electrum-ravencoin"
-GIT_REPO_ISSUES_URL = "https://github.com/Electrum-RVN-SIG/electrum-ravencoin/issues"
+GIT_REPO_URL = "https://github.com/EvrmoreOrg/electrum-evrmore"
+GIT_REPO_ISSUES_URL = "https://github.com/EvrmoreOrg/electrum-evrmore/issues"
 BIP39_WALLET_FORMATS = read_json('bip39_wallet_formats.json', [])
 
 
@@ -102,10 +102,10 @@ class AbstractNet:
 
     @classmethod
     def rev_genesis_bytes(cls) -> bytes:
-        return bytes.fromhex(ravencoin.rev_hex(cls.GENESIS))
+        return bytes.fromhex(evrmore.rev_hex(cls.GENESIS))
 
 
-class RavencoinMainnet(AbstractNet):
+class EvrmoreMainnet(AbstractNet):
     NET_NAME = "mainnet"
     TESTNET = False
     WIF_PREFIX = 128
@@ -167,7 +167,7 @@ class RavencoinMainnet(AbstractNet):
     )
 
 
-class RavencoinTestnet(AbstractNet):
+class EvrmoreTestnet(AbstractNet):
     NET_NAME = "testnet"
     BIP44_COIN_TYPE = 1
     LN_REALM_BYTE = 0
@@ -235,14 +235,14 @@ class RavencoinTestnet(AbstractNet):
 NETS_LIST = tuple(all_subclasses(AbstractNet))
 
 # don't import net directly, import the module instead (so that net is singleton)
-net = RavencoinMainnet
+net = EvrmoreMainnet
 
 
 def set_mainnet():
     global net
-    net = RavencoinMainnet
+    net = EvrmoreMainnet
 
 
 def set_testnet():
     global net
-    net = RavencoinTestnet
+    net = EvrmoreTestnet

@@ -31,8 +31,8 @@ from typing import Tuple, TYPE_CHECKING, Union, Sequence, Optional, Dict, List, 
 from functools import lru_cache, wraps
 from abc import ABC, abstractmethod
 
-from . import ravencoin, ecc, constants, bip32
-from .ravencoin import deserialize_privkey, serialize_privkey, BaseDecodeError
+from . import evrmore, ecc, constants, bip32
+from .evrmore import deserialize_privkey, serialize_privkey, BaseDecodeError
 from .transaction import Transaction, PartialTransaction, PartialTxInput, PartialTxOutput, TxInput
 from .bip32 import (convert_bip32_path_to_list_of_uint32, BIP32_PRIME,
                     is_xpub, is_xprv, BIP32Node, normalize_bip32_derivation,
@@ -1055,7 +1055,7 @@ def is_old_mpk(mpk: str) -> bool:
 
 def is_address_list(text):
     parts = text.split()
-    return bool(parts) and all(ravencoin.is_address(x) for x in parts)
+    return bool(parts) and all(evrmore.is_address(x) for x in parts)
 
 
 def get_private_keys(text, *, allow_spaces_inside_key=True, raise_on_error=False):
@@ -1065,7 +1065,7 @@ def get_private_keys(text, *, allow_spaces_inside_key=True, raise_on_error=False
         parts = list(filter(bool, parts))
     else:
         parts = text.split()
-    if bool(parts) and all(ravencoin.is_private_key(x, raise_on_error=raise_on_error) for x in parts):
+    if bool(parts) and all(evrmore.is_private_key(x, raise_on_error=raise_on_error) for x in parts):
         return parts
 
 

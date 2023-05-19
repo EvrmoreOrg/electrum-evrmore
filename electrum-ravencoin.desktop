@@ -1,24 +1,24 @@
 # If you want Electrum to appear in a Linux app launcher ("start menu"), install this by doing:
-# sudo desktop-file-install electrum-ravencoin.desktop
+# sudo desktop-file-install electrum-evrmore.desktop
 
 [Desktop Entry]
-Comment=Lightweight Ravencoin Client
-Exec=sh -c "PATH=\"\\$HOME/.local/bin:\\$PATH\"; electrum-ravencoin %u"
-GenericName[en_US]=Electrum Ravencoin Wallet
-GenericName[ru_RU]=Electrum Ravencoin Wallet
-GenericName=Electrum Ravencoin Wallet
-Icon=electrum-ravencoin
-Name[en_US]=Electrum Ravencoin Wallet
-Name[ru_RU]=Electrum Ravencoin Wallet
-Name=Electrum Ravencoin Wallet
+Comment=Lightweight Evrmore Client
+Exec=sh -c "PATH=\"\\$HOME/.local/bin:\\$PATH\"; electrum-evrmore %u"
+GenericName[en_US]=Electrum Evrmore Wallet
+GenericName[ru_RU]=Electrum Evrmore Wallet
+GenericName=Electrum Evrmore Wallet
+Icon=electrum-evrmore
+Name[en_US]=Electrum Evrmore Wallet
+Name[ru_RU]=Electrum Evrmore Wallet
+Name=Electrum Evrmore Wallet
 Categories=Finance;Network;
 StartupNotify=true
-StartupWMClass=electrum-ravencoin
+StartupWMClass=electrum-evrmore
 Terminal=false
 Type=Application
-MimeType=x-scheme-handler/ravencoin;
+MimeType=x-scheme-handler/evrmore;
 Actions=Testnet;
 
 [Desktop Action Testnet]
-Exec=sh -c "PATH=\"\\$HOME/.local/bin:\\$PATH\"; electrum-ravencoin --testnet %u"
+Exec=sh -c "PATH=\"\\$HOME/.local/bin:\\$PATH\"; electrum-evrmore --testnet %u"
 Name=Testnet mode

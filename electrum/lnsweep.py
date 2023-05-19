@@ -6,7 +6,7 @@ from typing import Optional, Dict, List, Tuple, TYPE_CHECKING, NamedTuple, Calla
 from enum import Enum, auto
 
 from .util import bfh, bh2u
-from .ravencoin import redeem_script_to_address, dust_threshold, construct_witness
+from .evrmore import redeem_script_to_address, dust_threshold, construct_witness
 from .invoices import PR_PAID
 from . import ecc
 from .lnutil import (make_commitment_output_to_remote_address, make_commitment_output_to_local_witness_script,

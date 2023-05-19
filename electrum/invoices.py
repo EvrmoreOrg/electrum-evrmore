@@ -9,9 +9,9 @@ from .i18n import _
 from .util import age, InvoiceError, Satoshis, parse_max_spend
 from .lnaddr import lndecode, LnAddr
 from . import constants
-from .ravencoin import COIN, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC
-from .ravencoin import address_to_script
-from .transaction import PartialTxOutput, RavenValue
+from .evrmore import COIN, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC
+from .evrmore import address_to_script
+from .transaction import PartialTxOutput, EvrmoreValue
 from .crypto import sha256d
 
 if TYPE_CHECKING:
@@ -91,9 +91,9 @@ class Invoice(StoredObject):
     # mandatory fields
 
     def generate_amount(x):
-        if isinstance(x, RavenValue):
+        if isinstance(x, EvrmoreValue):
             return x
-        return RavenValue.from_json(x)
+        return EvrmoreValue.from_json(x)
 
     amount_msat = attr.ib(kw_only=True, converter=generate_amount)  # type: Optional[Union[int, str]]  # can be '!' or None
     message = attr.ib(type=str, kw_only=True)
@@ -134,7 +134,7 @@ class Invoice(StoredObject):
             return self.outputs[0].address
 
     def get_asset(self) -> Optional[str]:
-        return next(iter(self.outputs[0].raven_value.assets.keys()), None)
+        return next(iter(self.outputs[0].evrmore_value.assets.keys()), None)
 
     def get_outputs(self):
         if self.is_lightning():
@@ -148,7 +148,7 @@ class Invoice(StoredObject):
         # 0 means never
         return self.exp + self.time if self.exp else 0
 
-    def get_amount_msat(self) -> Union[RavenValue, None]:
+    def get_amount_msat(self) -> Union[EvrmoreValue, None]:
         return self.amount_msat
 
     def get_time(self):
@@ -157,7 +157,7 @@ class Invoice(StoredObject):
     def get_message(self):
         return self.message
 
-    def get_amount_sat(self) -> Union[RavenValue, None]:
+    def get_amount_sat(self) -> Union[EvrmoreValue, None]:
         """
         Returns an integer satoshi amount, or '!' or None.
         Callers who need msat precision should call get_amount_msat()
@@ -173,7 +173,7 @@ class Invoice(StoredObject):
         amount = self.get_amount_sat()
         asset = self.get_asset()
         if amount is not None:
-            amount = amount.rvn_value.value if not asset else amount.assets[asset].value
+            amount = amount.evr_value.value if not asset else amount.assets[asset].value
         message = self.message
         extra = {}
         if self.time and self.exp:
@@ -185,7 +185,7 @@ class Invoice(StoredObject):
         if lightning:
             extra['lightning'] = lightning
         if not addr and lightning:
-            return "raven:?lightning="+lightning
+            return "evrmore:?lightning="+lightning
         uri = create_bip21_uri(addr, amount, message, extra_query_params=extra)
         return str(uri)
 
@@ -194,13 +194,13 @@ class Invoice(StoredObject):
         if value is not None:
             lndecode(value)  # this checks the str can be decoded
 
-    # TODO: RVN Only
+    # TODO: EVR Only
     @amount_msat.validator
-    def _validate_amount(self, attribute, value: Optional[RavenValue]):
+    def _validate_amount(self, attribute, value: Optional[EvrmoreValue]):
         if value is None:
             return
         if value.assets:
-            assert value.rvn_value == 0
+            assert value.evr_value == 0
             assert len(value.assets) == 1
             asset_name, asset_val = list(value.assets.items())[0]
             if isinstance(asset_val, (Satoshis, int)):
@@ -212,11 +212,11 @@ class Invoice(StoredObject):
             else:
                 raise InvoiceError(f"{asset_name} unexpected amount: {value!r}")
         
-        if isinstance(value.rvn_value, (Satoshis, int)):
-            if not (0 <= value.rvn_value <= TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN * 1000):
+        if isinstance(value.evr_value, (Satoshis, int)):
+            if not (0 <= value.evr_value <= TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN * 1000):
                 raise InvoiceError(f"amount is out-of-bounds: {value!r} msat")
-        elif isinstance(value.rvn_value, str):
-            if value.rvn_value != '!':
+        elif isinstance(value.evr_value, str):
+            if value.evr_value != '!':
                 raise InvoiceError(f"unexpected amount: {value!r}")
         else:
             raise InvoiceError(f"unexpected amount: {value!r}")

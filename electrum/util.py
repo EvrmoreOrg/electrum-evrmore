@@ -79,11 +79,11 @@ def all_subclasses(cls) -> Set:
 
 ca_path = certifi.where()
 
-base_units = {'RVN': 8}  # {'BTC':8, 'mBTC':5, 'bits':2, 'sat':0}
+base_units = {'EVR': 8}  # {'BTC':8, 'mBTC':5, 'bits':2, 'sat':0}
 base_units_inverse = inv_dict(base_units)
-base_units_list = ['RVN']  # list(dict) does not guarantee order
+base_units_list = ['EVR']  # list(dict) does not guarantee order
 
-DECIMAL_POINT_DEFAULT = 8  # RVN
+DECIMAL_POINT_DEFAULT = 8  # EVR
 
 
 class UnknownBaseUnit(Exception): pass
@@ -118,11 +118,11 @@ def parse_max_spend(amt: Any) -> Optional[int]:
     ```
     """
 
-    if isinstance(amt, RavenValue):
-        def parse_ravenvalue():
-            rvn_max_spend = parse_max_spend(amt.rvn_value)
-            if rvn_max_spend is not None:
-                return rvn_max_spend
+    if isinstance(amt, EvrmoreValue):
+        def parse_evrmorevalue():
+            evr_max_spend = parse_max_spend(amt.evr_value)
+            if evr_max_spend is not None:
+                return evr_max_spend
             
             for _, value in amt.assets.items():
                 m_spend = parse_max_spend(value)
@@ -130,7 +130,7 @@ def parse_max_spend(amt: Any) -> Optional[int]:
                     return m_spend
             return None
 
-        return parse_ravenvalue()
+        return parse_evrmorevalue()
 
     if not (isinstance(amt, str) and amt and amt[-1] == '!'):
         return None
@@ -349,27 +349,27 @@ class IPFSData(NamedTuple):
     #is_rip14: Optional[bool]  # true/false/unknown
 
 
-class RavenValue:  # The raw RVN value as well as asset values of a transaction
+class EvrmoreValue:  # The raw EVR value as well as asset values of a transaction
     @staticmethod
     def from_json(d: Dict):
         if d is None:
             return None
-        assert 'RVN' in d and 'ASSETS' in d
-        return RavenValue(d['RVN'], d['ASSETS'])
+        assert 'EVR' in d and 'ASSETS' in d
+        return EvrmoreValue(d['EVR'], d['ASSETS'])
 
-    def __init__(self, rvn: Union[int, Satoshis, str] = 0, assets=None):
+    def __init__(self, evr: Union[int, Satoshis, str] = 0, assets=None):
         if assets is None:
             assets = {}
-        assert isinstance(rvn, (int, Satoshis, str))
+        assert isinstance(evr, (int, Satoshis, str))
         assert isinstance(assets, Dict)
-        if isinstance(rvn, int):
-            self.__rvn_value = Satoshis(rvn)
-        elif isinstance(rvn, Satoshis):
-            self.__rvn_value = rvn
-        elif isinstance(rvn, str) and '!' in rvn:
-            self.__rvn_value = rvn
+        if isinstance(evr, int):
+            self.__evr_value = Satoshis(evr)
+        elif isinstance(evr, Satoshis):
+            self.__evr_value = evr
+        elif isinstance(evr, str) and '!' in evr:
+            self.__evr_value = evr
         else:
-            raise ValueError(f'Invalid rvn value: {rvn}')
+            raise ValueError(f'Invalid evr value: {evr}')
         
         self.__asset_value = {}
         for asset, value in assets.items():
@@ -380,37 +380,37 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
             elif isinstance(value, str) and '!' in value:
                 pass
             else:
-                raise ValueError(f'Invalid rvn value: {rvn}')
+                raise ValueError(f'Invalid evr value: {evr}')
 
             self.__asset_value[asset] = value
 
     @property
-    def rvn_value(self) -> Union[Satoshis, str]:
-        return self.__rvn_value
+    def evr_value(self) -> Union[Satoshis, str]:
+        return self.__evr_value
 
     @property
     def assets(self) -> Dict[str, Union[Satoshis, str]]:
         return copy.copy(self.__asset_value)
 
     def __repr__(self):
-        return 'RavenValue(RVN: {}, ASSETS: {})'.format(self.__rvn_value, {k: v.__str__() for k, v in self.__asset_value.items()})
+        return 'EvrmoreValue(EVR: {}, ASSETS: {})'.format(self.__evr_value, {k: v.__str__() for k, v in self.__asset_value.items()})
 
     def __str__(self):
         ret = []
-        r = self.__rvn_value
+        r = self.__evr_value
         if r:
-            ret.append(f'{format_satoshis(r, num_zeros=1)} RVN')
+            ret.append(f'{format_satoshis(r, num_zeros=1)} EVR')
         for a, v in self.__asset_value.items():
             ret.append(f'{format_satoshis(v, num_zeros=1)} {a}')
 
         return ', '.join(ret)
 
     def __add__(self, other):
-        if isinstance(other, RavenValue):
-            if '!' == self.rvn_value or '!' == other.rvn_value:
+        if isinstance(other, EvrmoreValue):
+            if '!' == self.evr_value or '!' == other.evr_value:
                 v_r = '!'
             else:
-                v_r = self.rvn_value + other.rvn_value
+                v_r = self.evr_value + other.evr_value
             v_a = self.assets
             for k, v in other.assets.items():
                 if k in v_a:
@@ -420,13 +420,13 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
                         v_a[k] += v
                 else:
                     v_a[k] = v
-            return RavenValue(v_r, v_a)
+            return EvrmoreValue(v_r, v_a)
         else:
-            raise ValueError('RavenValue required')
+            raise ValueError('EvrmoreValue required')
 
     def __sub__(self, other):
-        if isinstance(other, RavenValue):
-            v_r = self.rvn_value - other.rvn_value
+        if isinstance(other, EvrmoreValue):
+            v_r = self.evr_value - other.evr_value
             v_a = self.assets
             for k, v in other.assets.items():
                 if k in v_a:
@@ -435,36 +435,36 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
                         del v_a[k]
                 else:
                     v_a[k] = -v
-            return RavenValue(v_r, v_a)
+            return EvrmoreValue(v_r, v_a)
         else:
-            raise ValueError('RavenValue required')
+            raise ValueError('EvrmoreValue required')
 
     def __mul__(self, other):
         if isinstance(other, int):
-            new_rvn_value = Satoshis(self.__rvn_value.value * other)
+            new_evr_value = Satoshis(self.__evr_value.value * other)
             new_assets = {}
             for asset, val in self.assets.items():
                 new_assets[asset] = val * other
-            return RavenValue(new_rvn_value, new_assets)
+            return EvrmoreValue(new_evr_value, new_assets)
         else:
             raise ValueError('int required')
 
     def __floordiv__(self, other):
         if isinstance(other, int):
-            new_v_r = self.__rvn_value.value // other
-            new_rvn_value = Satoshis(int(new_v_r))
+            new_v_r = self.__evr_value.value // other
+            new_evr_value = Satoshis(int(new_v_r))
             new_assets = {}
             for asset, val in self.assets.items():
                 new_v_a = val.value // other
                 new_assets[asset] = Satoshis(int(new_v_a))
-            return RavenValue(new_rvn_value, new_assets)
+            return EvrmoreValue(new_evr_value, new_assets)
         else:
             raise ValueError('int required')
 
     def __eq__(self, other):
-        if not isinstance(other, RavenValue):
+        if not isinstance(other, EvrmoreValue):
             return False
-        if self.__rvn_value != other.__rvn_value:
+        if self.__evr_value != other.__evr_value:
             return False
         for asset, value in self.__asset_value.items():
             if value != other.__asset_value.get(asset, 0):
@@ -472,16 +472,16 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
         return True
         
     def __hash__(self):
-        k1 = hash(self.__rvn_value)
+        k1 = hash(self.__evr_value)
         k2 = hash(frozenset(self.__asset_value.items()))
         return int((k1 + k2) * (k1 + k2 + 1) / 2 + k2)
 
     def __lt__(self, other):
-        if isinstance(other, RavenValue):
+        if isinstance(other, EvrmoreValue):
             o_a = other.assets
             if len(self.__asset_value) == 0 and len(o_a) != 0:
                 return True
-            if self.__rvn_value >= other.__rvn_value:
+            if self.__evr_value >= other.__evr_value:
                 return False
             for asset, amt in self.__asset_value.items():
                 if asset not in o_a:
@@ -490,13 +490,13 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
                     return False
             return True
         else:
-            raise ValueError('RavenValue required')
+            raise ValueError('EvrmoreValue required')
 
     def __ge__(self, other):
         return not self.__lt__(other)
 
     def __copy__(self):
-        return RavenValue(self.__rvn_value, self.__asset_value)
+        return EvrmoreValue(self.__evr_value, self.__asset_value)
 
     def __deepcopy__(self, memo):
         cls = self.__class__
@@ -508,15 +508,15 @@ class RavenValue:  # The raw RVN value as well as asset values of a transaction
 
     def to_json(self):
         d = {
-            'RVN': self.rvn_value if isinstance(self.rvn_value, str) else self.rvn_value.value,
+            'EVR': self.evr_value if isinstance(self.evr_value, str) else self.evr_value.value,
             'ASSETS': {k: v if isinstance(v, str) else v.value for k, v in self.assets.items()},
         }
         return d
 
     def is_incoming(self):
-        # 0 >= if receiving assets or RVN
+        # 0 >= if receiving assets or EVR
         # <0 for the fee spent
-        return self.rvn_value >= 0
+        return self.evr_value >= 0
 
 
 # note: this is not a NamedTuple as then its json encoding cannot be customized
@@ -953,11 +953,11 @@ def user_dir():
     elif 'ANDROID_DATA' in os.environ:
         return android_data_dir()
     elif os.name == 'posix':
-        return os.path.join(os.environ["HOME"], ".electrum-ravencoin")
+        return os.path.join(os.environ["HOME"], ".electrum-evrmore")
     elif "APPDATA" in os.environ:
-        return os.path.join(os.environ["APPDATA"], "Electrum-Ravencoin")
+        return os.path.join(os.environ["APPDATA"], "Electrum-Evrmore")
     elif "LOCALAPPDATA" in os.environ:
-        return os.path.join(os.environ["LOCALAPPDATA"], "Electrum-Ravencoin")
+        return os.path.join(os.environ["LOCALAPPDATA"], "Electrum-Evrmore")
     else:
         # raise Exception("No home directory found in environment variables.")
         return
@@ -1182,14 +1182,14 @@ mainnet_block_explorers = {
     'rvn.traysi.org': ('http://rvn.traysi.org/',
                        {'tx': 'tx/', 'addr': 'address/'}),
     'rvn.cryptoscope.io': ('https://rvn.cryptoscope.io/',
-                           {'tx': 'tx/?txid=', 'addr': 'address/?address='}),
+                          {'tx': 'tx/?txid=', 'addr': 'address/?address='}),
 }
 
 testnet_block_explorers = {
     'ravencoin.network': ('https://testnet.ravencoin.network/',
                           {'tx': 'tx/', 'addr': 'address/'}),
     'rvn.cryptoscope.io': ('https://rvnt.cryptoscope.io/',
-                           {'tx': 'tx/?txid=', 'addr': 'address/?address='}),
+                          {'tx': 'tx/?txid=', 'addr': 'address/?address='}),
 }
 
 signet_block_explorers = {
@@ -1213,7 +1213,7 @@ ipfs_explorers = {
     'infura.io': ('https://ipfs.infura.io/',
                   {'ipfs': 'ipfs/'}),
     'ravencoinipfs-gateway.com': ('https://ravencoinipfs-gateway.com/',
-                                  {'ipfs': 'ipfs/'}),
+                {'ipfs': 'ipfs/'}),
 }
 
 _ipfs_explorer_default_api_loc = {'ipfs': 'ipfs/'}
@@ -1279,7 +1279,7 @@ def block_explorer(config: 'SimpleConfig') -> Optional[str]:
     """
     if config.get('block_explorer_custom') is not None:
         return None
-    default_ = 'rvn.cryptoscope.io'
+    default_ = 'evr.cryptoscope.io'
     be_key = config.get('block_explorer', default_)
     be_tuple = block_explorer_info().get(be_key)
     if be_tuple is None:
@@ -1323,7 +1323,7 @@ def block_explorer_URL(config: 'SimpleConfig', kind: str, item: str) -> Optional
 
 
 # note: when checking against these, use .lower() to support case-insensitivity
-BITCOIN_BIP21_URI_SCHEME = 'raven'
+BITCOIN_BIP21_URI_SCHEME = 'evrmore'
 LIGHTNING_URI_SCHEME = 'lightning'
 
 
@@ -1333,21 +1333,21 @@ class InvalidBitcoinURI(Exception): pass
 # TODO rename to parse_bip21_uri or similar
 def parse_URI(uri: str, on_pr: Callable = None, *, loop=None) -> dict:
     """Raises InvalidBitcoinURI on malformed URI."""
-    from . import ravencoin
-    from .ravencoin import COIN, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC
+    from . import evrmore
+    from .evrmore import COIN, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC
     from .lnaddr import lndecode
 
     if not isinstance(uri, str):
         raise InvalidBitcoinURI(f"expected string, not {repr(uri)}")
 
     if ':' not in uri:
-        if not ravencoin.is_address(uri):
-            raise InvalidBitcoinURI("Not a ravencoin address")
+        if not evrmore.is_address(uri):
+            raise InvalidBitcoinURI("Not a evrmore address")
         return {'address': uri}
 
     u = urllib.parse.urlparse(uri)
     if u.scheme.lower() != BITCOIN_BIP21_URI_SCHEME:
-        raise InvalidBitcoinURI("Not a ravencoin URI")
+        raise InvalidBitcoinURI("Not a evrmore URI")
     address = u.path
 
     # python for android fails to parse query
@@ -1363,7 +1363,7 @@ def parse_URI(uri: str, on_pr: Callable = None, *, loop=None) -> dict:
 
     out = {k: v[0] for k, v in pq.items()}
     if address:
-        if not ravencoin.is_address(address):
+        if not evrmore.is_address(address):
             raise InvalidBitcoinURI(f"Invalid bitcoin address: {address}")
         out['address'] = address
     if 'amount' in out:
@@ -1398,7 +1398,7 @@ def parse_URI(uri: str, on_pr: Callable = None, *, loop=None) -> dict:
             raise InvalidBitcoinURI(f"failed to parse 'exp' field: {repr(e)}") from e
     if 'sig' in out:
         try:
-            out['sig'] = bh2u(ravencoin.base_decode(out['sig'], base=58))
+            out['sig'] = bh2u(evrmore.base_decode(out['sig'], base=58))
         except Exception as e:
             raise InvalidBitcoinURI(f"failed to parse 'sig' field: {repr(e)}") from e
     if 'lightning' in out:
@@ -1436,8 +1436,8 @@ def parse_URI(uri: str, on_pr: Callable = None, *, loop=None) -> dict:
 
 def create_bip21_uri(addr, amount_sat: Optional[int], message: Optional[str],
                      *, extra_query_params: Optional[dict] = None) -> str:
-    from . import ravencoin
-    if not ravencoin.is_address(addr):
+    from . import evrmore
+    if not evrmore.is_address(addr):
         return ""
     if extra_query_params is None:
         extra_query_params = {}
@@ -1629,7 +1629,7 @@ class TxMinedInfo(NamedTuple):
 
 def make_aiohttp_session(proxy: Optional[dict], headers=None, timeout=None):
     if headers is None:
-        headers = {'User-Agent': 'Electrum-Ravencoin'}
+        headers = {'User-Agent': 'Electrum-Evrmore'}
     if timeout is None:
         # The default timeout is high intentionally.
         # DNS on some systems can be really slow, see e.g. #5337

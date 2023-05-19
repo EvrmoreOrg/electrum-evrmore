@@ -10,7 +10,7 @@ from electrum import WalletStorage, Wallet
 from electrum.wallet import Abstract_Wallet
 from electrum.wallet_db import WalletDB
 from electrum.util import format_satoshis, EventListener, event_listener
-from electrum.ravencoin import is_address, COIN
+from electrum.evrmore import is_address, COIN
 from electrum.transaction import PartialTxOutput
 from electrum.network import TxBroadcastError, BestEffortRequestFailed
 
@@ -181,7 +181,7 @@ class ElectrumGui(BaseElectrumGui, EventListener):
 
     def do_send(self):
         if not is_address(self.str_recipient):
-            print(_('Invalid ravencoin address'))
+            print(_('Invalid evrmore address'))
             return
         try:
             amount = int(Decimal(self.str_amount) * COIN)

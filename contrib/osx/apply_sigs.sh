@@ -18,7 +18,7 @@ CP=gcp
 UNSIGNED="$1"
 SIGNATURE="$2"
 ARCH=x86_64
-OUTDIR="/tmp/electrum_ravencoin_compare_dmg/signed_app"
+OUTDIR="/tmp/electrum_evrmore_compare_dmg/signed_app"
 
 if [ -z "$UNSIGNED" ]; then
     echo "usage: $0 <unsigned app> <path to mac_extracted_sigs.tar.gz>"

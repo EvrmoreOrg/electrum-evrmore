@@ -136,7 +136,7 @@ class RequestList(MyTreeView):
             message = req.get_message()
             date = format_time(timestamp)
             asset = req.get_asset()
-            amount_str = self.parent.format_amount(amount.rvn_value.value if not asset else amount.assets[asset].value) if amount else ""
+            amount_str = self.parent.format_amount(amount.evr_value.value if not asset else amount.assets[asset].value) if amount else ""
             asset_str = asset if asset else ""
             labels = [date, message, asset_str, amount_str, status_str]
             items = [QStandardItem(e) for e in labels]
@@ -182,9 +182,9 @@ class RequestList(MyTreeView):
             return
         menu = QMenu(self)
         if req.get_address():
-            menu.addAction(_("Copy Address"), lambda: self.parent.do_copy(req.get_address(), title='Ravencoin Address'))
+            menu.addAction(_("Copy Address"), lambda: self.parent.do_copy(req.get_address(), title='Evrmore Address'))
             URI = self.wallet.get_request_URI(req)
-            menu.addAction(_("Copy URI"), lambda: self.parent.do_copy(URI, title='Ravencoin URI'))
+            menu.addAction(_("Copy URI"), lambda: self.parent.do_copy(URI, title='Evrmore URI'))
         if req.is_lightning():
             menu.addAction(_("Copy Lightning Request"), lambda: self.parent.do_copy(req.lightning_invoice, title='Lightning Request'))
         self.add_copy_menu(menu, idx)

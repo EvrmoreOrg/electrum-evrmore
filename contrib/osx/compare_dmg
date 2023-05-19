@@ -10,7 +10,7 @@ UNSIGNED_DMG="$1"
 RELEASE_DMG="$2"
 CONTRIB_OSX="$(dirname "$(grealpath "$0")")"
 PROJECT_ROOT="$CONTRIB_OSX/../.."
-WORKSPACE="/tmp/electrum_ravencoin_compare_dmg"
+WORKSPACE="/tmp/electrum_evrmore_compare_dmg"
 
 if [ -z "$UNSIGNED_DMG" ]; then
     echo "usage: $0 <unsigned dmg> <release dmg>"
@@ -32,18 +32,18 @@ DMG_UNSIGNED_UNPACKED="$WORKSPACE/dmg1"
 DMG_RELEASE_UNPACKED="$WORKSPACE/dmg2"
 
 hdiutil attach "$UNSIGNED_DMG"
-cp -r /Volumes/Electrum-Ravencoin "$DMG_UNSIGNED_UNPACKED"
-hdiutil detach /Volumes/Electrum-Ravencoin
+cp -r /Volumes/Electrum-Evrmore "$DMG_UNSIGNED_UNPACKED"
+hdiutil detach /Volumes/Electrum-Evrmore
 
 hdiutil attach "$RELEASE_DMG"
-cp -r /Volumes/Electrum-Ravencoin "$DMG_RELEASE_UNPACKED"
-hdiutil detach /Volumes/Electrum-Ravencoin
+cp -r /Volumes/Electrum-Evrmore "$DMG_RELEASE_UNPACKED"
+hdiutil detach /Volumes/Electrum-Evrmore
 
 # copy signatures from RELEASE_DMG to UNSIGNED_DMG
 echo "Extracting signatures from release app..."
-QUIET="1" "$CONTRIB_OSX/extract_sigs.sh" "$DMG_RELEASE_UNPACKED"/Electrum-Ravencoin.app
+QUIET="1" "$CONTRIB_OSX/extract_sigs.sh" "$DMG_RELEASE_UNPACKED"/Electrum-Evrmore.app
 echo "Applying extracted signatures to unsigned app..."
-QUIET="1" "$CONTRIB_OSX/apply_sigs.sh" "$DMG_UNSIGNED_UNPACKED"/Electrum-Ravencoin.app mac_extracted_sigs.tar.gz
+QUIET="1" "$CONTRIB_OSX/apply_sigs.sh" "$DMG_UNSIGNED_UNPACKED"/Electrum-Evrmore.app mac_extracted_sigs.tar.gz
 
 rm mac_extracted_sigs.tar.gz
 rm -rf "$DMG_UNSIGNED_UNPACKED"

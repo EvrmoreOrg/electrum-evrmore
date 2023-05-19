@@ -9,14 +9,14 @@ from PyQt5.QtCore import Qt, QSize, QRegExp
 from PyQt5.QtWidgets import (QComboBox, QLabel, QVBoxLayout, QGridLayout, QLineEdit,
                              QHBoxLayout, QPushButton, QWidget, QSizePolicy, QFrame)
 
-from electrum.ravencoin import is_address
+from electrum.evrmore import is_address
 from electrum.i18n import _
 from electrum.util import InvoiceError, decimal_point_to_base_unit_name
 from electrum.invoices import PR_DEFAULT_EXPIRATION_WHEN_CREATING
 from electrum.invoices import PR_EXPIRED, pr_expiration_values
 from electrum.logging import Logger
 
-from .amountedit import AmountEdit, RVNAmountEdit, SizedFreezableLineEdit
+from .amountedit import AmountEdit, EVRAmountEdit, SizedFreezableLineEdit
 from .qrcodewidget import QRCodeWidget
 from .util import read_QIcon, ColorScheme, HelpLabel, WWLabel, MessageBoxMixin, MONOSPACE_FONT
 from .util import ButtonsTextEdit
@@ -48,7 +48,7 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
         grid.addWidget(self.receive_message_e, 0, 1, 1, 4)
 
         self.asset_requested = SizedFreezableLineEdit(width=400)
-        self.receive_amount_e = RVNAmountEdit(self.window.get_decimal_point, lambda: (self.asset_requested.text()[:4] or decimal_point_to_base_unit_name(self.window.get_decimal_point())))
+        self.receive_amount_e = EVRAmountEdit(self.window.get_decimal_point, lambda: (self.asset_requested.text()[:4] or decimal_point_to_base_unit_name(self.window.get_decimal_point())))
         grid.addWidget(QLabel(_('Requested amount')), 1, 0)
         grid.addWidget(self.receive_amount_e, 1, 1)
 
@@ -90,8 +90,8 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
             _('This information is seen by the recipient if you send them a signed payment request.'),
             '\n\n',
             _('For on-chain requests, the address gets reserved until expiration. After that, it might get reused.'), ' ',
-            _('The ravencoin address never expires and will always be part of this electrum wallet.'), ' ',
-            _('You can reuse a ravencoin address any number of times but it is not good for your privacy.'),
+            _('The evrmore address never expires and will always be part of this electrum wallet.'), ' ',
+            _('You can reuse an evrmore address any number of times but it is not good for your privacy.'),
             '\n\n',
             _('For Lightning requests, payments will not be accepted after the expiration.'),
         ])
@@ -171,7 +171,7 @@ class ReceiveTab(QWidget, MessageBoxMixin, Logger):
         self.receive_tabs.setMinimumHeight(ReceiveTabWidget.min_size.height())
 
         #self.receive_tabs.setMinimumHeight(ReceiveTabWidget.min_size.height() + 4) # for margins
-        self.receive_tabs.addTab(self.receive_address_widget, read_QIcon("ravencoin.png"), _('Address'))
+        self.receive_tabs.addTab(self.receive_address_widget, read_QIcon("evrmore.png"), _('Address'))
         self.receive_tabs.addTab(self.receive_URI_widget, read_QIcon("link.png"), _('URI'))
         #self.receive_tabs.addTab(self.receive_lightning_widget, read_QIcon("lightning.png"), _('Lightning'))
         self.receive_tabs.currentChanged.connect(self.update_receive_qr_window)

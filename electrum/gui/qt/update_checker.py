@@ -26,8 +26,8 @@ VERSION_ANNOUNCEMENT_SIGNING_KEYS = (
 
 
 class UpdateCheck(QDialog, Logger):
-    url = "https://raw.githubusercontent.com/Electrum-RVN-SIG/electrum-ravencoin/master/check-version.json"
-    download_url = "https://github.com/Electrum-RVN-SIG/electrum-ravencoin/releases"
+    url = "https://raw.githubusercontent.com/EvrmoreOrg/electrum-evrmore/master/check-version.json"
+    download_url = "https://github.com/EvrmoreOrg/electrum-evrmore/releases"
 
     class VerifyUpdateHashes(QWidget):
         def __init__(self):
@@ -69,7 +69,7 @@ class UpdateCheck(QDialog, Logger):
                 try:
                     # This can throw on invalid base64
                     sig = base64.b64decode(str(signature.toPlainText()))
-                    verified = ecc.verify_message_with_address(address, sig, message, net=constants.RavencoinMainnet)
+                    verified = ecc.verify_message_with_address(address, sig, message, net=constants.EvrmoreMainnet)
                     break
                 except:
                     pass
@@ -179,7 +179,7 @@ class UpdateCheckThread(QThread, Logger):
                     sig = base64.b64decode(sig)
                     msg = version_num.encode('utf-8')
                     if ecc.verify_message_with_address(address=address, sig65=sig, message=msg,
-                                                       net=constants.RavencoinMainnet):
+                                                       net=constants.EvrmoreMainnet):
                         self.logger.info(f"valid sig for version announcement '{version_num}' from address '{address}'")
                         break
                 else:

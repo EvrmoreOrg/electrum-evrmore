@@ -34,8 +34,8 @@ from .util import NetworkRetryManager, JsonRPCClient, NotEnoughFunds
 from .util import EventListener, event_listener
 from .lnutil import LN_MAX_FUNDING_SAT
 from .keystore import BIP32_KeyStore
-from .ravencoin import COIN
-from .ravencoin import opcodes, make_op_return, address_to_scripthash
+from .evrmore import COIN
+from .evrmore import opcodes, make_op_return, address_to_scripthash
 from .transaction import Transaction
 from .transaction import get_script_type_from_output_script
 from .crypto import sha256
@@ -55,7 +55,7 @@ from .lnchannel import ChannelState, PeerState, HTLCWithStatus
 from .lnrater import LNRater
 from . import lnutil
 from .lnutil import funding_output_script
-from .ravencoin import redeem_script_to_address
+from .evrmore import redeem_script_to_address
 from .lnutil import (Outpoint, LNPeerAddr,
                      get_compressed_pubkey_from_bech32, extract_nodeid,
                      PaymentFailure, split_host_port, ConnStringFormatError,
@@ -413,9 +413,9 @@ class LNWorker(Logger, EventListener, NetworkRetryManager[LNPeerAddr]):
                 return [peer]
 
         # getting desperate... let's try hardcoded fallback list of peers
-        if constants.net in (constants.RavencoinTestnet,):
+        if constants.net in (constants.EvrmoreTestnet,):
             fallback_list = FALLBACK_NODE_LIST_TESTNET
-        elif constants.net in (constants.RavencoinMainnet,):
+        elif constants.net in (constants.EvrmoreMainnet,):
             fallback_list = FALLBACK_NODE_LIST_MAINNET
         else:
             return []  # regtest??

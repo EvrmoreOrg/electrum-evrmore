@@ -1,7 +1,7 @@
 import base64
 import sys
 
-from electrum.ravencoin import (public_key_to_p2pkh, address_from_private_key,
+from electrum.evrmore import (public_key_to_p2pkh, address_from_private_key,
                                 is_address, is_private_key,
                                 var_int, _op_push, address_to_script, OnchainOutputType, address_to_payload,
                                 deserialize_privkey, serialize_privkey, is_segwit_address,

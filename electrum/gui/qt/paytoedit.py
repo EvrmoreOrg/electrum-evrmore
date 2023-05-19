@@ -31,10 +31,10 @@ from typing import NamedTuple, Sequence, Optional, List, TYPE_CHECKING
 from PyQt5.QtGui import QFontMetrics, QFont
 from PyQt5.QtWidgets import QApplication
 
-from electrum import ravencoin, assets
+from electrum import evrmore, assets
 from electrum.util import bfh, parse_max_spend
 from electrum.transaction import PartialTxOutput
-from electrum.ravencoin import COIN, opcodes, construct_script
+from electrum.evrmore import COIN, opcodes, construct_script
 from electrum.logging import Logger
 from electrum.lnurl import LNURLError
 
@@ -153,7 +153,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
     def parse_output(self, x) -> bytes:
         try:
             address = self.parse_address(x)
-            return bfh(ravencoin.address_to_script(address))
+            return bfh(evrmore.address_to_script(address))
         except Exception:
             pass
         try:
@@ -190,7 +190,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
         r = line.strip()
         m = re.match('^'+RE_ALIAS+'$', r)
         address = str(m.group(2) if m else r)
-        assert ravencoin.is_address(address)
+        assert evrmore.is_address(address)
         return address
 
     def _on_input_btn(self, text: str):
@@ -354,7 +354,7 @@ class PayToEdit(CompletionTextEdit, ScanQRTextEdit, Logger):
         if not (('.' in key) and ('<' not in key) and (' ' not in key)):
             return None
         parts = key.split(sep=',')  # assuming single line
-        if parts and len(parts) > 0 and ravencoin.is_address(parts[0]):
+        if parts and len(parts) > 0 and evrmore.is_address(parts[0]):
             return None
         try:
             data = self.win.contacts.resolve(key)

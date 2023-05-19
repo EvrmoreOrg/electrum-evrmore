@@ -51,12 +51,12 @@ from PyQt5.QtWidgets import (QMessageBox, QSystemTrayIcon, QTabWidget,
 import electrum
 from electrum.blockchain import DGW_PASTBLOCKS, hash_header
 from electrum.gui import messages
-from electrum import (keystore, ecc, constants, util, ravencoin, commands,
+from electrum import (keystore, ecc, constants, util, evrmore, commands,
                       paymentrequest, lnutil)
-from electrum.ravencoin import COIN, is_address, base_decode, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, address_to_scripthash
+from electrum.evrmore import COIN, is_address, base_decode, TOTAL_COIN_SUPPLY_LIMIT_IN_BTC, address_to_scripthash
 from electrum.plugin import run_hook, BasePlugin
 from electrum.i18n import _
-from electrum.util import (RavenValue, format_time, get_asyncio_loop,
+from electrum.util import (EvrmoreValue, format_time, get_asyncio_loop,
                            UserCancelled, profiler,
                            bh2u, bfh, InvalidPassword,
                            UserFacingException,
@@ -79,7 +79,7 @@ from electrum.lnaddr import lndecode
 from .asset_workspace import AssetCreateWorkspace, AssetReissueWorkspace
 
 from .exception_window import Exception_Hook
-from .amountedit import RVNAmountEdit
+from .amountedit import EVRAmountEdit
 from .qrcodewidget import QRDialog
 from .qrtextedit import ShowQRTextEdit, ScanQRTextEdit, ScanShowQRTextEdit
 from .transaction_dialog import show_transaction
@@ -183,7 +183,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         self.asset_whitelist = self.wallet.config.get('asset_whitelist', [])
 
         # Tracks sendable things
-        self.send_options = ['RVN']  # type: List[str]
+        self.send_options = ['EVR']  # type: List[str]
 
         Exception_Hook.maybe_setup(config=self.config, wallet=self.wallet)
 
@@ -271,7 +271,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         if self.config.get("is_maximized"):
             self.showMaximized()
 
-        self.setWindowIcon(read_QIcon("electrum-ravencoin.png"))
+        self.setWindowIcon(read_QIcon("electrum-evrmore.png"))
         self.init_menubar()
 
         wrtabs = weakref.proxy(tabs)
@@ -321,7 +321,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
             # to prevent GC from getting in our way.
             def on_version_received(v):
                 if UpdateCheck.is_newer(v):
-                    self.update_check_button.setText(_("Update to Electrum-Ravencoin {} is available").format(v))
+                    self.update_check_button.setText(_("Update to Electrum-Evrmore {} is available").format(v))
                     self.update_check_button.clicked.connect(lambda: self.show_update_check(v))
                     self.update_check_button.show()
 
@@ -561,7 +561,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
 
     @classmethod
     def get_app_name_and_version_str(cls) -> str:
-        name = "Electrum Ravencoin"
+        name = "Electrum Evrmore"
         if constants.net.TESTNET:
             name += " " + constants.net.NET_NAME.capitalize()
         return f"{name} {ELECTRUM_VERSION}"
@@ -583,8 +583,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         if self.wallet.is_watching_only():
             msg = ' '.join([
                 _("This wallet is watching-only."),
-                _("This means you will not be able to spend Ravencoins with it."),
-                _("Make sure you own the seed phrase or the private keys, before you request Ravencoins to be sent to this wallet.")
+                _("This means you will not be able to spend EVR with it."),
+                _("Make sure you own the seed phrase or the private keys, before you request EVR to be sent to this wallet.")
             ])
             self.show_warning(msg, title=_('Watch-only wallet'))
 
@@ -625,7 +625,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         msg = ''.join([
             _("You are in testnet mode."), ' ',
             _("Testnet coins are worthless."), '\n',
-            _("Testnet is separate from the main Ravencoin network. It is used for testing.")
+            _("Testnet is separate from the main Evrmore network. It is used for testing.")
         ])
         cb = QCheckBox(_("Don't show this again."))
         cb_checked = False
@@ -833,8 +833,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         help_menu = menubar.addMenu(_("&Help"))
         help_menu.addAction(_("&About"), self.show_about)
         help_menu.addAction(_("&Check for updates"), self.show_update_check)
-        help_menu.addAction("&RVN Electrum Wiki", lambda: webopen("https://raven.wiki/wiki/Electrum"))
-        help_menu.addAction("&GetRavencoin.org", lambda: webopen("https://GetRavencoin.org"))
+        # help_menu.addAction("&RVN Electrum Wiki", lambda: webopen("https://raven.wiki/wiki/Electrum"))
+        help_menu.addAction("&Evrmorecoin.org", lambda: webopen("https://evrmorecoin.org"))
         help_menu.addSeparator()
         help_menu.addAction(_("&Documentation"), lambda: webopen("http://docs.electrum.org/")).setShortcut(
             QKeySequence.HelpContents)
@@ -850,18 +850,18 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         d = self.network.get_donation_address()
         if d:
             host = self.network.get_parameters().server.host
-            self.handle_payment_identifier('raven:%s?message=donation for %s' % (d, host))
+            self.handle_payment_identifier('evrmore:%s?message=donation for %s' % (d, host))
         else:
             self.show_error(_('No donation address for this server'))
 
     def show_about(self):
         QMessageBox.about(self, "Electrum",
                           (_("Version") + " %s" % ELECTRUM_VERSION + "\n\n" +
-                           _("Electrum's focus is speed, with low resource usage and simplifying Ravencoin.") + " " +
+                           _("Electrum's focus is speed, with low resource usage and simplifying Evrmore.") + " " +
                            _("You do not need to perform regular backups, because your wallet can be "
                              "recovered from a secret phrase that you can memorize or write on paper.") + " " +
                            _("Startup times are instant because it operates in conjunction with high-performance "
-                             "servers that handle the most complicated parts of the Ravencoin system.") + "\n\n" +
+                             "servers that handle the most complicated parts of the Evrmore system.") + "\n\n" +
                            _("Uses icons from the Icons8 icon pack (icons8.com).")))
 
     def show_bitcoin_paper(self):
@@ -907,16 +907,16 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
                 break
         # Combine the transactions if there are at least three
         if len(txns) >= 3:
-            total_amount = RavenValue()
+            total_amount = EvrmoreValue()
             for tx in txns:
                 tx_wallet_delta = self.wallet.get_wallet_delta(tx)
                 if not tx_wallet_delta.is_relevant:
                     continue
                 total_amount += tx_wallet_delta.delta
             recv = ''
-            rvn = total_amount.rvn_value
+            evr = total_amount.evr_value
             assets = total_amount.assets
-            recv += self.format_amount_and_units(rvn)
+            recv += self.format_amount_and_units(evr)
             if assets:
                 recv += ', '
                 assets = ['{}: {}'.format(asset, self.config.format_amount(val)) for asset, val in assets.items()]
@@ -929,9 +929,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
                 if not tx_wallet_delta.is_relevant:
                     continue
                 recv = ''
-                rvn = tx_wallet_delta.delta.rvn_value
+                evr = tx_wallet_delta.delta.evr_value
                 assets = tx_wallet_delta.delta.assets
-                recv += self.format_amount_and_units(rvn)
+                recv += self.format_amount_and_units(evr)
                 if assets:
                     recv += ', '
                     assets = ['{}: {}'.format(asset, self.config.format_amount(val)) for asset, val in assets.items()]
@@ -975,10 +975,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         """
 
         suffix = ''
-        if isinstance(amount_sat, RavenValue):
+        if isinstance(amount_sat, EvrmoreValue):
             if amount_sat.assets:
                 suffix = f' ({len(amount_sat.assets)} asset' + ('s' if len(amount_sat.assets) > 1 else '') + ')'
-            amount_sat = amount_sat.rvn_value.value
+            amount_sat = amount_sat.evr_value.value
         text = self.config.format_amount_and_units(amount_sat)
         fiat = self.fx.format_amount_and_units(amount_sat, timestamp=timestamp) if self.fx else None
         if text and fiat:
@@ -1271,7 +1271,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
                                 return
                         except Exception:
                             pass
-                        input_values.append(RavenValue(0, {a: outpoint.value}) if a else RavenValue(outpoint.value))
+                        input_values.append(EvrmoreValue(0, {a: outpoint.value}) if a else EvrmoreValue(outpoint.value))
                     except Exception as e:
                         self.logger.exception('')
                         input_values.append(None)
@@ -1284,7 +1284,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
             output_values = []
             for output in tx.outputs():
                 a = output.asset
-                output_values.append(RavenValue(0, {a: output.value}) if a else RavenValue(output.value))
+                output_values.append(EvrmoreValue(0, {a: output.value}) if a else EvrmoreValue(output.value))
 
             if not all(output_values):
                 info.setStyleSheet(ColorScheme.RED.as_stylesheet())
@@ -1292,8 +1292,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
                 return
                   
             self.current_swap_in = input_values
-            total_in = sum(input_values, RavenValue())
-            self.current_swap_out = total_out = sum(output_values, RavenValue())
+            total_in = sum(input_values, EvrmoreValue())
+            self.current_swap_out = total_out = sum(output_values, EvrmoreValue())
 
             info.setText(_(f'You will receive: {total_in}\nYou will spend: {total_out}\nYou will handle the transaction fees.'))
 
@@ -1342,7 +1342,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
                 return
 
             coins = []
-            if self.current_swap_out.rvn_value != 0:
+            if self.current_swap_out.evr_value != 0:
                 coins += self.get_coins()
             for asset in self.current_swap_out.assets.keys():
                 coins += self.get_coins(asset=asset)
@@ -1356,10 +1356,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
 
             addr = self.wallet.get_receiving_address()
             
-            total_in = sum(self.current_swap_in, RavenValue())
+            total_in = sum(self.current_swap_in, EvrmoreValue())
 
-            if total_in.rvn_value != 0:
-                outputs.append(PartialTxOutput.from_address_and_value(addr, total_in.rvn_value))
+            if total_in.evr_value != 0:
+                outputs.append(PartialTxOutput.from_address_and_value(addr, total_in.evr_value))
             for a, v in total_in.assets.items(): 
                 outputs.append(PartialTxOutput.from_address_and_value(addr, v, asset=a))
 
@@ -1384,7 +1384,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
 
         buy_error = QLabel()
         buy_error.setStyleSheet(ColorScheme.RED.as_stylesheet())
-        buy_amt = RVNAmountEdit(self.get_decimal_point)
+        buy_amt = EVRAmountEdit(self.get_decimal_point)
 
         def on_edit(w):
             buy_error.setText('')    
@@ -1400,7 +1400,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         vbox2.addWidget(buy_text, 1)
         vbox2.addWidget(buy_error, 1)
 
-        buy_amt_label = QLabel(_("RVN Offered:"))
+        buy_amt_label = QLabel(_("EVR Offered:"))
         vbox2.addWidget(buy_amt_label, 1)
         vbox2.addWidget(buy_amt, 1)
 
@@ -1412,7 +1412,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
                 return
             coins = self.get_coins()
             for c in coins:
-                if c.value_sats().rvn_value == offer and self.question(
+                if c.value_sats().evr_value == offer and self.question(
                     _("You already have an unspent transaction output with this amount. "
                       "Would you like use this UTXO?"),
                     title=_("UTXO")
@@ -1435,7 +1435,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         l = QTextEdit()
 
         def test():
-            from electrum.ravencoin import address_to_script
+            from electrum.evrmore import address_to_script
             from electrum.transaction import Satoshis
             
             i1 = PartialTxInput(prevout=TxOutpoint(bytes.fromhex('7e602949d4c149b433f368046c0c478e2557a20ced1b394bf10045ff358768fb'), 0), is_coinbase_output=False)
@@ -1444,8 +1444,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
             i1.script_type = 'p2pkh'
             i2.script_type = 'p2pkh'
 
-            i1._trusted_value_sats = RavenValue(449500)
-            i2._trusted_value_sats = RavenValue(350000)
+            i1._trusted_value_sats = EvrmoreValue(449500)
+            i2._trusted_value_sats = EvrmoreValue(350000)
 
             self.wallet._add_input_sig_info(i1, 'RV1265roRyHUYuLerLfit8QmyiWDrZtbv2', only_der_suffix=None)
             self.wallet._add_input_sig_info(i2, 'R9TonskbB14efLXRM7ZdcCDxe7nbMM9BxK', only_der_suffix=None)
@@ -1614,7 +1614,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
             return self.send_options[combo_index]
         return None
 
-    def create_and_freeze_swap(self, vin: PartialTxInput, vout: RavenValue):
+    def create_and_freeze_swap(self, vin: PartialTxInput, vout: EvrmoreValue):
         self.set_frozen_state_of_coins([vin])
         self.wallet.set_label(vin.prevout.txid.hex(), _("Atomic Swap"))
         
@@ -1648,17 +1648,17 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         self.max_button.setChecked(True)
         amount = tx.output_value()
         __, x_fee_amount = run_hook('get_tx_extra_fee', self.wallet, tx) or (None, 0)
-        amount_after_all_fees = amount - RavenValue(x_fee_amount)
+        amount_after_all_fees = amount - EvrmoreValue(x_fee_amount)
         assets = amount_after_all_fees.assets
         if len(assets) == 0:
-            to_show = amount_after_all_fees.rvn_value.value
+            to_show = amount_after_all_fees.evr_value.value
         else:
             __, v = list(assets.items())[0]
             to_show = v.value
         self.amount_e.setAmount(to_show)
         # show tooltip explaining max amount
         mining_fee = tx.get_fee()
-        mining_fee_str = self.format_amount_and_units(mining_fee.rvn_value.value)
+        mining_fee_str = self.format_amount_and_units(mining_fee.evr_value.value)
         msg = _("Mining fee: {} (can be adjusted on next screen)").format(mining_fee_str)
         if x_fee_amount:
             twofactor_fee_str = self.format_amount_and_units(x_fee_amount)
@@ -1677,13 +1677,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         # Don't interrupt if we don't need to
         coins = self.get_manually_selected_coins() if self.utxo_list else None
         if coins:
-            selected_value = sum((x.value_sats() for x in coins), RavenValue())
-            list_rvn = selected_value.rvn_value > 0
+            selected_value = sum((x.value_sats() for x in coins), EvrmoreValue())
+            list_evr = selected_value.evr_value > 0
             selectable_assets = list(selected_value.assets.keys())
         else:
-            list_rvn, selectable_assets = self.wallet.get_non_frozen_assets()
+            list_evr, selectable_assets = self.wallet.get_non_frozen_assets()
 
-        new_send_options = ([util.decimal_point_to_base_unit_name(self.get_decimal_point())] if list_rvn else []) + \
+        new_send_options = ([util.decimal_point_to_base_unit_name(self.get_decimal_point())] if list_evr else []) + \
                             sorted(selectable_assets)
 
         if not new_send_options:
@@ -2113,7 +2113,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
             'electrum': electrum,
             'daemon': self.gui_object.daemon,
             'util': util,
-            'bitcoin': ravencoin,
+            'bitcoin': evrmore,
             'lnutil': lnutil,
         })
 
@@ -2137,8 +2137,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         console.updateNamespace(methods)
 
     def show_balance_dialog(self):
-        balance = sum(self.wallet.get_balances_for_piechart(), RavenValue())
-        if balance == RavenValue():
+        balance = sum(self.wallet.get_balances_for_piechart(), EvrmoreValue())
+        if balance == EvrmoreValue():
             return
         from .balance_dialog import BalanceDialog
         d = BalanceDialog(self, wallet=self.wallet)
@@ -2530,7 +2530,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
             self.logger.exception('')
             self.show_message(repr(e))
             return
-        xtype = ravencoin.deserialize_privkey(pk)[0]
+        xtype = evrmore.deserialize_privkey(pk)[0]
         d = WindowModalDialog(self, _("Private key"))
         d.setMinimumSize(600, 150)
         vbox = QVBoxLayout()
@@ -2554,8 +2554,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
     def do_sign(self, address, message, signature, password):
         address = address.text().strip()
         message = message.toPlainText().strip()
-        if not ravencoin.is_address(address):
-            self.show_message(_('Invalid Ravencoin address.'))
+        if not evrmore.is_address(address):
+            self.show_message(_('Invalid Evrmore address.'))
             return
         if self.wallet.is_watching_only():
             self.show_message(_('This is a watching-only wallet.'))
@@ -2582,8 +2582,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
     def do_verify(self, address, message, signature):
         address = address.text().strip()
         message = message.toPlainText().strip().encode('utf-8')
-        if not ravencoin.is_address(address):
-            self.show_message(_('Invalid Ravencoin address.'))
+        if not evrmore.is_address(address):
+            self.show_message(_('Invalid Evrmore address.'))
             return
         try:
             # This can throw on invalid base64
@@ -2966,8 +2966,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         d.setMinimumSize(600, 300)
         vbox = QVBoxLayout(d)
         hbox_top = QHBoxLayout()
-        hbox_top.addWidget(QLabel(_("RVN currently in your wallet will be used for the fee to sweep assets\n"
-                                    "if there is no RVN held in the private keys.\n"
+        hbox_top.addWidget(QLabel(_("EVR currently in your wallet will be used for the fee to sweep assets\n"
+                                    "if there is no EVR held in the private keys.\n"
                                     "Enter private keys:")))
         hbox_top.addWidget(InfoButton(WIF_HELP_TEXT), alignment=Qt.AlignRight)
         vbox.addLayout(hbox_top)
@@ -2992,7 +2992,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
 
         def get_address():
             addr = str(address_e.text()).strip()
-            if ravencoin.is_address(addr):
+            if evrmore.is_address(addr):
                 return addr
 
         def get_pk(*, raise_on_error=False):
@@ -3028,22 +3028,22 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
 
         def on_success(result):
             coins, keypairs, asset_outpoints_to_locking_scripts = result
-            total_held = sum([coin.value_sats() for coin in coins], RavenValue())
+            total_held = sum([coin.value_sats() for coin in coins], EvrmoreValue())
 
-            coins_rvn = [coin for coin in coins if coin.value_sats().rvn_value.value != 0]
+            coins_evr = [coin for coin in coins if coin.value_sats().evr_value.value != 0]
             coins_assets = [coin for coin in coins if coin.value_sats().assets]
 
             self.warn_if_watching_only()
 
-            # If there is not RVN in the privkeys, use our own
+            # If there is not EVR in the privkeys, use our own
                         
             outputs = []
             if total_held.assets:
                 outputs = [PartialTxOutput.from_address_and_value(addr, value='!', asset=asset) for asset in total_held.assets.keys()]
-            if total_held.rvn_value.value != 0:
+            if total_held.evr_value.value != 0:
                 outputs += [PartialTxOutput.from_address_and_value(addr, value='!')]
 
-            self.send_tab.pay_onchain_dialog(self.get_coins(), outputs, mandatory_inputs=coins_rvn + coins_assets, external_keypairs=keypairs, mixed=True,
+            self.send_tab.pay_onchain_dialog(self.get_coins(), outputs, mandatory_inputs=coins_evr + coins_assets, external_keypairs=keypairs, mixed=True,
                                         locking_script_overrides=asset_outpoints_to_locking_scripts)
 
         def on_failure(exc_info):
@@ -3191,7 +3191,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         self.logviewer.setAcceptRichText(False)
         self.logviewer.setReadOnly(True)
         self.logviewer.setPlainText(
-            _("Enable 'Write logs to file' in Preferences -> General and restart Electrum-Ravencoin to view logs here"))
+            _("Enable 'Write logs to file' in Preferences -> General and restart Electrum-Evrmore to view logs here"))
         layout.addWidget(self.logviewer, 1, 1)
         logfile = get_logfile_path()
         self.logtimer = QTimer(self)
@@ -3304,7 +3304,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         output_amount = QLabel('')
         grid.addWidget(QLabel(_('Output amount') + ':'), 2, 0)
         grid.addWidget(output_amount, 2, 1)
-        fee_e = RVNAmountEdit(self.get_decimal_point)
+        fee_e = EVRAmountEdit(self.get_decimal_point)
         combined_fee = QLabel('')
         combined_feerate = QLabel('')
 

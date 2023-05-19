@@ -95,7 +95,7 @@ $ hdiutil detach "/Volumes/Command Line Developer Tools"
 
 #### 2. Build Electrum
 
-    cd electrum-ravencoin
+    cd electrum-evrmore
     git submodule update --init
     ./contrib/osx/make_osx
 

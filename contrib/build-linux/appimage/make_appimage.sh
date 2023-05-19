@@ -19,7 +19,7 @@ PKG2APPIMAGE_COMMIT="a9c85b7e61a3a883f4a35c41c5decb5af88b6b5d"
 
 
 VERSION=`git describe --tags --dirty --always`
-APPIMAGE="$DISTDIR/electrum-ravencoin-$VERSION-x86_64.AppImage"
+APPIMAGE="$DISTDIR/electrum-evrmore-$VERSION-x86_64.AppImage"
 
 . "$CONTRIB"/build_tools_util.sh
 
@@ -121,11 +121,11 @@ info "installing electrum and its dependencies."
 "$python" -m pip install --no-build-isolation --no-dependencies --no-binary :all: --no-warn-script-location \
     --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements.txt"
 "$python" -m pip install --no-dependencies --no-binary :all: --no-warn-script-location \
-    --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-ravencoin.txt"
+    --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-evrmore.txt"
 "$python" -m pip install --no-build-isolation --no-dependencies --no-binary :all: --only-binary PyQt5,PyQt5-Qt5,cryptography --no-warn-script-location \
     --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-binaries.txt"
 "$python" -m pip install --no-binary :all: --no-warn-script-location \
-    --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-ravencoin-binaries.txt"
+    --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-evrmore-binaries.txt"
 "$python" -m pip install --no-build-isolation --no-dependencies --no-binary :all: --no-warn-script-location \
     --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-hw.txt"
 
@@ -141,8 +141,8 @@ cp "/usr/lib/x86_64-linux-gnu/libzbar.so.0" "$APPDIR/usr/lib/libzbar.so.0"
 
 
 info "desktop integration."
-cp "$PROJECT_ROOT/electrum-ravencoin.desktop" "$APPDIR/electrum-ravencoin.desktop"
-cp "$PROJECT_ROOT/electrum/gui/icons/electrum-ravencoin.png" "$APPDIR/electrum-ravencoin.png"
+cp "$PROJECT_ROOT/electrum-evrmore.desktop" "$APPDIR/electrum-evrmore.desktop"
+cp "$PROJECT_ROOT/electrum/gui/icons/electrum-evrmore.png" "$APPDIR/electrum-evrmore.png"
 
 
 # add launcher

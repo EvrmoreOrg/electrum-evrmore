@@ -24,7 +24,7 @@ from .logging import Logger
 
 DEFAULT_ENABLED = False
 DEFAULT_CURRENCY = "USD"
-DEFAULT_EXCHANGE = "CoinGecko"  # default exchange should ideally provide historical rates
+DEFAULT_EXCHANGE = "SafeTrade"  # default exchange should ideally provide historical rates
 
 # See https://en.wikipedia.org/wiki/ISO_4217
 CCY_PRECISIONS = {'BHD': 3, 'BIF': 0, 'BYR': 0, 'CLF': 4, 'CLP': 0,
@@ -165,47 +165,68 @@ class ExchangeBase(Logger):
         rates = await self.get_rates('')
         return sorted([str(a) for (a, b) in rates.items() if b is not None and len(a) == 3])
 
-class CoinGecko(ExchangeBase):
-    # Refer to https://www.coingecko.com/api/documentations/v3
+class SafeTrade(ExchangeBase):
+    # Refer to https://safe.trade/docs for API V2 info
 
     async def get_currencies(self):
-        values = await self.get_json('api.coingecko.com',
-                                     '/api/v3/exchange_rates')
-        return [name.upper() for name in values['rates'].keys()]
+        dicts = await self.get_json('safe.trade',
+                                    '/api/v2/peatio/public/markets')
+        return [d['name'][4:] for d in dicts if d['name'][:4] == 'EVR/']
 
     async def get_rates(self, ccy):
-        dicts = await self.get_json('api.coingecko.com',
-                                    '/api/v3/coins/ravencoin/market_chart?vs_currency=%s&days=1' % ccy)
-        return {ccy: to_decimal(dicts['prices'][-1][1])}
+        dicts = await self.get_json('safe.trade',
+                                    '/api/v2/peatio/public/markets/evr%s/tickers' % ccy.lower())
+        return {ccy: to_decimal(dicts['ticker']['last'])}
 
     def history_ccys(self):
         return CURRENCIES[self.name()]
 
     async def request_history(self, ccy):
-        dicts = await self.get_json('api.coingecko.com',
-                                    '/api/v3/coins/ravencoin/market_chart?vs_currency=%s&days=max' % ccy)
-        return dict([(datetime.utcfromtimestamp(d[0] / 1000).strftime('%Y-%m-%d'), to_decimal(d[1])) for d in dicts['prices']])
+        dicts = await self.get_json('safe.trade',
+                                    '/api/v2/peatio/public/markets/evr%s/kline?period=1440' % ccy.lower())
+        return dict([(datetime.utcfromtimestamp(d[0]).strftime('%Y-%m-%d'), to_decimal(d[4])) for d in dicts])
 
-class Bittrex(ExchangeBase):
-    # Refer to https://bittrex.github.io/api/v3
+#class CoinGecko(ExchangeBase):
+#    # Refer to https://www.coingecko.com/api/documentations/v3
+#
+#    async def get_currencies(self):
+#        values = await self.get_json('api.coingecko.com',
+#                                     '/api/v3/exchange_rates')
+#        return [name.upper() for name in values['rates'].keys()]
+#
+#    async def get_rates(self, ccy):
+#        dicts = await self.get_json('api.coingecko.com',
+#                                    '/api/v3/coins/ravencoin/market_chart?vs_currency=%s&days=1' % ccy)
+#        return {ccy: to_decimal(dicts['prices'][-1][1])}
+#
+#    def history_ccys(self):
+#        return CURRENCIES[self.name()]
+#
+#    async def request_history(self, ccy):
+#        dicts = await self.get_json('api.coingecko.com',
+#                                    '/api/v3/coins/ravencoin/market_chart?vs_currency=%s&days=max' % ccy)
+#        return dict([(datetime.utcfromtimestamp(d[0] / 1000).strftime('%Y-%m-%d'), to_decimal(d[1])) for d in dicts['prices']])
 
-    async def get_currencies(self):
-        dicts = await self.get_json('api.bittrex.com',
-                                    '/v3/markets')
-        return [d['symbol'][4:] for d in dicts if d['symbol'][:4] == 'RVN-']
-
-    async def get_rates(self, ccy):
-        dicts = await self.get_json('api.bittrex.com',
-                                    '/v3/markets/RVN-%s/ticker' % ccy)
-        return {ccy: to_decimal(dicts['lastTradeRate'])}
-
-    def history_ccys(self):
-        return CURRENCIES[self.name()]
-
-    async def request_history(self, ccy):
-        dicts = await self.get_json('api.bittrex.com',
-                                    'v3/markets/RVN-%s/candles/TRADE/DAY_1/recent' % ccy)
-        return dict([(d['startsAt'][:10], to_decimal(d['close'])) for d in dicts])
+#class Bittrex(ExchangeBase):
+#    # Refer to https://bittrex.github.io/api/v3
+#
+#    async def get_currencies(self):
+#        dicts = await self.get_json('api.bittrex.com',
+#                                    '/v3/markets')
+#        return [d['symbol'][4:] for d in dicts if d['symbol'][:4] == 'RVN-']
+#
+#    async def get_rates(self, ccy):
+#        dicts = await self.get_json('api.bittrex.com',
+#                                    '/v3/markets/RVN-%s/ticker' % ccy)
+#        return {ccy: to_decimal(dicts['lastTradeRate'])}
+#
+#    def history_ccys(self):
+#        return CURRENCIES[self.name()]
+#
+#    async def request_history(self, ccy):
+#        dicts = await self.get_json('api.bittrex.com',
+#                                    'v3/markets/RVN-%s/candles/TRADE/DAY_1/recent' % ccy)
+#        return dict([(d['startsAt'][:10], to_decimal(d['close'])) for d in dicts])
 
     # TODO: Add more exchange API's
 

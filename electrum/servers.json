@@ -1,17 +1,13 @@
 {
-  "rvn4lyfe.com": {
+  "electrum1-mainnet.evrmorecoin.org": {
     "pruning": "-",
     "s": "50002",
     "t": "50001",
     "version": "1.10"
   },
-  "rvn-dashboard.com": {
+  "electrum2-mainnet.evrmorecoin.org": {
     "pruning": "-",
     "s": "50002",
-    "version": "1.10"
-  },
-  "aq7vuqykup2voklcrpqljf6jnjkzrouowsjfrmybdou5kdhrpr6sjjid.onion": {
-    "pruning": "-",
     "t": "50001",
     "version": "1.10"
   }

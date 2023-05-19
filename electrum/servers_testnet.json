@@ -1,17 +1,14 @@
 {
-    "168.119.100.140": {
-        "pruning": "-",
-        "s": "50002",
-        "version": "1.9"
-    },
-    "electrum.ravencoin.foundation": {
-        "pruning": "-",
-        "s": "50012",
-        "version": "1.9"
-    },
-    "rvn4lyfe.com": {
-        "pruning": "-",
-        "s": "50003",
-        "version": "1.10"
-    }
+  "electrum1-testnet.evrmorecoin.org": {
+    "pruning": "-",
+    "s": "50002",
+    "t": "50001",
+    "version": "1.10"
+  },
+  "electrum2-testnet.evrmorecoin.org": {
+    "pruning": "-",
+    "s": "50002",
+    "t": "50001",
+    "version": "1.10"
+  }
 }

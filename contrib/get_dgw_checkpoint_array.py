@@ -39,7 +39,7 @@ def rpc(method, params):
     data_json = dumps(data)
     username = argv[1]
     password = argv[2]
-    port = 8766
+    port = 8819
     if len(argv) > 3:
         port = argv[3]
     url = "http://127.0.0.1:{}/".format(port)
@@ -54,7 +54,8 @@ def rpc(method, params):
     return loads(json_response)
 
 INTERVAL = 2016
-START = 168 * INTERVAL
+#START = 168 * INTERVAL
+START = 0 * INTERVAL
 
 curr_height = START
 

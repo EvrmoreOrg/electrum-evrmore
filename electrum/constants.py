@@ -109,19 +109,20 @@ class EvrmoreMainnet(AbstractNet):
     NET_NAME = "mainnet"
     TESTNET = False
     WIF_PREFIX = 128
-    ADDRTYPE_P2PKH = 60
-    ADDRTYPE_P2SH = 122
-    ADDRTYPE_P2SH_ALT = 122
-    MATURE = 60
+    ADDRTYPE_P2PKH = 133
+    ADDRTYPE_P2SH = 92
+    ADDRTYPE_P2SH_ALT = 92
+    MATURE = 100
     SEGWIT_HRP = ""
     BOLT11_HRP = SEGWIT_HRP
-    GENESIS = "0000006b444bc2f2ffe627be9d9e7e7a0730000870ef6eb6da46c8eae389df90"
+    GENESIS = "0000007b11d0481b2420a7c656ef76775d54ab5b29ee7ea250bc768535693b05"
     DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     DEFAULT_SERVERS = read_json('servers.json', {})
     CHECKPOINTS = read_json('checkpoints.json', [])
-    DGW_CHECKPOINTS = read_json('checkpoints_dgw.json', [])
+    DGW_CHECKPOINTS = read_json('checkpoints_dgw_mainnet.json', [])
     DGW_CHECKPOINTS_SPACING = 2016
-    DGW_CHECKPOINTS_START = 168 * DGW_CHECKPOINTS_SPACING  #338_688, DGW starts at 338_778
+    #DGW_CHECKPOINTS_START = 168 * DGW_CHECKPOINTS_SPACING  #338_688, DGW starts at 338_778
+    DGW_CHECKPOINTS_START = 0     #1, DGW starts at 0
 
     XPRV_HEADERS = {
         'standard': 0x0488ade4,  # xprv
@@ -154,16 +155,16 @@ class EvrmoreMainnet(AbstractNet):
     )
 
     BURN_ADDRESSES = BurnAddresses(
-        IssueAssetBurnAddress='RXissueAssetXXXXXXXXXXXXXXXXXhhZGt',
-        ReissueAssetBurnAddress='RXReissueAssetXXXXXXXXXXXXXXVEFAWu',
-        IssueSubAssetBurnAddress='RXissueSubAssetXXXXXXXXXXXXXWcwhwL',
-        IssueUniqueAssetBurnAddress='RXissueUniqueAssetXXXXXXXXXXWEAe58',
-        IssueMsgChannelAssetBurnAddress='RXissueMsgChanneLAssetXXXXXXSjHvAY',
-        IssueQualifierAssetBurnAddress='RXissueQuaLifierXXXXXXXXXXXXUgEDbC',
-        IssueSubQualifierAssetBurnAddress='RXissueSubQuaLifierXXXXXXXXXVTzvv5',
-        IssueRestrictedAssetBurnAddress='RXissueRestrictedXXXXXXXXXXXXzJZ1q',
-        AddNullQualifierTagBurnAddress='RXaddTagBurnXXXXXXXXXXXXXXXXZQm5ya',
-        GlobalBurnAddress='RXBurnXXXXXXXXXXXXXXXXXXXXXXWUo9FV'
+        IssueAssetBurnAddress="EXissueAssetXXXXXXXXXXXXXXXXYiYRBD",
+        ReissueAssetBurnAddress="EXReissueAssetXXXXXXXXXXXXXXY1ANQH",
+        IssueSubAssetBurnAddress="EXissueSubAssetXXXXXXXXXXXXXWW1ASo",
+        IssueUniqueAssetBurnAddress="EXissueUniqueAssetXXXXXXXXXXTZjZJ5",
+        IssueMsgChannelAssetBurnAddress="EXissueMsgChanneLAssetXXXXXXXD3mRa",
+        IssueQualifierAssetBurnAddress="EXissueQuaLifierXXXXXXXXXXXXW5Zxyf",
+        IssueSubQualifierAssetBurnAddress="EXissueSubQuaLifierXXXXXXXXXUgTjtu",
+        IssueRestrictedAssetBurnAddress="EXissueRestrictedXXXXXXXXXXXZZMynb",
+        AddNullQualifierTagBurnAddress="EXaddTagBurnXXXXXXXXXXXXXXXXb5HLXh",
+        GlobalBurnAddress="EXBurnXXXXXXXXXXXXXXXXXXXXXXZ8ZjfN",
     )
 
 
@@ -178,10 +179,10 @@ class EvrmoreTestnet(AbstractNet):
     ADDRTYPE_P2PKH = 111
     ADDRTYPE_P2SH = 196
     ADDRTYPE_P2SH_ALT = 196
-    MATURE = 60
+    MATURE = 100
     SEGWIT_HRP = ""
     BOLT11_HRP = SEGWIT_HRP
-    GENESIS = "000000ecfc5e6324a079542221d00e10362bdc894d56500c414060eea8a3ad5a"
+    GENESIS = "00000044bc03f8460e64bc07b080f4929b1cb96fda46b8bd806e57bfb9db82f4"
     DEFAULT_PORTS = {'t': '51001', 's': '51002'}
     DEFAULT_SERVERS = read_json('servers_testnet.json', {})
     CHECKPOINTS = []

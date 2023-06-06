@@ -37,16 +37,14 @@ from .simple_config import SimpleConfig
 from .logging import get_logger, Logger
 
 try:
-    import x16r_hash
-    import x16rv2_hash
     import kawpow
 except ImportError as e:
-    sys.exit("x16r, x16rv2 and kawpow modules are required")
+    sys.exit("the kawpow module is required")
 
 _logger = get_logger(__name__)
 
-MAX_TARGET = 0x00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-KAWPOW_LIMIT = 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff
+MAX_TARGET = 0x000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffff     # this is consensus.powLimit
+KAWPOW_LIMIT = 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff   # this is consensus.kawpowLimit
 
 POST_KAWPOW_HEADER_SIZE = 120  # bytes
 PRE_KAWPOW_HEADER_SIZE = 80
@@ -54,29 +52,25 @@ PRE_KAWPOW_HEADER_SIZE = 80
 DGW_PASTBLOCKS = 180
 
 if constants.net.TESTNET:
-    X16Rv2ActivationTS = 1567533600
-    KawpowActivationTS = 1585159200
-    KawpowActivationHeight = 231544
+    KawpowActivationTS = 2524629600         # the begin of the year 2050
+    KawpowActivationHeight = 14289094       # ((2524629600 - 1685566886)/60) + 304716
     nDGWActivationBlock = 1
 else:
-    X16Rv2ActivationTS = 1569945600
-    KawpowActivationTS = 1588788000
-    KawpowActivationHeight = 1219736
-    nDGWActivationBlock = 338778
+    KawpowActivationTS = 1667228619         # 1 sec before block 1
+    KawpowActivationHeight = 1
+    nDGWActivationBlock = 1
 
 
 def set_constants():
-    global X16Rv2ActivationTS, KawpowActivationTS, KawpowActivationHeight, nDGWActivationBlock
+    global KawpowActivationTS, KawpowActivationHeight, nDGWActivationBlock
     if constants.net.TESTNET:
-        X16Rv2ActivationTS = 1567533600
-        KawpowActivationTS = 1585159200
-        KawpowActivationHeight = 231544
+        KawpowActivationTS = 2524629600
+        KawpowActivationHeight = 14289094
         nDGWActivationBlock = 1
     else:
-        X16Rv2ActivationTS = 1569945600
-        KawpowActivationTS = 1588788000
-        KawpowActivationHeight = 1219736
-        nDGWActivationBlock = 338778
+        KawpowActivationTS = 1667228619
+        KawpowActivationHeight = 1
+        nDGWActivationBlock = 1
 
 
 class MissingHeader(Exception):
@@ -140,10 +134,6 @@ def hash_header(header: dict) -> str:
         header['prev_block_hash'] = '00' * 32
     if header['timestamp'] >= KawpowActivationTS:
         return hash_raw_header_kawpow(serialize_header(header))
-    elif header['timestamp'] >= X16Rv2ActivationTS:
-        hdr = serialize_header(header)[:80 * 2]
-        h = hash_raw_header_v2(hdr)
-        return h
     else:
         hdr = serialize_header(header)[:80 * 2]
         h = hash_raw_header(hdr)
@@ -151,14 +141,7 @@ def hash_header(header: dict) -> str:
 
 
 def hash_raw_header(header: str) -> str:
-    raw_hash = x16r_hash.getPoWHash(bfh(header)[:80])
-    hash_result = hash_encode(raw_hash)
-    return hash_result
-
-
-def hash_raw_header_v2(header: str) -> str:
-    raw_hash = x16rv2_hash.getPoWHash(bfh(header)[:80])
-    hash_result = hash_encode(raw_hash)
+    hash_result = hash_encode(sha256d(bfh(header)[:80]))
     return hash_result
 
 
@@ -411,10 +394,8 @@ class Blockchain(Logger):
             raise Exception("bits mismatch: %s vs %s" % (bits, header.get('bits')))
         if header['timestamp'] >= KawpowActivationTS:
             hash_func = kawpow_hash
-        elif header['timestamp'] >= X16Rv2ActivationTS:
-            hash_func = x16rv2_hash.getPoWHash
         else:
-            hash_func = x16r_hash.getPoWHash
+            hash_func = sha256d
         _powhash = rev_hex(bh2u(hash_func(bfh(serialize_header(header)))))
         if int('0x' + _powhash, 16) > target:
             raise Exception("insufficient proof of work: %s vs target %s" % (int('0x' + _powhash, 16), target))
@@ -718,8 +699,8 @@ class Blockchain(Logger):
             h, t = self.dgw_checkpoints[index][dgw_height_checkpoint]
             return t
         # There was a difficulty reset for kawpow
-        elif not constants.net.TESTNET and height in range(1219736, 1219736 + 180):  # kawpow reset
-            return KAWPOW_LIMIT
+        #elif not constants.net.TESTNET and height in range(1219736, 1219736 + 180):  # kawpow reset
+        #    return KAWPOW_LIMIT
         # If we have a DWG header already saved to our header cache (i.e. for a reorg), get that
         elif height <= self.height():
             return self.bits_to_target(self.read_header(height)['bits'])

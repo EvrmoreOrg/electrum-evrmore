@@ -10,8 +10,6 @@ recordclass
 certifi
 bitstring
 attrs>=19.2.0
-x16r_hash
-x16rv2_hash
 kawpow
 matplotlib
 

@@ -45,7 +45,6 @@ from .simple_config import SimpleConfig
 from .plugin import Plugins, HardwarePluginLibraryUnavailable
 from .logging import Logger
 from .plugins.hw_wallet.plugin import OutdatedHwFirmwareException, HW_PluginBase
-from .constants import net
 
 if TYPE_CHECKING:
     from .plugin import DeviceInfo, BasePlugin
@@ -147,11 +146,9 @@ class BaseWizard(Logger):
         wallet_kinds = [
             ('standard',  _("Standard wallet")),
             #('2fa', _("Wallet with two-factor authentication")),
-            #('multisig',  _("Multi-signature wallet (advanced)")),
+            ('multisig',  _("Multi-signature wallet (advanced)")),
             ('imported',  _("Import Evrmore addresses or private keys")),
         ]
-        if net.TESTNET:
-            wallet_kinds.insert(1, ('multisig',  _("Multi-signature wallet (advanced)")))
         choices = [pair for pair in wallet_kinds if pair[0] in wallet_types]
         self.choice_dialog(title=title, message=message, choices=choices, run_next=self.on_wallet_type)
 
@@ -425,7 +422,7 @@ class BaseWizard(Logger):
             choices = [
                 ('standard',   '(p2sh)',            normalize_bip32_derivation("m/45'/0")),
 
-                # Evrmore does not current support segwit
+                # Evrmore does not support segwit
 
                 #('p2wsh-p2sh', 'p2sh-segwit multisig (p2wsh-p2sh)', purpose48_derivation(0, xtype='p2wsh-p2sh')),
                 #('p2wsh',      'native segwit multisig (p2wsh)',    purpose48_derivation(0, xtype='p2wsh')),

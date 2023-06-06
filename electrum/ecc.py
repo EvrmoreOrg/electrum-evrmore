@@ -372,7 +372,7 @@ class ECPubkey(object):
         except:
             return False
 
-
+# These are the parameters of the elliptic curve used by Bitcoin as defined in Secp256k1
 GENERATOR = ECPubkey(bytes.fromhex('0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
                                    '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'))
 CURVE_ORDER = 0xFFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFE_BAAEDCE6_AF48A03B_BFD25E8C_D0364141
@@ -382,7 +382,7 @@ POINT_AT_INFINITY = ECPubkey(None)
 def msg_magic(message: bytes) -> bytes:
     from .evrmore import var_int
     length = bfh(var_int(len(message)))
-    return b"\x16Raven Signed Message:\n" + length + message
+    return b"\x18Evrmore Signed Message:\n" + length + message
 
 
 def verify_signature(pubkey: bytes, sig: bytes, h: bytes) -> bool:

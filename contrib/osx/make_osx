@@ -214,10 +214,6 @@ python3 -m pip install --no-build-isolation --no-dependencies --no-warn-script-l
     -Ir ./contrib/deterministic-build/requirements-binaries-mac.txt \
     || fail "Could not install dependencies specific to binaries"
 
-info "Installing dependencies specific to evrmore..."
-python3 -m pip install --no-dependencies --no-warn-script-location -Ir ./contrib/deterministic-build/requirements-evrmore.txt \
-    || fail "Could not install dependencies specific to evrmore"
-
 info "Installing dependencies specific to evrmore binaries..."
 # We don't want to ignore installed packages
 python3 -m pip install --no-warn-script-location -r ./contrib/deterministic-build/requirements-evrmore-binaries.txt \

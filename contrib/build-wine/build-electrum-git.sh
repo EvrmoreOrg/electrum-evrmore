@@ -45,7 +45,7 @@ $WINE_PYTHON -m pip install --no-build-isolation --no-dependencies --no-warn-scr
     --cache-dir "$WINE_PIP_CACHE_DIR" -r "$CONTRIB"/deterministic-build/requirements-hw.txt
 
 
-KAWPOW="kawpow-0.9.4.4-cp39-cp39-win32.whl"
+#KAWPOW="kawpow-0.9.4.4-cp39-cp39-win32.whl"
 
 download_if_not_exist "$CACHEDIR/$KAWPOW" "https://raw.githubusercontent.com/kralverde/electrum-ravencoin-wheels/master/$KAWPOW"
 verify_hash "$CACHEDIR/$KAWPOW" "33dd35bf4ab2c819dda33bc407c7632c424e3a2fa13b621cf68be793f7f17630"

@@ -1,7 +1,7 @@
 from electrum.ecc import msg_magic
 from electrum.crypto import sha256d
 
-import kawpow
+import evrhash
 
 #m = msg_magic('TESTING'.encode('ascii'))
 #print(m.hex())

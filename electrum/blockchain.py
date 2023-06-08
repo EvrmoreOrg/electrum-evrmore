@@ -37,9 +37,9 @@ from .simple_config import SimpleConfig
 from .logging import get_logger, Logger
 
 try:
-    import kawpow
+    import evrhash
 except ImportError as e:
-    sys.exit("the kawpow module is required")
+    sys.exit("the evrhash module is required")
 
 _logger = get_logger(__name__)
 
@@ -155,7 +155,7 @@ def kawpow_hash(hdr_bin):
     header_hash = revb(sha256d(hdr_bin[:80]))
     mix_hash = revb(hdr_bin[88:120])
     nNonce64 = struct.unpack("< Q", hdr_bin[80:88])[0]
-    final_hash = revb(kawpow.light_verify(header_hash, mix_hash, nNonce64))
+    final_hash = revb(evrhash.light_verify(header_hash, mix_hash, nNonce64))
     return final_hash
 
 

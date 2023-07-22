@@ -10,11 +10,8 @@ MAIN_SCRIPT='run_electrum'
 ICONS_FILE=PYPKG + '/gui/icons/electrum-evrmore.icns'
 
 
-for i, x in enumerate(sys.argv):
-    if x == '--name':
-        VERSION = sys.argv[i+1]
-        break
-else:
+VERSION = os.environ.get("ELECTRUM_VERSION")
+if not VERSION:
     raise Exception('no version')
 
 electrum = os.path.abspath(".") + "/"
@@ -48,9 +45,9 @@ datas += collect_data_files('ckcc')
 datas += collect_data_files('bitbox02')
 
 # Add libusb so Trezor and Safe-T mini will work
-binaries = [(electrum + "contrib/osx/libusb-1.0.dylib", ".")]
-binaries += [(electrum + "contrib/osx/libsecp256k1.0.dylib", ".")]
-binaries += [(electrum + "contrib/osx/libzbar.0.dylib", ".")]
+binaries = [(electrum + "electrum/libusb-1.0.dylib", ".")]
+binaries += [(electrum + "electrum/libsecp256k1.0.dylib", ".")]
+binaries += [(electrum + "electrum/libzbar.0.dylib", ".")]
 
 # Workaround for "Retro Look":
 binaries += [b for b in collect_dynamic_libs('PyQt5') if 'macstyle' in b[0]]
@@ -101,6 +98,7 @@ exe = EXE(
     upx=True,
     icon=electrum+ICONS_FILE,
     console=False,
+    target_arch='x86_64',  # TODO investigate building 'universal2'
 )
 
 app = BUNDLE(
@@ -114,6 +112,13 @@ app = BUNDLE(
     bundle_identifier=None,
     info_plist={
         'NSHighResolutionCapable': 'True',
-        'NSSupportsAutomaticGraphicsSwitching': 'True'
+        'NSSupportsAutomaticGraphicsSwitching': 'True',
+        'CFBundleURLTypes':
+            [{
+                'CFBundleURLName': 'bitcoin',
+                'CFBundleURLSchemes': ['bitcoin', 'lightning', ],
+            }],
+        'LSMinimumSystemVersion': '10.13.0',
+        'NSCameraUsageDescription': 'Electrum would like to access the camera to scan for QR codes',
     },
 )

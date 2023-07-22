@@ -10,7 +10,7 @@ recordclass
 certifi
 bitstring
 attrs>=19.2.0
-#kawpow
+evrhash
 matplotlib
 
 # Note that we also need the dnspython[DNSSEC] extra which pulls in cryptography,

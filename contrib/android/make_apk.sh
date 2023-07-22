@@ -15,7 +15,7 @@ LOCALE="$PROJECT_ROOT"/electrum/locale/
 export ELEC_APK_GUI=$1
 
 if [ ! -d "$PACKAGES" ]; then
-  "$CONTRIB"/make_packages || fail "make_packages failed"
+    "$CONTRIB"/make_packages.sh || fail "make_packages failed"
 fi
 
 pushd "$PROJECT_ROOT"
@@ -25,17 +25,10 @@ popd
 # update locale
 info "preparing electrum-locale."
 (
-    cd "$CONTRIB"/deterministic-build/electrum-locale
-    if ! which msgfmt > /dev/null 2>&1; then
-        fail "Please install gettext"
-    fi
+    LOCALE="$PROJECT_ROOT/electrum/locale/"
     # we want the binary to have only compiled (.mo) locale files; not source (.po) files
-    rm -rf "$PROJECT_ROOT/electrum/locale/"
-    for i in ./locale/*; do
-        dir="$PROJECT_ROOT/electrum/$i/LC_MESSAGES"
-        mkdir -p $dir
-        msgfmt --output-file="$dir/electrum.mo" "$i/electrum.po" || true
-    done
+    rm -rf "$LOCALE"
+    "$CONTRIB/build_locale.sh" "$CONTRIB/deterministic-build/electrum-locale/locale/" "$LOCALE"
 )
 
 pushd "$CONTRIB_ANDROID"
@@ -60,12 +53,14 @@ fi
 if [[ "$3" == "release" ]] ; then
     # do release build, and sign the APKs.
     TARGET="release"
-    echo -n Keystore Password:
-    read -s password
+    export P4A_RELEASE_KEYSTORE_PASSWD="$4"
+    export P4A_RELEASE_KEYALIAS_PASSWD="$4"
     export P4A_RELEASE_KEYSTORE=~/.keystore
-    export P4A_RELEASE_KEYSTORE_PASSWD=$password
-    export P4A_RELEASE_KEYALIAS_PASSWD=$password
     export P4A_RELEASE_KEYALIAS=electrum
+    if [ -z "$P4A_RELEASE_KEYSTORE_PASSWD" ] || [ -z "$P4A_RELEASE_KEYALIAS_PASSWD" ]; then
+        echo "p4a password not defined"
+        exit 1
+    fi
 elif [[ "$3" == "release-unsigned" ]] ; then
     # do release build, but do not sign the APKs.
     TARGET="release"

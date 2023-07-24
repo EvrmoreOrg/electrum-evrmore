@@ -163,8 +163,15 @@ info "installing electrum and its dependencies."
     --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements.txt"
 "$python" -m pip install --no-build-isolation --no-dependencies --no-binary :all: --only-binary PyQt5,PyQt5-Qt5,cryptography --no-warn-script-location \
     --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-binaries.txt"
-"$python" -m pip install --no-binary :all: --no-warn-script-location \
+
+# For evrhash, we are creating a local pypi since we haven't uploaded to pypi.org
+#"$python" -m pip install --no-binary :all: --no-warn-script-location \
+#    --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-evrmore-binaries.txt"
+info "the ENV value PROJECT_ROOT is: $PROJECT_ROOT"
+info "contents of local-pypi: "`ls /opt/electrum/local-pypi/`
+"$python" -m pip install --no-binary :all: --no-warn-script-location --index-url "file://$PROJECT_ROOT/local-pypi/" \
     --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-evrmore-binaries.txt"
+
 "$python" -m pip install --no-build-isolation --no-dependencies --no-binary :all: --no-warn-script-location \
     --cache-dir "$PIP_CACHE_DIR" -r "$CONTRIB/deterministic-build/requirements-hw.txt"
 

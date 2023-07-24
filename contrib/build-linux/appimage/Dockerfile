@@ -2,18 +2,19 @@
 # from https://docs.appimage.org/introduction/concepts.html :
 # "[AppImages] should be built on the oldest possible system, allowing them to run on newer system[s]"
 
-FROM debian:buster@sha256:e83854c9fb469daa7273d73c43a3fe5ae2da77cb40d3d34282a9af09a9db49f9
+#FROM debian:buster@sha256:e83854c9fb469daa7273d73c43a3fe5ae2da77cb40d3d34282a9af09a9db49f9
+FROM debian:buster
 
 ENV LC_ALL=C.UTF-8 LANG=C.UTF-8
 ENV DEBIAN_FRONTEND=noninteractive
 
 # need ca-certificates before using snapshot packages
-RUN apt update -qq > /dev/null && apt install -qq --yes --no-install-recommends \
-    ca-certificates
+#RUN apt update -qq > /dev/null && apt install -qq --yes --no-install-recommends \
+#    ca-certificates
 
 # pin the distro packages
-COPY apt.sources.list /etc/apt/sources.list
-COPY apt.preferences /etc/apt/preferences.d/snapshot
+#COPY apt.sources.list /etc/apt/sources.list
+#COPY apt.preferences /etc/apt/preferences.d/snapshot
 
 RUN apt-get update -q && \
     apt-get install -qy --allow-downgrades \

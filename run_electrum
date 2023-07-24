@@ -46,7 +46,7 @@ is_android = 'ANDROID_DATA' in os.environ
 is_appimage = 'APPIMAGE' in os.environ
 # is_local: unpacked tar.gz but not pip installed, or git clone
 is_local = (not is_pyinstaller and not is_android and not is_appimage
-            and os.path.exists(os.path.join(script_dir, "electrum.desktop")))
+            and os.path.exists(os.path.join(script_dir, "electrum-evrmore.desktop")))
 is_git_clone = is_local and os.path.exists(os.path.join(script_dir, ".git"))
 
 if is_git_clone:

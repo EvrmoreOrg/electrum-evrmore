@@ -1,12 +1,13 @@
-FROM debian:bullseye@sha256:bfe6615d017d1eebe19f349669de58cda36c668ef916e618be78071513c690e5
+#FROM debian:bullseye@sha256:bfe6615d017d1eebe19f349669de58cda36c668ef916e618be78071513c690e5
+FROM debian:bullseye
 
 # need ca-certificates before using snapshot packages
-RUN apt update -qq > /dev/null && apt install -qq --yes --no-install-recommends \
-    ca-certificates
+#RUN apt update -qq > /dev/null && apt install -qq --yes --no-install-recommends \
+#    ca-certificates
 
 # pin the distro packages.
-COPY apt.sources.list /etc/apt/sources.list
-COPY apt.preferences /etc/apt/preferences.d/snapshot
+#COPY apt.sources.list /etc/apt/sources.list
+#COPY apt.preferences /etc/apt/preferences.d/snapshot
 
 ENV LC_ALL=C.UTF-8 LANG=C.UTF-8
 ENV DEBIAN_FRONTEND=noninteractive

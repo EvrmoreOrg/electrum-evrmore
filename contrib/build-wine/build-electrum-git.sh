@@ -34,8 +34,12 @@ export MULTIDICT_NO_EXTENSIONS=1
 export FROZENLIST_NO_EXTENSIONS=1
 
 info "Installing requirements..."
-$WINE_PYTHON -m pip install --no-build-isolation --no-dependencies --no-binary :all: --no-warn-script-location \
+#$WINE_PYTHON -m pip install --no-build-isolation --no-dependencies --no-binary :all: --no-warn-script-location \
+#    --cache-dir "$WINE_PIP_CACHE_DIR" -r "$CONTRIB"/deterministic-build/requirements.txt
+# wine has trouble compiling recordclass
+$WINE_PYTHON -m pip install --no-build-isolation --no-dependencies --no-binary :all: --only-binary recordclass --no-warn-script-location \
     --cache-dir "$WINE_PIP_CACHE_DIR" -r "$CONTRIB"/deterministic-build/requirements.txt
+
 info "Installing dependencies specific to binaries..."
 # TODO use "--no-binary :all:" (but we don't have a C compiler...)
 $WINE_PYTHON -m pip install --no-build-isolation --no-dependencies --no-warn-script-location \
@@ -45,14 +49,15 @@ info "Installing hardware wallet requirements..."
 $WINE_PYTHON -m pip install --no-build-isolation --no-dependencies --no-warn-script-location \
     --cache-dir "$WINE_PIP_CACHE_DIR" -r "$CONTRIB"/deterministic-build/requirements-hw.txt
 
+#KAWPOW="kawpow-0.9.4.4-cp39-cp39-win32.whl"
+#download_if_not_exist "$CACHEDIR/$KAWPOW" "https://raw.githubusercontent.com/kralverde/electrum-ravencoin-wheels/master/$KAWPOWW"
+#verify_hash "$CACHEDIR/$KAWPOW" "33dd35bf4ab2c819dda33bc407c7632c424e3a2fa13b621cf68be793f7f17630"
+#$WINE_PYTHON -m pip install --cache-dir "$WINE_PIP_CACHE_DIR" "$CACHEDIR/$EVRHASH"
 
-EVRHASH="kawpow-0.9.4.4-cp39-cp39-win32.whl"
-
-download_if_not_exist "$CACHEDIR/$KAWPOW" "https://raw.githubusercontent.com/kralverde/electrum-ravencoin-wheels/master/$KAWPOWW"
-verify_hash "$CACHEDIR/$KAWPOW" "33dd35bf4ab2c819dda33bc407c7632c424e3a2fa13b621cf68be793f7f17630"
-
-$WINE_PYTHON -m pip install --cache-dir "$WINE_PIP_CACHE_DIR" "$CACHEDIR/$EVRHASH"
-
+info "Installing the evrhash wheel..."
+EVRHASH="evrhash-0.5.1a1-cp39-cp39-win32.whl"
+$WINE_PYTHON -m pip install --no-build-isolation --no-dependencies --no-warn-script-location \
+    --cache-dir "$WINE_PIP_CACHE_DIR" "$CONTRIB/build-wine/wheel/$EVRHASH"
 
 pushd $WINEPREFIX/drive_c/electrum
 # see https://github.com/pypa/pip/issues/2195 -- pip makes a copy of the entire directory
@@ -65,7 +70,8 @@ rm -rf dist/
 
 # build standalone and portable versions
 info "Running pyinstaller..."
-ELECTRUM_CMDLINE_NAME="$NAME_ROOT-$VERSION" wine "$WINE_PYHOME/scripts/pyinstaller.exe" --noconfirm --ascii --clean -w deterministic.spec
+#ELECTRUM_CMDLINE_NAME="$NAME_ROOT-$VERSION" wine "$WINE_PYHOME/scripts/pyinstaller.exe" --noconfirm --ascii --clean -w deterministic.spec
+wine "$WINE_PYHOME/scripts/pyinstaller.exe" --noconfirm --ascii --clean --name $NAME_ROOT-$VERSION -w deterministic.spec
 
 # set timestamps in dist, in order to make the installer reproducible
 pushd dist

@@ -44,32 +44,32 @@ except ImportError as e:
 _logger = get_logger(__name__)
 
 MAX_TARGET = 0x000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffff     # this is consensus.powLimit
-KAWPOW_LIMIT = 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff   # this is consensus.kawpowLimit
+EVRHASH_LIMIT = 0x0000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff   # this is consensus.evrhashLimit
 
-POST_KAWPOW_HEADER_SIZE = 120  # bytes
-PRE_KAWPOW_HEADER_SIZE = 80
+POST_EVRHASH_HEADER_SIZE = 120  # bytes
+PRE_EVRHASH_HEADER_SIZE = 80
 
 DGW_PASTBLOCKS = 180
 
 if constants.net.TESTNET:
-    KawpowActivationTS = 2524629600         # the begin of the year 2050
-    KawpowActivationHeight = 14289094       # ((2524629600 - 1685566886)/60) + 304716
+    EvrhashActivationTS = 2524629600         # the begin of the year 2050
+    EvrhashActivationHeight = 14289094       # ((2524629600 - 1685566886)/60) + 304716
     nDGWActivationBlock = 1
 else:
-    KawpowActivationTS = 1667228619         # 1 sec before block 1
-    KawpowActivationHeight = 1
+    EvrhashActivationTS = 1667228619         # 1 sec before block 1
+    EvrhashActivationHeight = 1
     nDGWActivationBlock = 1
 
 
 def set_constants():
-    global KawpowActivationTS, KawpowActivationHeight, nDGWActivationBlock
+    global EvrhashActivationTS, EvrhashActivationHeight, nDGWActivationBlock
     if constants.net.TESTNET:
-        KawpowActivationTS = 2524629600
-        KawpowActivationHeight = 14289094
+        EvrhashActivationTS = 2524629600
+        EvrhashActivationHeight = 14289094
         nDGWActivationBlock = 1
     else:
-        KawpowActivationTS = 1667228619
-        KawpowActivationHeight = 1
+        EvrhashActivationTS = 1667228619
+        EvrhashActivationHeight = 1
         nDGWActivationBlock = 1
 
 
@@ -83,7 +83,7 @@ class InvalidHeader(Exception):
 
 def serialize_header(header_dict: dict) -> str:
     ts = header_dict['timestamp']
-    if ts >= KawpowActivationTS:
+    if ts >= EvrhashActivationTS:
         s = int_to_hex(header_dict['version'], 4) \
             + rev_hex(header_dict['prev_block_hash']) \
             + rev_hex(header_dict['merkle_root']) \
@@ -99,14 +99,14 @@ def serialize_header(header_dict: dict) -> str:
             + int_to_hex(int(header_dict['timestamp']), 4) \
             + int_to_hex(int(header_dict['bits']), 4) \
             + int_to_hex(int(header_dict['nonce']), 4)
-        s = s.ljust(POST_KAWPOW_HEADER_SIZE * 2, '0')  # pad with zeros to post kawpow header size
+        s = s.ljust(POST_EVRHASH_HEADER_SIZE * 2, '0')  # pad with zeros to post evrhash header size
     return s
 
 
 def deserialize_header(s: bytes, height: int) -> dict:
     if not s:
         raise InvalidHeader('Invalid header: {}'.format(s))
-    if len(s) not in (POST_KAWPOW_HEADER_SIZE, PRE_KAWPOW_HEADER_SIZE):
+    if len(s) not in (POST_EVRHASH_HEADER_SIZE, PRE_EVRHASH_HEADER_SIZE):
         raise InvalidHeader('Invalid header length: {}'.format(len(s)))
 
     def hex_to_int(hex):
@@ -117,7 +117,7 @@ def deserialize_header(s: bytes, height: int) -> dict:
          'merkle_root': hash_encode(s[36:68]),
          'timestamp': int(hash_encode(s[68:72]), 16),
          'bits': int(hash_encode(s[72:76]), 16)}
-    if h['timestamp'] >= KawpowActivationTS:
+    if h['timestamp'] >= EvrhashActivationTS:
         h['nheight'] = int(hash_encode(s[76:80]), 16)
         h['nonce'] = int(hash_encode(s[80:88]), 16)
         h['mix_hash'] = hash_encode(s[88:120])
@@ -132,8 +132,8 @@ def hash_header(header: dict) -> str:
         return '0' * 64
     if header.get('prev_block_hash') is None:
         header['prev_block_hash'] = '00' * 32
-    if header['timestamp'] >= KawpowActivationTS:
-        return hash_raw_header_kawpow(serialize_header(header))
+    if header['timestamp'] >= EvrhashActivationTS:
+        return hash_raw_header_evrhash(serialize_header(header))
     else:
         hdr = serialize_header(header)[:80 * 2]
         h = hash_raw_header(hdr)
@@ -151,7 +151,7 @@ def revb(data):
     return bytes(b)
 
 
-def kawpow_hash(hdr_bin):
+def evrhash_hash(hdr_bin):
     header_hash = revb(sha256d(hdr_bin[:80]))
     mix_hash = revb(hdr_bin[88:120])
     nNonce64 = struct.unpack("< Q", hdr_bin[80:88])[0]
@@ -159,8 +159,8 @@ def kawpow_hash(hdr_bin):
     return final_hash
 
 
-def hash_raw_header_kawpow(header: str) -> str:
-    final_hash = hash_encode(kawpow_hash(bfh(header)))
+def hash_raw_header_evrhash(header: str) -> str:
+    final_hash = hash_encode(evrhash_hash(bfh(header)))
     return final_hash
 
 
@@ -249,7 +249,7 @@ def init_headers_file_for_best_chain():
     filename = b.path()
     # We want to start with one less than the checkpoint so we have headers to calculate the new
     # Chainwork from
-    length = POST_KAWPOW_HEADER_SIZE * constants.net.max_dgw_checkpoint()
+    length = POST_EVRHASH_HEADER_SIZE * constants.net.max_dgw_checkpoint()
     if not os.path.exists(filename) or os.path.getsize(filename) < length:
         with open(filename, 'wb') as f:
             if length > 0:
@@ -378,7 +378,7 @@ class Blockchain(Logger):
     @with_lock
     def update_size(self) -> None:
         p = self.path()
-        self._size = os.path.getsize(p) // POST_KAWPOW_HEADER_SIZE if os.path.exists(p) else 0
+        self._size = os.path.getsize(p) // POST_EVRHASH_HEADER_SIZE if os.path.exists(p) else 0
 
     @classmethod
     def verify_header(cls, header: dict, prev_hash: str, target: int, expected_header_hash: str = None) -> None:
@@ -392,8 +392,8 @@ class Blockchain(Logger):
         bits = cls.target_to_bits(target)
         if bits != header.get('bits'):
             raise Exception("bits mismatch: %s vs %s" % (bits, header.get('bits')))
-        if header['timestamp'] >= KawpowActivationTS:
-            hash_func = kawpow_hash
+        if header['timestamp'] >= EvrhashActivationTS:
+            hash_func = evrhash_hash
         else:
             hash_func = sha256d
         _powhash = rev_hex(bh2u(hash_func(bfh(serialize_header(header)))))
@@ -407,17 +407,17 @@ class Blockchain(Logger):
         prev_hash = self.get_hash(start_height - 1)
         headers = {}
         while p < len(data):
-            if s < KawpowActivationHeight:
-                raw = data[p:p + PRE_KAWPOW_HEADER_SIZE]
-                p += PRE_KAWPOW_HEADER_SIZE
+            if s < EvrhashActivationHeight:
+                raw = data[p:p + PRE_EVRHASH_HEADER_SIZE]
+                p += PRE_EVRHASH_HEADER_SIZE
             else:
-                raw = data[p:p + POST_KAWPOW_HEADER_SIZE]
-                p += POST_KAWPOW_HEADER_SIZE
+                raw = data[p:p + POST_EVRHASH_HEADER_SIZE]
+                p += POST_EVRHASH_HEADER_SIZE
             try:
                 expected_header_hash = self.get_hash(s)
             except MissingHeader:
                 expected_header_hash = None
-            if len(raw) not in (POST_KAWPOW_HEADER_SIZE, PRE_KAWPOW_HEADER_SIZE):
+            if len(raw) not in (POST_EVRHASH_HEADER_SIZE, PRE_EVRHASH_HEADER_SIZE):
                 raise Exception('Invalid header length: {}'.format(len(raw)))
             header = deserialize_header(raw, s)
             headers[header.get('block_height')] = header
@@ -467,7 +467,7 @@ class Blockchain(Logger):
             return
 
         delta_height = (start_height - self.forkpoint)
-        delta_bytes = delta_height * POST_KAWPOW_HEADER_SIZE
+        delta_bytes = delta_height * POST_EVRHASH_HEADER_SIZE
         # if this chunk contains our forkpoint, only save the part after forkpoint
         # (the part before is the responsibility of the parent)
         if delta_bytes < 0:
@@ -475,23 +475,23 @@ class Blockchain(Logger):
             delta_bytes = 0
         truncate = not chunk_within_checkpoint_region
 
-        def convert_to_kawpow_len():
+        def convert_to_evrhash_len():
             r = b''
             p = 0
             s = start_height
             while p < len(chunk):
-                if s < KawpowActivationHeight:
-                    r += chunk[p:p + PRE_KAWPOW_HEADER_SIZE] + bytes(40)
-                    p += PRE_KAWPOW_HEADER_SIZE
+                if s < EvrhashActivationHeight:
+                    r += chunk[p:p + PRE_EVRHASH_HEADER_SIZE] + bytes(40)
+                    p += PRE_EVRHASH_HEADER_SIZE
                 else:
-                    r += chunk[p:p + POST_KAWPOW_HEADER_SIZE]
-                    p += POST_KAWPOW_HEADER_SIZE
+                    r += chunk[p:p + POST_EVRHASH_HEADER_SIZE]
+                    p += POST_EVRHASH_HEADER_SIZE
                 s += 1
-            if len(r) % POST_KAWPOW_HEADER_SIZE != 0:
+            if len(r) % POST_EVRHASH_HEADER_SIZE != 0:
                 raise Exception('Header extension error')
             return r
 
-        chunk = convert_to_kawpow_len()
+        chunk = convert_to_evrhash_len()
         self.write(chunk, delta_bytes, truncate)
         assert self.read_header(start_height) == deserialize_header(chunk[:120], start_height)
         self.swap_with_parent()
@@ -539,15 +539,15 @@ class Blockchain(Logger):
         assert forkpoint > parent.forkpoint, (f"forkpoint of parent chain ({parent.forkpoint}) "
                                               f"should be at lower height than children's ({forkpoint})")
         with open(parent.path(), 'rb') as f:
-            f.seek((forkpoint - parent.forkpoint) * POST_KAWPOW_HEADER_SIZE)
-            parent_data = f.read(parent_branch_size * POST_KAWPOW_HEADER_SIZE)
+            f.seek((forkpoint - parent.forkpoint) * POST_EVRHASH_HEADER_SIZE)
+            parent_data = f.read(parent_branch_size * POST_EVRHASH_HEADER_SIZE)
         self.write(parent_data, 0)
-        parent.write(my_data, (forkpoint - parent.forkpoint) * POST_KAWPOW_HEADER_SIZE)
+        parent.write(my_data, (forkpoint - parent.forkpoint) * POST_EVRHASH_HEADER_SIZE)
         # swap parameters
         self.parent, parent.parent = parent.parent, self
         self.forkpoint, parent.forkpoint = parent.forkpoint, self.forkpoint
         self._forkpoint_hash, parent._forkpoint_hash = parent._forkpoint_hash, hash_raw_header(
-            bh2u(parent_data[:POST_KAWPOW_HEADER_SIZE]))
+            bh2u(parent_data[:POST_EVRHASH_HEADER_SIZE]))
         self._prev_hash, parent._prev_hash = parent._prev_hash, self._prev_hash
         # parent's new name
         os.replace(child_old_name, parent.path())
@@ -576,7 +576,7 @@ class Blockchain(Logger):
         filename = self.path()
         self.assert_headers_file_available(filename)
         with open(filename, 'rb+') as f:
-            if truncate and offset != self._size * POST_KAWPOW_HEADER_SIZE:
+            if truncate and offset != self._size * POST_EVRHASH_HEADER_SIZE:
                 f.seek(offset)
                 f.truncate()
             f.seek(offset)
@@ -591,8 +591,8 @@ class Blockchain(Logger):
         data = bfh(serialize_header(header))
         # headers are only _appended_ to the end:
         assert delta == self.size(), (delta, self.size())
-        assert len(data) == POST_KAWPOW_HEADER_SIZE
-        self.write(data, delta * POST_KAWPOW_HEADER_SIZE)
+        assert len(data) == POST_EVRHASH_HEADER_SIZE
+        self.write(data, delta * POST_EVRHASH_HEADER_SIZE)
         self.swap_with_parent()
 
     @with_lock
@@ -607,11 +607,11 @@ class Blockchain(Logger):
         name = self.path()
         self.assert_headers_file_available(name)
         with open(name, 'rb') as f:
-            f.seek(delta * POST_KAWPOW_HEADER_SIZE)
-            h = f.read(POST_KAWPOW_HEADER_SIZE)
-            if len(h) < POST_KAWPOW_HEADER_SIZE:
+            f.seek(delta * POST_EVRHASH_HEADER_SIZE)
+            h = f.read(POST_EVRHASH_HEADER_SIZE)
+            if len(h) < POST_EVRHASH_HEADER_SIZE:
                 raise Exception('Expected to read a full header. This was only {} bytes'.format(len(h)))
-        if h == bytes([0]) * POST_KAWPOW_HEADER_SIZE:
+        if h == bytes([0]) * POST_EVRHASH_HEADER_SIZE:
             return None
         return deserialize_header(h, height)
 
@@ -698,9 +698,9 @@ class Blockchain(Logger):
             index = height // constants.net.DGW_CHECKPOINTS_SPACING - constants.net.DGW_CHECKPOINTS_START // constants.net.DGW_CHECKPOINTS_SPACING
             h, t = self.dgw_checkpoints[index][dgw_height_checkpoint]
             return t
-        # There was a difficulty reset for kawpow
-        #elif not constants.net.TESTNET and height in range(1219736, 1219736 + 180):  # kawpow reset
-        #    return KAWPOW_LIMIT
+        # There was a difficulty reset for evrhash
+        #elif not constants.net.TESTNET and height in range(1219736, 1219736 + 180):  # evrhash reset
+        #    return EVRHASH_LIMIT
         # If we have a DWG header already saved to our header cache (i.e. for a reorg), get that
         elif height <= self.height():
             return self.bits_to_target(self.read_header(height)['bits'])

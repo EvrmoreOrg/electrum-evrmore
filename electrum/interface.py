@@ -52,7 +52,7 @@ from . import x509
 from . import pem
 from . import version
 from . import blockchain
-from .blockchain import Blockchain, PRE_KAWPOW_HEADER_SIZE, POST_KAWPOW_HEADER_SIZE
+from .blockchain import Blockchain, PRE_EVRHASH_HEADER_SIZE, POST_EVRHASH_HEADER_SIZE
 from . import evrmore
 from . import constants
 from .i18n import _
@@ -652,8 +652,8 @@ class Interface(Logger):
         assert_non_negative_integer(res['count'])
         assert_non_negative_integer(res['max'])
         assert_hex_str(res['hex'])
-        if POST_KAWPOW_HEADER_SIZE * 2 * res['count'] < len(res['hex']) \
-                or len(res['hex']) < PRE_KAWPOW_HEADER_SIZE * 2 * res['count']:
+        if POST_EVRHASH_HEADER_SIZE * 2 * res['count'] < len(res['hex']) \
+                or len(res['hex']) < PRE_EVRHASH_HEADER_SIZE * 2 * res['count']:
             raise RequestCorrupted('inconsistent chunk hex and count')
         # we never request more than 2016 headers, but we enforce those fit in a single response
         if res['max'] < 2016:

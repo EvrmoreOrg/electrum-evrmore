@@ -1,3 +1,31 @@
+
+
+# Electrum-Evrmore v0.5.2 - the 1st Evrmore port of Electrum
+
+  This is the first version of Electrum for Evrmore.
+  It supports EVR and Evrmore assets.
+
+  Binaries are being released for Linux (AppImage) and for
+  Windows (exe, portable exe, and an installer). And of course
+  the source code. Mac/iOs and Android are not supported.
+  Only Qt display interface is supported.
+
+  Hardware wallets are not yet supported (but should not be
+  difficult to get working).
+
+  Note that the electrumX servers understand the December-2022
+  forkdrop expiration, so if you had EVR from the forkdrop which
+  you did not claim, they will NOT be show in the Electrum
+  balance since they are unspendable (worthless).
+
+  I hope you enjoy this release and find it useful. But as with most
+  software of this type, please remember that it is alpha-stage 
+  software which is largely untested and likely to contain bugs. 
+  So use it carefully and take precautions against loss of tokens. 
+  Use at your own risk. All liability is waived.
+
+# ==== Below refer to electrum-bitcoin or electrum-ravencoin =======
+
 # Release 4.3.0 - (not released yet)
 
   This version introduces a set of UX modifications, that aim at

@@ -109,7 +109,7 @@ class EvrmoreMainnet(AbstractNet):
     NET_NAME = "mainnet"
     TESTNET = False
     WIF_PREFIX = 128
-    ADDRTYPE_P2PKH = 133
+    ADDRTYPE_P2PKH = 33
     ADDRTYPE_P2SH = 92
     ADDRTYPE_P2SH_ALT = 92
     MATURE = 100

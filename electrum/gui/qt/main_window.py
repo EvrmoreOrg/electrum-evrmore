@@ -80,6 +80,7 @@ from .asset_workspace import AssetCreateWorkspace, AssetReissueWorkspace
 
 from .exception_window import Exception_Hook
 from .amountedit import EVRAmountEdit
+from .messages_list import UpdateDevMessagesThread
 from .qrcodewidget import QRDialog
 from .qrtextedit import ShowQRTextEdit, ScanQRTextEdit, ScanShowQRTextEdit
 from .transaction_dialog import show_transaction
@@ -224,7 +225,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         self.assets_tab = self.create_assets_tab()
         self.console_tab = self.create_console_tab()
         self.contacts_tab = self.create_contacts_tab()
-        # self.messages_tab = self.create_messages_tab()
+        self.messages_tab = self.create_messages_tab()
         # self.swap_tab = self.create_swap_tab()
         # self.channels_tab = self.create_channels_tab()
 
@@ -249,7 +250,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
             if self.config.get('show_{}_tab'.format(name), default):
                 tabs.addTab(tab, icon, description.replace("&", ""))
 
-        #add_optional_tab(tabs, self.messages_tab, read_QIcon("tab_message.png"), _("Messages"), "messages")
+        add_optional_tab(tabs, self.messages_tab, read_QIcon("tab_message.png"), _("DevMsgs"), "messages", True)
         add_optional_tab(tabs, self.addresses_tab, read_QIcon("tab_addresses.png"), _("&Addresses"), "addresses")
         # add_optional_tab(tabs, self.channels_tab, read_QIcon("lightning.png"), _("Channels"), "channels")
         add_optional_tab(tabs, self.utxo_tab, read_QIcon("tab_coins.png"), _("Co&ins"), "utxo")
@@ -329,10 +330,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
             self._update_check_thread.checked.connect(on_version_received)
             self._update_check_thread.start()
 
-            #self._dev_notification_thread = None
-            #if config.get('get_dev_notifications', True):
-            #    self._dev_notification_thread = UpdateDevMessagesThread(self)
-            #    self._dev_notification_thread.start()
+        self._dev_notification_thread = None
+        if config.get('get_dev_notifications', True):
+            self._dev_notification_thread = UpdateDevMessagesThread(self)
+            self._dev_notification_thread.start()
 
     def run_coroutine_from_thread(self, coro, name, on_result=None):
         if self._cleaned_up:
@@ -790,7 +791,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
             tab.menu_action = view_menu.addAction(item_name, lambda: self.toggle_tab(tab))
 
         view_menu = menubar.addMenu(_("&View"))
-        # add_toggle_action(view_menu, self.messages_tab)
+        add_toggle_action(view_menu, self.messages_tab, True)
         add_toggle_action(view_menu, self.addresses_tab)
         add_toggle_action(view_menu, self.utxo_tab)
         # add_toggle_action(view_menu, self.channels_tab)
@@ -1488,6 +1489,13 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger, QtEventListener):
         tabwidget.addTab(w5, _("My Swaps"))
         return tabwidget
     '''
+
+    def create_messages_tab(self):
+        from .messages_list import MessageList
+        self.message_list = l = MessageList(self)
+        tab = self.create_list_tab(l)
+        return tab
+
     def create_assets_tab(self):
 
         from .asset_view import AssetView

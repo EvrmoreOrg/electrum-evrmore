@@ -21,7 +21,8 @@ from electrum._vendor.distutils.version import StrictVersion
 
 
 VERSION_ANNOUNCEMENT_SIGNING_KEYS = (
-        "RPuQNvDVBC5Q4fXKyfYLjrunbyqiEYckP5",  # kralverde since ravencoin fork
+        "EXn7nzAi1KZjyxkzKLYjeUZYcMtF1zCp53",   # kralverde "RPuQNvDVBC5Q4fXKyfYLjrunbyqiEYckP5" translated to EVR address
+        "EaBGnWtDiAseYZiyvNT1u3WTjAeYtAR7MV"    # Hans_Schmidt address
     )
 
 

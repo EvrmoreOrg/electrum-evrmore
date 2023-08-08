@@ -117,7 +117,7 @@ class MessageList(MyTreeView):
         self.proxy.setSourceModel(self.std_model)
         self.setModel(self.proxy)
         self.update()
-        self.sortByColumn(self.Columns.HEIGHT, Qt.AscendingOrder)
+        self.sortByColumn(self.Columns.HEIGHT, Qt.DescendingOrder)
         self.messages = {}
 
     def webopen_safe(self, url):

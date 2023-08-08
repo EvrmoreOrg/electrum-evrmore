@@ -729,7 +729,7 @@ class SettingsDialog(QDialog, QtEventListener):
             #(invoices_widgets, _('Invoices')),
             #(lightning_widgets, _('Lightning')),
             (fiat_widgets, _('Fiat')),
-            #(message_widgets, _('Messages')),
+            (message_widgets, _('Messages')),
             #(oa_widgets, _('OpenAlias')),
             (misc_widgets, _('Misc')),
         ]

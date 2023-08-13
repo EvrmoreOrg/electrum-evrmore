@@ -263,7 +263,7 @@ class AssetCreateWorkspace(QWidget):
 
         top_layout = QHBoxLayout()
         top_layout.addLayout(self.create_options_layout.layout())
-        top_layout.addWidget(HelpButton("https://ravencoin.org/assets/"))
+        top_layout.addWidget(HelpButton("https://hans-schmidt.github.io/mastering_evrmore/current_tech_docs/evrmore_overview_of_assets.html"))
 
         widgetA = QWidget()
         widgetA.setLayout(top_layout)
@@ -807,7 +807,7 @@ class AssetReissueWorkspace(QWidget):
 
         top_layout = QHBoxLayout()
         top_layout.addWidget(self.aval_owner_combo)
-        top_layout.addWidget(HelpButton("https://ravencoin.org/assets/"))
+        top_layout.addWidget(HelpButton("https://hans-schmidt.github.io/mastering_evrmore/current_tech_docs/evrmore_overview_of_assets.html"))
         widgetA = QWidget()
         widgetA.setLayout(top_layout)
         widgetC = QWidget()

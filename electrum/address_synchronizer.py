@@ -129,7 +129,7 @@ class AddressSynchronizer(Logger, EventListener):
         return self.db.get_messages()
 
     def add_message(self, height, message_data):
-        self.db.add_message(height, message_data)
+        self.db.add_message(int(height), message_data)  # the int() is probably redundant
 
     def get_address_history(self, addr: str) -> Sequence[Tuple[str, int]]:
         """Returns the history for the address, in the format that would be returned by a server.

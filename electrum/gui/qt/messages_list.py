@@ -88,7 +88,8 @@ class UpdateDevMessagesThread(QThread, Logger):
         except Exception as e:
             self.logger.info(f"got exception: '{repr(e)}'")
         else:
-            self.parent.wallet.add_message(int(update_info[0]), ('DEVELOPER\nANNOUNCEMENT', update_info[1], None))
+            self.parent.wallet.db.add_message(int(update_info[0]), ('DEVELOPER\nANNOUNCEMENT', update_info[1], None))
+            # needed to add "db" since Abstract_Wallet no longer inherits methods from AddressSynchronizer
 
 
 class MessageList(MyTreeView):
@@ -171,7 +172,8 @@ class MessageList(MyTreeView):
     def update(self):
         if self.maybe_defer_update():
             return
-        self.messages = self.wallet.get_messages()
+        self.messages = self.wallet.db.get_messages()
+        # needed to add "db" since Abstract_Wallet no longer inherits methods from AddressSynchronizer
         self.proxy.setDynamicSortFilter(False)  # temp. disable re-sorting after every change
         self.std_model.clear()
         self.refresh_headers()
@@ -188,7 +190,7 @@ class MessageList(MyTreeView):
 
                 # create item
                 labels = [height, is_from, message_txt]
-                asset_item = [QStandardItem(e) for e in labels]
+                asset_item = [QStandardItem(str(e)) for e in labels]    # added str() because Qt was generating errors about it being an int
                 # align text and set fonts
                 for i, item in enumerate(asset_item):
                     item.setTextAlignment(Qt.AlignVCenter)

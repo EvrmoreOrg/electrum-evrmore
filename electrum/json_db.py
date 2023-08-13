@@ -174,7 +174,7 @@ class JsonDB(Logger):
         return json.dumps(
             self.data,
             indent=4 if human_readable else None,
-            sort_keys=bool(human_readable),
+            #sort_keys=bool(human_readable),    # generating errors because the height for messages is an int; gotta fix that
             cls=JsonDBJsonEncoder,
         )
 

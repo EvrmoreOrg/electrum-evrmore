@@ -112,7 +112,7 @@ class EvrmoreMainnet(AbstractNet):
     ADDRTYPE_P2PKH = 33
     ADDRTYPE_P2SH = 92
     ADDRTYPE_P2SH_ALT = 92
-    MATURE = 100
+    MATURE = 60             # max fork reorg depth
     SEGWIT_HRP = ""
     BOLT11_HRP = SEGWIT_HRP
     GENESIS = "0000007b11d0481b2420a7c656ef76775d54ab5b29ee7ea250bc768535693b05"
@@ -179,7 +179,7 @@ class EvrmoreTestnet(AbstractNet):
     ADDRTYPE_P2PKH = 111
     ADDRTYPE_P2SH = 196
     ADDRTYPE_P2SH_ALT = 196
-    MATURE = 100
+    MATURE = 60             # max fork reorg depth
     SEGWIT_HRP = ""
     BOLT11_HRP = SEGWIT_HRP
     GENESIS = "00000044bc03f8460e64bc07b080f4929b1cb96fda46b8bd806e57bfb9db82f4"

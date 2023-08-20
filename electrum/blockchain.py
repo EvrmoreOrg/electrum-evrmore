@@ -54,23 +54,23 @@ DGW_PASTBLOCKS = 180
 if constants.net.TESTNET:
     EvrhashActivationTS = 2524629600         # the begin of the year 2050
     EvrhashActivationHeight = 14289094       # ((2524629600 - 1685566886)/60) + 304716
-    nDGWActivationBlock = 1
+    nDGWActivationBlock = 0
 else:
-    EvrhashActivationTS = 1667228619         # 1 sec before block 1
-    EvrhashActivationHeight = 1
-    nDGWActivationBlock = 1
+    EvrhashActivationTS = 1667072172 - 1     # 1 sec before block 0
+    EvrhashActivationHeight = 0
+    nDGWActivationBlock = 0
 
 
 def set_constants():
     global EvrhashActivationTS, EvrhashActivationHeight, nDGWActivationBlock
     if constants.net.TESTNET:
-        EvrhashActivationTS = 2524629600
-        EvrhashActivationHeight = 14289094
-        nDGWActivationBlock = 1
+        EvrhashActivationTS = 2524629600         # the begin of the year 2050
+        EvrhashActivationHeight = 14289094       # ((2524629600 - 1685566886)/60) + 304716
+        nDGWActivationBlock = 0
     else:
-        EvrhashActivationTS = 1667228619
-        EvrhashActivationHeight = 1
-        nDGWActivationBlock = 1
+        EvrhashActivationTS = 1667072172 - 1     # 1 sec before block 0
+        EvrhashActivationHeight = 0
+        nDGWActivationBlock = 0
 
 
 class MissingHeader(Exception):
@@ -422,8 +422,15 @@ class Blockchain(Logger):
             header = deserialize_header(raw, s)
             headers[header.get('block_height')] = header
             
-            # Don't bother with the target of headers in the middle of
-            # DGW checkpoints
+            # For header verification we need to know the target
+            # The target used is decided according to the following rules:
+            #   - for testnet, just use 0 and skip header verification
+            #   - for mainnet, if the block is a dgw_checkpoint, get the target from the dgw_checkpoint file
+            #   - if the block is between 2 dgw_checkpoints, then just trust and use the target given in the submitted header
+            #   - if the block height is after the last dgw_checkpoint, then calculate the target 
+            #         using _target_dgwv3() - a sliding 180-block moving avg with a 3x max increase
+
+            # Don't bother with the target of headers in the middle of DGW checkpoints
             target = 0
             if constants.net.DGW_CHECKPOINTS_START <= s <= constants.net.max_dgw_checkpoint() + 2016:
                 if self.is_dgw_height_checkpoint(s) is not None:
@@ -682,15 +689,7 @@ class Blockchain(Logger):
 
         if constants.net.TESTNET:
             return 0
-        # Before we switched to Dark Wave Gravity Difficulty,
-        # We used bitcoin's method of calculating difficulty.
-        # The bits of each block (the difficulty) was the same for
-        # The entire 2016 block checkpoint. Note that the last block hash to target
-        # pairing in checkpoints.json
-        # "000000000000f0bf1b393ef1dbbf23421eba2ad09de6315dcfaabe106fcf9e7a",
-        # 2716428330192056873911465544471964056901126523302699863524769792
-        # is technically incorrect but necessary due to DGW activating
-        # in the middle of that chunk.
+        # bitcoin-style target changes once every 2016 blocks (EVR never worked this way)
         elif height < nDGWActivationBlock:
             h, t = self.checkpoints[height // 2016]
             return t
@@ -698,9 +697,6 @@ class Blockchain(Logger):
             index = height // constants.net.DGW_CHECKPOINTS_SPACING - constants.net.DGW_CHECKPOINTS_START // constants.net.DGW_CHECKPOINTS_SPACING
             h, t = self.dgw_checkpoints[index][dgw_height_checkpoint]
             return t
-        # There was a difficulty reset for evrhash
-        #elif not constants.net.TESTNET and height in range(1219736, 1219736 + 180):  # evrhash reset
-        #    return EVRHASH_LIMIT
         # If we have a DWG header already saved to our header cache (i.e. for a reorg), get that
         elif height <= self.height():
             return self.bits_to_target(self.read_header(height)['bits'])

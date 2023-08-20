@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
 ################################## transactions
 
-COINBASE_MATURITY = 100
+COINBASE_MATURITY = 100            # temp freeze on miner rewards
 COIN = 100000000
 TOTAL_COIN_SUPPLY_LIMIT_IN_BTC = 21_000_000_000
 
